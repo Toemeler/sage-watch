@@ -62,9 +62,11 @@ struct NextView: View {
                     Text("wake \(Plan.fmt(Plan.dayClock(entry.window.predicted)))").foregroundStyle(.secondary)
                 }
             }
+        #if os(watchOS)
         case .accessoryCorner:
             Image(systemName: entry.sleepBlock == .nap ? "powersleep" : "moon")
                 .widgetLabel { Text(asleep ? "wake \(Plan.fmt(Plan.dayClock(entry.window.predicted)))" : "\(title) in \(countdown)") }
+        #endif
         default:
             Text(asleep ? "Wake \(Plan.fmt(Plan.dayClock(entry.window.predicted)))" : "\(title) in \(countdown)")
         }
@@ -78,7 +80,9 @@ struct SageNext: Widget {
         }
         .configurationDisplayName("Sage · next")
         .description("Countdown to the nap or the night, and the smart-wake window while you sleep.")
+        #if os(watchOS)
         .supportedFamilies([.accessoryCircular, .accessoryRectangular, .accessoryCorner, .accessoryInline])
+        #endif
     }
 }
 
