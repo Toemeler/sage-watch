@@ -1,0 +1,75 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)
+          echo "Using $XC"; sudo xcode-select -s "$XC"; xcodebuild -version
+
+      - name: Install tools
+        run: brew install xcodegen ldid
+
+      - name: Generate project
+        run: xcodegen generate
+
+      - name: Unit tests (iPhone simulator)
+        run: |
+          set -o pipefail
+          SIM=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')))")
+          xcodebuild test -project Sage.xcodeproj -scheme Sage -destination "id=$SIM" \
+            -derivedDataPath build-test CODE_SIGNING_ALLOWED=NO | xcbeautify
+
+      - name: Build iPhone app with embedded watch app (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild -project Sage.xcodeproj -scheme Sage -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | xcbeautify
+
+      - name: Package IPA (entitlements via ldid, re-signed by SideStore on install)
+        run: |
+          set -e
+          APP=build/Build/Products/Release-iphoneos/Sage.app
+          test -d "$APP"
+          WATCH="$APP/Watch/SageWatch.app"
+          if [ -d "$WATCH" ]; then ldid -SWatch/SageWatch.entitlements "$WATCH/SageWatch"; echo "watch app embedded"; else echo "::error::watch app not embedded"; exit 1; fi
+          ldid -SiOS/Sage.entitlements "$APP/Sage"
+          mkdir -p out/Payload && cp -R "$APP" out/Payload/
+          (cd out && zip -qry Sage.ipa Payload)
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sage-ipa
+          path: out/Sage.ipa
+
+      - name: Publish release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(grep MARKETING_VERSION project.yml | head -1 | sed -E 's/.*"(.*)".*/\1/')
+          TAG="v${VER}-build.${{ github.run_number }}"
+          PRE="--prerelease"
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then TAG="${GITHUB_REF#refs/tags/}"; PRE=""; fi
+          gh release create "$TAG" out/Sage.ipa --title "Sage $TAG" $PRE --notes-file RELEASE_NOTES.md

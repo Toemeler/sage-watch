@@ -1,0 +1,83 @@
+name: Sage
+options:
+  bundleIdPrefix: dev.sage
+  deploymentTarget:
+    iOS: "17.0"
+    watchOS: "10.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # unsigned build: the IPA is re-signed on install (Sideloadly / AltStore with a free Apple ID)
+    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGNING_REQUIRED: NO
+    CODE_SIGN_IDENTITY: ""
+    DEVELOPMENT_TEAM: ""
+targets:
+  Sage:
+    type: application
+    platform: iOS
+    sources:
+      - path: iOS
+      - path: Shared
+      - path: Resources
+    info:
+      path: iOS/Info.plist
+      properties:
+        CFBundleDisplayName: Sage
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UIAppFonts: [PlayfairDisplay-Regular.ttf, PlayfairDisplay-Italic.ttf]
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIUserInterfaceStyle: Dark
+        NSHealthShareUsageDescription: Sage shows your steps, heart rate and sleep on the watch face and in the app. Nothing leaves your devices.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.sage.companion
+        TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - target: SageWatch
+  SageWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: Watch
+      - path: Shared
+      - path: Resources
+    info:
+      path: Watch/Info.plist
+      properties:
+        CFBundleDisplayName: Sage
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        WKApplication: true
+        WKCompanionAppBundleIdentifier: dev.sage.companion
+        UIAppFonts: [PlayfairDisplay-Regular.ttf, PlayfairDisplay-Italic.ttf]
+        NSHealthShareUsageDescription: Sage shows your steps and heart rate on the face. Nothing leaves your devices.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.sage.companion.watchkitapp
+        TARGETED_DEVICE_FAMILY: "4"
+  SageTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: Sage
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.sage.companion.tests
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Sage.app/Sage
+        BUNDLE_LOADER: $(TEST_HOST)
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Sage:
+    build:
+      targets:
+        Sage: all
+    test:
+      targets: [SageTests]
+      gatherCoverageData: true
