@@ -80,11 +80,11 @@ enum Plan {
         return Double(c.hour! * 60 + c.minute!) + Double(c.second!) / 60
     }
     /// times before 12:00 count as "after midnight" of the night block (24+)
-    static func nightClock(_ d: Date) -> Double { let m = dayClock(d); return m < 720 ? m + 1440 : m }
-    static func inNap(_ d: Date) -> Bool { let m = dayClock(d); return m >= nap.onset && m < nap.wake }
-    static func afterNap(_ d: Date) -> Bool { let m = dayClock(d); return m >= nap.wake && m < nap.wake + 30 }
-    static func inNight(_ d: Date) -> Bool { let m = nightClock(d); return m >= night.onset && m < night.wake }
-    static func napLeftSeconds(_ d: Date) -> Double { max(0, (nap.wake - dayClock(d)) * 60) }
+    static func nightClock(_ d: Date, _ cal: Calendar = .current) -> Double { let m = dayClock(d, cal); return m < 720 ? m + 1440 : m }
+    static func inNap(_ d: Date, _ cal: Calendar = .current) -> Bool { let m = dayClock(d, cal); return m >= nap.onset && m < nap.wake }
+    static func afterNap(_ d: Date, _ cal: Calendar = .current) -> Bool { let m = dayClock(d, cal); return m >= nap.wake && m < nap.wake + 30 }
+    static func inNight(_ d: Date, _ cal: Calendar = .current) -> Bool { let m = nightClock(d, cal); return m >= night.onset && m < night.wake }
+    static func napLeftSeconds(_ d: Date, _ cal: Calendar = .current) -> Double { max(0, (nap.wake - dayClock(d, cal)) * 60) }
     static var totalSleep: Double { night.minutes + nap.minutes }
 }
 
@@ -95,12 +95,12 @@ enum FaceMode: String, CaseIterable {
     static func auto(_ d: Date, _ cal: Calendar = .current) -> FaceMode {
         let wd = cal.component(.weekday, from: d)          // 1 = Sunday ... 7 = Saturday
         let weekend = wd == 1 || wd == 7
-        let night = Plan.nightClock(d), day = Plan.dayClock(d), h = day / 60
-        if Plan.inNight(d) { return .sleeping }
+        let night = Plan.nightClock(d, cal), day = Plan.dayClock(d, cal), h = day / 60
+        if Plan.inNight(d, cal) { return .sleeping }
         if night >= 1440 && night < Plan.night.onset { return .evening }            // 00:00-00:30 is still the wind-down
         if night >= Plan.night.wake && night < 1440 + 9.5 * 60 { return .morning }
-        if Plan.inNap(d) { return .nap }
-        if Plan.afterNap(d) { return .afterNap }
+        if Plan.inNap(d, cal) { return .nap }
+        if Plan.afterNap(d, cal) { return .afterNap }
         if day >= Plan.nap.wake { return .evening }
         if weekend { return .weekend }
         if h >= 11.75 && h < 13.25 { return .lunch }
@@ -114,10 +114,10 @@ enum FaceMode: String, CaseIterable {
             let left = Int(Plan.nap.onset - Plan.dayClock(d, cal))
             let wd = cal.component(.weekday, from: d)
             if wd != 1 && wd != 7 && left > 0 && left <= 120 { return String(format: "NAP IN %dH %02dM", left / 60, left % 60) }
-            let f = DateFormatter(); f.locale = Locale(identifier: "en_US"); f.dateFormat = "MMMM"
+            let f = DateFormatter(); f.locale = Locale(identifier: "en_US"); f.timeZone = cal.timeZone; f.dateFormat = "MMMM"
             return f.string(from: d).uppercased()
         case .evening:
-            let left = Int(Plan.night.onset - Plan.nightClock(d))
+            let left = Int(Plan.night.onset - Plan.nightClock(d, cal))
             return left > 0 && left <= 180 ? String(format: "SLEEP IN %dH %02dM", left / 60, left % 60) : "GOOD EVENING"
         case .morning: return "NIGHT \(Self.hm(Plan.night.minutes)) · TOTAL \(Self.hm(Plan.totalSleep))"
         case .lunch: return "LUNCH BREAK"
