@@ -25,6 +25,7 @@ enum FaceRenderer {
         ctx.fill(Path(src), with: .color(.black))
         if !state.dimmed { drawDial(&ctx) }
         drawTrack(&ctx, dimmed: state.dimmed)
+        if !state.dimmed { drawRunner(&ctx, state.date) }
         drawIndices(&ctx, dimmed: state.dimmed)
         if !state.dimmed { drawNumerals(&ctx) }
         if !state.dimmed { drawDate(&ctx, state.date) }
@@ -122,23 +123,41 @@ enum FaceRenderer {
     // MARK: time
 
     private static func drawTime(_ ctx: inout GraphicsContext, _ d: Date, dimmed: Bool) {
-        let c = Calendar.current.dateComponents([.hour, .minute], from: d)
-        let h = c.hour ?? 0, m = c.minute ?? 0
-        let digits: [(Int, GlyphSet, FaceGeometry.Slot?, Color)] = [
-            (h / 10, Glyphs.regular, FaceGeometry.hourSlots.first, P.ivory),
-            (h % 10, Glyphs.regular, FaceGeometry.hourSlots.last, P.ivory),
-            (m / 10, Glyphs.italic, FaceGeometry.minuteSlots.first, P.sage),
-            (m % 10, Glyphs.italic, FaceGeometry.minuteSlots.last, P.sage)
+        let cal = Calendar.current
+        let c = cal.dateComponents([.hour, .minute, .second, .nanosecond], from: d)
+        let o = cal.dateComponents([.hour, .minute], from: d.addingTimeInterval(-60))
+        let h = c.hour ?? 0, m = c.minute ?? 0, ph = o.hour ?? 0, pm = o.minute ?? 0
+        // digits that changed this minute morph during the first 0.75 s, with the escapement overshoot
+        let sec = Double(c.second ?? 0) + Double(c.nanosecond ?? 0) / 1e9
+        let t = dimmed ? 1 : GlyphMorph.escape(sec / 0.75)
+        let digits: [(Int, Int, GlyphSet, FaceGeometry.Slot?, Color)] = [
+            (h / 10, ph / 10, Glyphs.regular, FaceGeometry.hourSlots.first, P.ivory),
+            (h % 10, ph % 10, Glyphs.regular, FaceGeometry.hourSlots.last, P.ivory),
+            (m / 10, pm / 10, Glyphs.italic, FaceGeometry.minuteSlots.first, P.sage),
+            (m % 10, pm % 10, Glyphs.italic, FaceGeometry.minuteSlots.last, P.sage)
         ]
-        for (n, set, slot, col) in digits {
+        for (n, prev, set, slot, col) in digits {
             guard let slot, let g = set.digits[n] else { continue }
-            let t = CGAffineTransform(translationX: slot.x, y: slot.base).scaledBy(x: slot.scaleX, y: -slot.scaleY)
-            let path = g.path.applying(t)
+            let xf = CGAffineTransform(translationX: slot.x, y: slot.base).scaledBy(x: slot.scaleX, y: -slot.scaleY)
+            let shape = (t < 1 && prev != n) ? GlyphMorph.path(GlyphMorph.pairs(set, from: prev, to: n), t) : g.path
+            let path = shape.applying(xf)
             if !dimmed {   // two offset dark copies stand in for a soft shadow (cheap on the watch GPU)
                 ctx.fill(path.applying(CGAffineTransform(translationX: 3, y: 5)), with: .color(.black.opacity(0.35)))
                 ctx.fill(path.applying(CGAffineTransform(translationX: 1.5, y: 2.5)), with: .color(.black.opacity(0.45)))
             }
             ctx.fill(path, with: .color(dimmed ? col.opacity(0.7) : col))
+        }
+    }
+
+    /// seconds runner: a bright tick travels the railway track five beats a second, trailing a fading wake
+    private static func drawRunner(_ ctx: inout GraphicsContext, _ d: Date) {
+        let c = Calendar.current.dateComponents([.second, .nanosecond], from: d)
+        let sec = Double(c.second ?? 0) + Double(c.nanosecond ?? 0) / 1e9
+        let head = Int(sec * 5) % 300, ticks = FaceGeometry.ticks
+        for k in 0..<14 {
+            let i = (head - k + 300) % 300, (p, n) = ticks[i], len = i % 5 == 0 ? 28.0 : 9.0
+            var line = Path(); line.move(to: p); line.addLine(to: CGPoint(x: p.x - n.dx * len, y: p.y - n.dy * len))
+            ctx.stroke(line, with: .color(Color(hex: 0xDDEBD2).opacity(0.9 * pow(1 - Double(k) / 14, 1.6))), lineWidth: i % 5 == 0 ? 2.2 : 1.6)
         }
     }
 

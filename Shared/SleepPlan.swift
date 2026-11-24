@@ -131,3 +131,44 @@ enum FaceMode: String, CaseIterable {
     }
     static func hm(_ m: Double) -> String { let v = Int(m); return "\(v / 60)H \(String(format: "%02d", v % 60))M" }
 }
+
+// MARK: - calendar: concrete windows and events
+
+extension Plan {
+    enum Block: String { case nap, night }
+
+    /// a concrete smart-wake window on the calendar
+    struct WakeWindow: Equatable {
+        let block: Block
+        let start: Date        // window opens: the watch starts listening for light sleep
+        let end: Date          // latest wake (the alarm)
+        let predicted: Date    // the model's smart-wake minute
+    }
+
+    /// `minutes` after midnight of the day `dayOffset` days from `now`'s day (night minutes are 24+ of the evening's day)
+    private static func date(_ now: Date, _ dayOffset: Int, _ minutes: Double, _ cal: Calendar) -> Date {
+        let day = cal.date(byAdding: .day, value: dayOffset, to: cal.startOfDay(for: now))!
+        return cal.date(byAdding: .second, value: Int((minutes * 60).rounded()), to: day)!
+    }
+
+    /// the next smart-wake window that has not ended yet (it may already be open)
+    static func nextWakeWindow(after now: Date, _ cal: Calendar = .current) -> WakeWindow {
+        var all: [WakeWindow] = []
+        for off in -1...1 {
+            all.append(WakeWindow(block: .nap, start: date(now, off, nap.windowStart, cal), end: date(now, off, nap.end, cal), predicted: date(now, off, nap.wake, cal)))
+            all.append(WakeWindow(block: .night, start: date(now, off, night.windowStart, cal), end: date(now, off, night.end, cal), predicted: date(now, off, night.wake, cal)))
+        }
+        return all.filter { $0.end > now }.min { $0.start < $1.start }!
+    }
+
+    /// the next time a sleep block begins
+    static func nextSleep(after now: Date, _ cal: Calendar = .current) -> (block: Block, at: Date) {
+        var all: [(Block, Date)] = []
+        for off in -1...1 {
+            all.append((.nap, date(now, off, nap.onset, cal)))
+            all.append((.night, date(now, off, night.onset, cal)))
+        }
+        let next = all.filter { $0.1 > now }.min { $0.1 < $1.1 }!
+        return (next.0, next.1)
+    }
+}

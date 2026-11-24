@@ -8,7 +8,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "0.2.0"
     CURRENT_PROJECT_VERSION: "1"
     # unsigned build: the IPA is re-signed on install (Sideloadly / AltStore with a free Apple ID)
     CODE_SIGNING_ALLOWED: NO
@@ -57,10 +57,33 @@ targets:
         WKCompanionAppBundleIdentifier: dev.sage.companion
         UIAppFonts: [PlayfairDisplay-Regular.ttf, PlayfairDisplay-Italic.ttf]
         NSHealthShareUsageDescription: Sage shows your steps and heart rate on the face. Nothing leaves your devices.
+        NSMotionUsageDescription: The smart alarm feels for light sleep through wrist movement during the wake window. Nothing is stored.
+        WKBackgroundModes: [smart-alarm]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.sage.companion.watchkitapp
         TARGETED_DEVICE_FAMILY: "4"
+    dependencies:
+      - target: SageComplications
+  SageComplications:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: Complications
+      - path: Shared/SleepPlan.swift
+    info:
+      path: Complications/Info.plist
+      properties:
+        CFBundleDisplayName: Sage
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.sage.companion.watchkitapp.complications
+        TARGETED_DEVICE_FAMILY: "4"
+        SKIP_INSTALL: YES
   SageTests:
     type: bundle.unit-test
     platform: iOS

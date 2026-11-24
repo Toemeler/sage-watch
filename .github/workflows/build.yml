@@ -53,6 +53,7 @@ jobs:
           test -d "$APP"
           WATCH="$APP/Watch/SageWatch.app"
           if [ -d "$WATCH" ]; then ldid -SWatch/SageWatch.entitlements "$WATCH/SageWatch"; echo "watch app embedded"; else echo "::error::watch app not embedded"; exit 1; fi
+          test -d "$WATCH/PlugIns/SageComplications.appex" && echo "complications embedded" || { echo "::error::complications not embedded"; ls -R "$WATCH" | head -40; exit 1; }
           ldid -SiOS/Sage.entitlements "$APP/Sage"
           mkdir -p out/Payload && cp -R "$APP" out/Payload/
           (cd out && zip -qry Sage.ipa Payload)

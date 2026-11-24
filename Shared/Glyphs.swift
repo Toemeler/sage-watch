@@ -10,7 +10,8 @@ struct Glyph {
 final class GlyphSet {
     let unitsPerEm: Double
     let digits: [Int: Glyph]
-    init(unitsPerEm: Double, digits: [Int: Glyph]) { self.unitsPerEm = unitsPerEm; self.digits = digits }
+    let sources: [Int: String]     // raw path data, for morphing
+    init(unitsPerEm: Double, digits: [Int: Glyph], sources: [Int: String] = [:]) { self.unitsPerEm = unitsPerEm; self.digits = digits; self.sources = sources }
 }
 
 enum Glyphs {
@@ -29,9 +30,9 @@ enum Glyphs {
 
     private static func load(_ key: String) -> GlyphSet {
         guard let raw = file[key] else { return GlyphSet(unitsPerEm: 1000, digits: [:]) }
-        var out: [Int: Glyph] = [:]
-        for (k, v) in raw.digits { if let n = Int(k) { out[n] = Glyph(path: SVGPath.parse(v.d), advance: v.adv) } }
-        return GlyphSet(unitsPerEm: raw.upm, digits: out)
+        var out: [Int: Glyph] = [:], src: [Int: String] = [:]
+        for (k, v) in raw.digits { if let n = Int(k) { out[n] = Glyph(path: SVGPath.parse(v.d), advance: v.adv); src[n] = v.d } }
+        return GlyphSet(unitsPerEm: raw.upm, digits: out, sources: src)
     }
 }
 

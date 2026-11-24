@@ -91,3 +91,65 @@ final class GlyphTests: XCTestCase {
         XCTAssertEqual(FaceGeometry.minuteSlots.count, 2)
     }
 }
+
+final class CalendarWindowTests: XCTestCase {
+    private let cal: Calendar = { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "Europe/Zurich")!; return c }()
+    private func at(_ d: Int, _ h: Int, _ m: Int) -> Date { cal.date(from: DateComponents(year: 2026, month: 11, day: d, hour: h, minute: m))! }
+    private func hm(_ date: Date) -> String { let c = cal.dateComponents([.day, .hour, .minute], from: date); return String(format: "%d %02d:%02d", c.day!, c.hour!, c.minute!) }
+
+    func testAfternoonPointsAtTheNapWindow() {
+        let w = Plan.nextWakeWindow(after: at(24, 15, 10), cal)
+        XCTAssertEqual(w.block, .nap)
+        XCTAssertEqual(hm(w.start), "24 18:15"); XCTAssertEqual(hm(w.end), "24 18:30"); XCTAssertEqual(hm(w.predicted), "24 18:25")
+    }
+
+    func testEveningPointsAtTomorrowMorning() {
+        let w = Plan.nextWakeWindow(after: at(24, 19, 0), cal)
+        XCTAssertEqual(w.block, .night)
+        XCTAssertEqual(hm(w.start), "25 06:00"); XCTAssertEqual(hm(w.end), "25 06:30"); XCTAssertEqual(hm(w.predicted), "25 06:21")
+    }
+
+    func testDuringTheNightPointsAtThisMorning() {
+        XCTAssertEqual(hm(Plan.nextWakeWindow(after: at(25, 2, 0), cal).start), "25 06:00")
+    }
+
+    func testOpenWindowIsStillTheNextOne() {
+        XCTAssertEqual(hm(Plan.nextWakeWindow(after: at(25, 6, 10), cal).end), "25 06:30")
+    }
+
+    func testAfterTheMorningAlarmPointsAtTheNap() {
+        XCTAssertEqual(hm(Plan.nextWakeWindow(after: at(25, 6, 31), cal).start), "25 18:15")
+    }
+
+    func testNextSleep() {
+        let a = Plan.nextSleep(after: at(24, 15, 10), cal); XCTAssertEqual(a.block, .nap); XCTAssertEqual(hm(a.at), "24 17:00")
+        let b = Plan.nextSleep(after: at(24, 19, 0), cal); XCTAssertEqual(b.block, .night); XCTAssertEqual(hm(b.at), "25 00:30")
+    }
+}
+
+final class MorphTests: XCTestCase {
+    func testEveryDigitPairMorphsWithMatchingPointCounts() {
+        for set in [Glyphs.regular, Glyphs.italic] {
+            for a in 0...9 {
+                let b = (a + 1) % 10
+                let pairs = GlyphMorph.pairs(set, from: a, to: b)
+                XCTAssertFalse(pairs.isEmpty, "\(a)->\(b)")
+                for (p, q) in pairs { XCTAssertEqual(p.count, GlyphMorph.samples); XCTAssertEqual(q.count, GlyphMorph.samples) }
+            }
+        }
+    }
+
+    func testMorphEndpointsMatchTheGlyphs() {
+        let pairs = GlyphMorph.pairs(Glyphs.regular, from: 1, to: 8)
+        let start = GlyphMorph.path(pairs, 0).boundingRect, end = GlyphMorph.path(pairs, 1).boundingRect
+        let one = Glyphs.regular.digits[1]!.path.boundingRect, eight = Glyphs.regular.digits[8]!.path.boundingRect
+        XCTAssertEqual(start.midX, one.midX, accuracy: 25); XCTAssertEqual(end.midX, eight.midX, accuracy: 25)
+        XCTAssertEqual(end.height, eight.height, accuracy: 25)
+    }
+
+    func testEscapementSettlesAtOne() {
+        XCTAssertEqual(GlyphMorph.escape(0), 0, accuracy: 1e-9)
+        XCTAssertEqual(GlyphMorph.escape(1), 1)
+        XCTAssertGreaterThan((0...100).map { GlyphMorph.escape(Double($0) / 100) }.max()!, 1)   // overshoot
+    }
+}
