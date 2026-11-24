@@ -141,7 +141,7 @@ struct DayRing: View {
             var p = Path(); p.addArc(center: c, radius: r, startAngle: ang(a), endAngle: ang(b > a ? b : b + 1440), clockwise: false); return p
         }
         for h in 0..<24 {
-            let a = ang(Double(h) * 60).radians, r1 = R + w * 0.9, r2 = R + w * (h % 6 == 0 ? 1.9 : 1.35)
+            let a = CGFloat(ang(Double(h) * 60).radians), r1 = R + w * 0.9, r2 = R + w * (h % 6 == 0 ? 1.9 : 1.35)
             var t = Path()
             t.move(to: CGPoint(x: c.x + cos(a) * r1, y: c.y + sin(a) * r1)); t.addLine(to: CGPoint(x: c.x + cos(a) * r2, y: c.y + sin(a) * r2))
             ctx.stroke(t, with: .color(h % 6 == 0 ? Theme.muted : Theme.hair), lineWidth: h % 6 == 0 ? 1.6 : 1)
@@ -157,10 +157,10 @@ struct DayRing: View {
         let nowM = Plan.dayClock(now)
         if nowM > nWake { ctx.stroke(arc(nWake, nowM, r: R - w * 1.05), with: .color(Theme.ivory.opacity(0.5)), lineWidth: w * 0.25) }
         for (m, t) in [((nOn + nWake) / 2, "night"), ((Plan.nap.onset + Plan.nap.wake) / 2, "nap")] {
-            let a = ang(m).radians
+            let a = CGFloat(ang(m).radians)
             ctx.draw(Text(t).font(.system(size: S * 0.036)).foregroundColor(Theme.sage), at: CGPoint(x: c.x + cos(a) * (R - w * 2.5), y: c.y + sin(a) * (R - w * 2.5)))
         }
-        let a = ang(nowM).radians, p = CGPoint(x: c.x + cos(a) * R, y: c.y + sin(a) * R)
+        let a = CGFloat(ang(nowM).radians), p = CGPoint(x: c.x + cos(a) * R, y: c.y + sin(a) * R)
         let dot = Path(ellipseIn: CGRect(x: p.x - w * 1.05, y: p.y - w * 1.05, width: w * 2.1, height: w * 2.1))
         ctx.fill(dot, with: .color(.black)); ctx.stroke(dot, with: .color(Theme.ivory), lineWidth: w * 0.35)
         let hhmm = Plan.fmt(nowM)
