@@ -39,14 +39,23 @@ enum GlyphMorph {
                 p = CGPoint(x: p.x, y: rel ? p.y + y : y); cur.append(p)
             case "Q":
                 guard let c = pt(), let q = pt() else { flush(); return out }
-                for i in 1...8 { let t = Double(i) / 8, u = 1 - t
-                    cur.append(CGPoint(x: u * u * p.x + 2 * u * t * c.x + t * t * q.x, y: u * u * p.y + 2 * u * t * c.y + t * t * q.y)) }
+                for i in 1...8 {
+                    let t: Double = Double(i) / 8, u: Double = 1 - t
+                    let w0: Double = u * u, w1: Double = 2 * u * t, w2: Double = t * t
+                    let x: Double = w0 * Double(p.x) + w1 * Double(c.x) + w2 * Double(q.x)
+                    let y: Double = w0 * Double(p.y) + w1 * Double(c.y) + w2 * Double(q.y)
+                    cur.append(CGPoint(x: x, y: y))
+                }
                 p = q
             case "C":
                 guard let c1 = pt(), let c2 = pt(), let q = pt() else { flush(); return out }
-                for i in 1...12 { let t = Double(i) / 12, u = 1 - t
-                    let a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, e = t * t * t
-                    cur.append(CGPoint(x: a * p.x + b * c1.x + c * c2.x + e * q.x, y: a * p.y + b * c1.y + c * c2.y + e * q.y)) }
+                for i in 1...12 {
+                    let t: Double = Double(i) / 12, u: Double = 1 - t
+                    let w0: Double = u * u * u, w1: Double = 3 * u * u * t, w2: Double = 3 * u * t * t, w3: Double = t * t * t
+                    let x: Double = w0 * Double(p.x) + w1 * Double(c1.x) + w2 * Double(c2.x) + w3 * Double(q.x)
+                    let y: Double = w0 * Double(p.y) + w1 * Double(c1.y) + w2 * Double(c2.y) + w3 * Double(q.y)
+                    cur.append(CGPoint(x: x, y: y))
+                }
                 p = q
             case "Z":
                 flush()
@@ -70,8 +79,12 @@ enum GlyphMorph {
         for k in 0..<n {
             let s = total * Double(k) / Double(n)
             while j < cum.count - 1 && cum[j] < s { j += 1 }
-            let seg = cum[j] - cum[j - 1], t = seg > 0 ? (s - cum[j - 1]) / seg : 0
-            out.append(CGPoint(x: pts[j - 1].x + (pts[j].x - pts[j - 1].x) * t, y: pts[j - 1].y + (pts[j].y - pts[j - 1].y) * t))
+            let seg: Double = cum[j] - cum[j - 1]
+            let t: Double = seg > 0 ? (s - cum[j - 1]) / seg : 0
+            let a = pts[j - 1], b = pts[j]
+            let x: Double = Double(a.x) + (Double(b.x) - Double(a.x)) * t
+            let y: Double = Double(a.y) + (Double(b.y) - Double(a.y)) * t
+            out.append(CGPoint(x: x, y: y))
         }
         return out
     }
@@ -129,7 +142,9 @@ enum GlyphMorph {
         var p = Path()
         for (a, b) in pairs {
             for i in 0..<a.count {
-                let q = CGPoint(x: a[i].x + (b[i].x - a[i].x) * t, y: a[i].y + (b[i].y - a[i].y) * t)
+                let x: Double = Double(a[i].x) + (Double(b[i].x) - Double(a[i].x)) * t
+                let y: Double = Double(a[i].y) + (Double(b[i].y) - Double(a[i].y)) * t
+                let q = CGPoint(x: x, y: y)
                 if i == 0 { p.move(to: q) } else { p.addLine(to: q) }
             }
             p.closeSubpath()
