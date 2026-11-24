@@ -129,41 +129,44 @@ struct DayRing: View {
     let now: Date
 
     var body: some View {
-        Canvas { ctx, size in
-            let S = min(size.width, size.height), c = CGPoint(x: size.width / 2, y: size.height / 2)
-            let R = S * 0.4, w = max(3, S * 0.045)
-            func ang(_ m: Double) -> Angle { .degrees(m / 1440 * 360 - 90) }
-            func arc(_ a: Double, _ b: Double, r: Double) -> Path {
-                var p = Path(); p.addArc(center: c, radius: r, startAngle: ang(a), endAngle: ang(b > a ? b : b + 1440), clockwise: false); return p
-            }
-            for h in 0..<24 {
-                let a = ang(Double(h) * 60).radians, r1 = R + w * 0.9, r2 = R + w * (h % 6 == 0 ? 1.9 : 1.35)
-                var t = Path()
-                t.move(to: CGPoint(x: c.x + cos(a) * r1, y: c.y + sin(a) * r1)); t.addLine(to: CGPoint(x: c.x + cos(a) * r2, y: c.y + sin(a) * r2))
-                ctx.stroke(t, with: .color(h % 6 == 0 ? Theme.muted : Theme.hair), lineWidth: h % 6 == 0 ? 1.6 : 1)
-            }
-            ctx.stroke(Path(ellipseIn: CGRect(x: c.x - R, y: c.y - R, width: 2 * R, height: 2 * R)), with: .color(Color(hex: 0x1D201B)), lineWidth: w)
-            ctx.stroke(arc(451, 1008, r: R - w * 1.4), with: .color(Theme.gold.opacity(0.28)), style: StrokeStyle(lineWidth: w * 0.35, lineCap: .round))
-            let nOn = Plan.night.onset - 1440, nWake = Plan.night.wake - 1440
-            ctx.stroke(arc(nOn, nWake, r: R), with: .color(Theme.sage), style: StrokeStyle(lineWidth: w, lineCap: .round))
-            ctx.stroke(arc(Plan.nap.onset, Plan.nap.wake, r: R), with: .color(Theme.sage.opacity(0.75)), style: StrokeStyle(lineWidth: w, lineCap: .round))
-            for (a, b) in [(Plan.night.windowStart - 1440, Plan.night.end - 1440), (Plan.nap.windowStart, Plan.nap.end)] {
-                ctx.stroke(arc(a, b, r: R + w * 0.95), with: .color(Theme.gold), style: StrokeStyle(lineWidth: w * 0.45, lineCap: .round))
-            }
-            let nowM = Plan.dayClock(now)
-            if nowM > nWake { ctx.stroke(arc(nWake, nowM, r: R - w * 1.05), with: .color(Theme.ivory.opacity(0.5)), lineWidth: w * 0.25) }
-            for (m, t) in [((nOn + nWake) / 2, "night"), ((Plan.nap.onset + Plan.nap.wake) / 2, "nap")] {
-                let a = ang(m).radians
-                ctx.draw(Text(t).font(.system(size: S * 0.036)).foregroundColor(Theme.sage), at: CGPoint(x: c.x + cos(a) * (R - w * 2.5), y: c.y + sin(a) * (R - w * 2.5)))
-            }
-            let a = ang(nowM).radians, p = CGPoint(x: c.x + cos(a) * R, y: c.y + sin(a) * R)
-            let dot = Path(ellipseIn: CGRect(x: p.x - w * 1.05, y: p.y - w * 1.05, width: w * 2.1, height: w * 2.1))
-            ctx.fill(dot, with: .color(.black)); ctx.stroke(dot, with: .color(Theme.ivory), lineWidth: w * 0.35)
-            let hhmm = Plan.fmt(nowM)
-            ctx.draw(Text(hhmm).font(Theme.serif(S * 0.17)).foregroundColor(Theme.ivory), at: CGPoint(x: c.x, y: c.y - S * 0.02))
-            ctx.draw(Text(subline(nowM)).font(.system(size: S * 0.036)).kerning(2).foregroundColor(Theme.muted), at: CGPoint(x: c.x, y: c.y + S * 0.09))
-        }
+        Canvas { ctx, size in draw(&ctx, size) }
         .accessibilityLabel(Text("Day ring with night sleep \(Plan.fmt(Plan.night.onset)) to \(Plan.fmt(Plan.night.wake)) and nap \(Plan.fmt(Plan.nap.onset)) to \(Plan.fmt(Plan.nap.wake))"))
+    }
+
+    private func draw(_ ctx: inout GraphicsContext, _ size: CGSize) {
+            let S = min(size.width, size.height), c = CGPoint(x: size.width / 2, y: size.height / 2)
+        let R = S * 0.4, w = max(3, S * 0.045)
+        func ang(_ m: Double) -> Angle { .degrees(m / 1440 * 360 - 90) }
+        func arc(_ a: Double, _ b: Double, r: Double) -> Path {
+            var p = Path(); p.addArc(center: c, radius: r, startAngle: ang(a), endAngle: ang(b > a ? b : b + 1440), clockwise: false); return p
+        }
+        for h in 0..<24 {
+            let a = ang(Double(h) * 60).radians, r1 = R + w * 0.9, r2 = R + w * (h % 6 == 0 ? 1.9 : 1.35)
+            var t = Path()
+            t.move(to: CGPoint(x: c.x + cos(a) * r1, y: c.y + sin(a) * r1)); t.addLine(to: CGPoint(x: c.x + cos(a) * r2, y: c.y + sin(a) * r2))
+            ctx.stroke(t, with: .color(h % 6 == 0 ? Theme.muted : Theme.hair), lineWidth: h % 6 == 0 ? 1.6 : 1)
+        }
+        ctx.stroke(Path(ellipseIn: CGRect(x: c.x - R, y: c.y - R, width: 2 * R, height: 2 * R)), with: .color(Color(hex: 0x1D201B)), lineWidth: w)
+        ctx.stroke(arc(451, 1008, r: R - w * 1.4), with: .color(Theme.gold.opacity(0.28)), style: StrokeStyle(lineWidth: w * 0.35, lineCap: .round))
+        let nOn = Plan.night.onset - 1440, nWake = Plan.night.wake - 1440
+        ctx.stroke(arc(nOn, nWake, r: R), with: .color(Theme.sage), style: StrokeStyle(lineWidth: w, lineCap: .round))
+        ctx.stroke(arc(Plan.nap.onset, Plan.nap.wake, r: R), with: .color(Theme.sage.opacity(0.75)), style: StrokeStyle(lineWidth: w, lineCap: .round))
+        for (a, b) in [(Plan.night.windowStart - 1440, Plan.night.end - 1440), (Plan.nap.windowStart, Plan.nap.end)] {
+            ctx.stroke(arc(a, b, r: R + w * 0.95), with: .color(Theme.gold), style: StrokeStyle(lineWidth: w * 0.45, lineCap: .round))
+        }
+        let nowM = Plan.dayClock(now)
+        if nowM > nWake { ctx.stroke(arc(nWake, nowM, r: R - w * 1.05), with: .color(Theme.ivory.opacity(0.5)), lineWidth: w * 0.25) }
+        for (m, t) in [((nOn + nWake) / 2, "night"), ((Plan.nap.onset + Plan.nap.wake) / 2, "nap")] {
+            let a = ang(m).radians
+            ctx.draw(Text(t).font(.system(size: S * 0.036)).foregroundColor(Theme.sage), at: CGPoint(x: c.x + cos(a) * (R - w * 2.5), y: c.y + sin(a) * (R - w * 2.5)))
+        }
+        let a = ang(nowM).radians, p = CGPoint(x: c.x + cos(a) * R, y: c.y + sin(a) * R)
+        let dot = Path(ellipseIn: CGRect(x: p.x - w * 1.05, y: p.y - w * 1.05, width: w * 2.1, height: w * 2.1))
+        ctx.fill(dot, with: .color(.black)); ctx.stroke(dot, with: .color(Theme.ivory), lineWidth: w * 0.35)
+        let hhmm = Plan.fmt(nowM)
+        ctx.draw(Text(hhmm).font(Theme.serif(S * 0.17)).foregroundColor(Theme.ivory), at: CGPoint(x: c.x, y: c.y - S * 0.02))
+        ctx.draw(Text(subline(nowM)).font(.system(size: S * 0.036)).kerning(2).foregroundColor(Theme.muted), at: CGPoint(x: c.x, y: c.y + S * 0.09))
+        
     }
 
     private func subline(_ m: Double) -> String {
@@ -230,17 +233,17 @@ struct SleepHeader: View {
 
 struct Hypnogram: View {
     let block: SleepBlock
-    var body: some View {
-        Canvas { ctx, size in
+    var body: some View { Canvas { ctx, size in draw(&ctx, size) } }
+
+    private func draw(_ ctx: inout GraphicsContext, _ size: CGSize) {
             let s = block.samples, bw = size.width / CGFloat(max(1, s.count)), base = size.height - 6
-            for (i, st) in s.enumerated() {
-                let h: CGFloat = st.stage == .awake ? 0.12 : st.stage == .rem ? 0.38 : st.stage == .light ? 0.6 : 1
-                let col: Color = st.stage == .awake ? Color(hex: 0xC98F7A) : st.stage == .rem ? Theme.rem : st.stage == .deep ? Color(hex: 0xCFE0C4) : Theme.sage
-                ctx.fill(Path(roundedRect: CGRect(x: CGFloat(i) * bw + 0.4, y: base - h * (base - 2), width: max(0.6, bw - 0.8), height: h * (base - 2)), cornerRadius: 1.5), with: .color(col))
-            }
-            let x = (block.windowStart - block.onset) / 4 * bw
-            ctx.fill(Path(CGRect(x: x, y: size.height - 3, width: size.width - x, height: 3)), with: .color(Theme.gold.opacity(0.8)))
+        for (i, st) in s.enumerated() {
+            let h: CGFloat = st.stage == .awake ? 0.12 : st.stage == .rem ? 0.38 : st.stage == .light ? 0.6 : 1
+            let col: Color = st.stage == .awake ? Color(hex: 0xC98F7A) : st.stage == .rem ? Theme.rem : st.stage == .deep ? Color(hex: 0xCFE0C4) : Theme.sage
+            ctx.fill(Path(roundedRect: CGRect(x: CGFloat(i) * bw + 0.4, y: base - h * (base - 2), width: max(0.6, bw - 0.8), height: h * (base - 2)), cornerRadius: 1.5), with: .color(col))
         }
+        let x = (block.windowStart - block.onset) / 4 * bw
+        ctx.fill(Path(CGRect(x: x, y: size.height - 3, width: size.width - x, height: 3)), with: .color(Theme.gold.opacity(0.8)))
     }
 }
 
@@ -288,18 +291,17 @@ struct FacesView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Eyebrow(text: "Watch face")
-                TimelineView(.periodic(from: .now, by: 1)) { tl in
-                    Canvas { ctx, size in
-                        let mode = preview ?? FaceMode.auto(tl.date)
-                        FaceRenderer.draw(&ctx, size: size, state: FaceState(date: tl.date, mode: mode, steps: health.steps, heartRate: health.heartRate))
-                    }
-                }
-                .aspectRatio(696.0 / 830.0, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 44, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 44, style: .continuous).stroke(Color(hex: 0x1D1D1D), lineWidth: 6))
-                .padding(.horizontal, 40)
+                FacePreview(mode: preview).padding(.horizontal, 40)
                 Card {
-                    ForEach(FaceMode.allCases, id: \.self) { m in
+                    ForEach(FaceMode.allCases, id: \.self) { m in modeRow(m) }
+                }
+            }
+            .padding(16)
+        }
+        .background(Theme.bg)
+    }
+
+    private func modeRow(_ m: FaceMode) -> some View {
                         Button { preview = preview == m ? nil : m } label: {
                             HStack {
                                 Text(m.rawValue.capitalized).foregroundStyle(Theme.ivory)
@@ -307,11 +309,25 @@ struct FacesView: View {
                                 if preview == m { Text("PREVIEW").font(.caption2).kerning(1.5).foregroundStyle(Theme.sage) }
                             }.padding(.vertical, 6)
                         }
-                    }
-                }
-            }
-            .padding(16)
+    }
+}
+
+struct FacePreview: View {
+    @EnvironmentObject private var health: HealthStore
+    let mode: FaceMode?
+    private let shape = RoundedRectangle(cornerRadius: 44, style: .continuous)
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { tl in
+            Canvas { ctx, size in draw(&ctx, size, tl.date) }
         }
-        .background(Theme.bg)
+        .aspectRatio(696.0 / 830.0, contentMode: .fit)
+        .clipShape(shape)
+        .overlay(shape.stroke(Color(hex: 0x1D1D1D), lineWidth: 6))
+    }
+
+    private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
+        let state = FaceState(date: date, mode: mode ?? FaceMode.auto(date), steps: health.steps, heartRate: health.heartRate)
+        FaceRenderer.draw(&ctx, size: size, state: state)
     }
 }
