@@ -5,7 +5,9 @@ if b[:4] == bytes.fromhex('cafebabe'):
     n = struct.unpack('>I', b[4:8])[0]
     offs = [struct.unpack('>IIIII', b[8 + 20 * i:28 + 20 * i])[2] for i in range(n)]
 for off in offs:
-    m = b[off:]; ncmds = struct.unpack('<I', m[16:20])[0]; p = 32
+    m = b[off:]; ncmds = struct.unpack('<I', m[16:20])[0]
+    p = 28 if m[:4] == bytes.fromhex('cefaedfe') else 32  # arm64_32 is a 32-bit Mach-O
+    print('slice magic', m[:4].hex())
     for _ in range(ncmds):
         cmd, sz = struct.unpack('<II', m[p:p + 8])
         if cmd == 0x32:
