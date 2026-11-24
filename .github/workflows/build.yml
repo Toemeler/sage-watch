@@ -27,7 +27,7 @@ jobs:
           echo "Using $XC"; sudo xcode-select -s "$XC"; xcodebuild -version
 
       - name: Install tools
-        run: brew install xcodegen ldid
+        run: brew install xcodegen
 
       - name: Generate project
         run: xcodegen generate
@@ -52,11 +52,15 @@ jobs:
           APP=build/Build/Products/Release-iphoneos/Sage.app
           test -d "$APP"
           WATCH="$APP/Watch/SageWatch.app"
-          if [ -d "$WATCH" ]; then ldid -SWatch/SageWatch.entitlements "$WATCH/SageWatch"; echo "watch app embedded"; else echo "::error::watch app not embedded"; exit 1; fi
+          if [ -d "$WATCH" ]; then echo "watch app embedded"; else echo "::error::watch app not embedded"; exit 1; fi
           test -d "$WATCH/PlugIns/SageComplications.appex" && echo "complications embedded" || { echo "::error::complications not embedded"; ls -R "$WATCH" | head -40; exit 1; }
-          ldid -SiOS/Sage.entitlements "$APP/Sage"
-          # guard: the embedded watch app must be a watchOS binary (LC_BUILD_VERSION platform 4), never iOS
           python3 scripts/check_platform.py "$WATCH/SageWatch"
+          lipo -info "$WATCH/SageWatch"
+          # ad-hoc sign inside-out with entitlements (ldid crashes on arm64_32); SideStore re-signs on install
+          codesign -f -s - "$WATCH/PlugIns/SageComplications.appex"
+          codesign -f -s - --entitlements Watch/SageWatch.entitlements "$WATCH"
+          codesign -f -s - --entitlements iOS/Sage.entitlements "$APP"
+          codesign -d --entitlements - "$WATCH" | tail -5
           mkdir -p out/Payload && cp -R "$APP" out/Payload/
           (cd out && zip -qry Sage.ipa Payload)
           ls -la out
