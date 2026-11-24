@@ -70,7 +70,16 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 14) {
                     header(tl.date)
                     DayRing(now: tl.date).frame(height: 260).frame(maxWidth: .infinity)
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    statsGrid
+                }
+                .padding(16)
+            }
+            .background(Theme.bg)
+        }
+    }
+
+    private var statsGrid: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         Card {
                             Eyebrow(text: "Night")
                             Text(hm(Plan.night.minutes)).font(Theme.serif(24)).foregroundStyle(Theme.ivory)
@@ -91,11 +100,6 @@ struct TodayView: View {
                             Text(health.heartRate.map(String.init) ?? "–").font(Theme.serif(24)).foregroundStyle(Theme.ivory)
                             Text(health.available ? "bpm · latest" : "Health not available").font(.caption).foregroundStyle(Theme.muted)
                         }
-                    }
-                }
-                .padding(16)
-            }
-            .background(Theme.bg)
         }
     }
 
@@ -176,28 +180,26 @@ struct SleepView: View {
     @State private var showNap = false
 
     var body: some View {
-        let block = showNap ? Plan.nap : Plan.night
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Picker("Block", selection: $showNap) { Text("Night").tag(false); Text("Nap").tag(true) }.pickerStyle(.segmented)
-                VStack(alignment: .leading, spacing: 2) {
-                    Eyebrow(text: "\(showNap ? "Nap" : "Last night") · \(Plan.fmt(block.onset)) → \(Plan.fmt(block.wake))")
-                    Text(hm(block.minutes)).font(Theme.serif(40)).foregroundStyle(Theme.ivory)
-                    Text("Smart wake at \(Plan.fmt(block.wake)) — light sleep, \(Int(block.end - block.wake)) min before the alarm")
-                        .font(.footnote).foregroundStyle(Theme.muted)
-                }
-                Card { Hypnogram(block: block).frame(height: 96) }
-                let t = totals(block)
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    stat("Deep", t[.deep] ?? 0, Theme.sage)
-                    stat("Light", t[.light] ?? 0, Theme.sageDark)
-                    stat("REM", t[.rem] ?? 0, Theme.rem)
-                    Card { Eyebrow(text: "Cycles"); Text("\(block.nCycles)").font(Theme.serif(22)).foregroundStyle(Theme.ivory) }
-                }
+                SleepHeader(block: showNap ? Plan.nap : Plan.night, isNap: showNap)
+                Card { Hypnogram(block: showNap ? Plan.nap : Plan.night).frame(height: 96) }
+                statsGrid(showNap ? Plan.nap : Plan.night)
             }
             .padding(16)
         }
         .background(Theme.bg)
+    }
+
+    private func statsGrid(_ block: SleepBlock) -> some View {
+        let t = totals(block)
+        return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            stat("Deep", t[.deep] ?? 0, Theme.sage)
+            stat("Light", t[.light] ?? 0, Theme.sageDark)
+            stat("REM", t[.rem] ?? 0, Theme.rem)
+            Card { Eyebrow(text: "Cycles"); Text("\(block.nCycles)").font(Theme.serif(22)).foregroundStyle(Theme.ivory) }
+        }
     }
 
     private func totals(_ b: SleepBlock) -> [Stage: Double] {
@@ -207,6 +209,21 @@ struct SleepView: View {
         Card {
             HStack { Eyebrow(text: name); Spacer(); Circle().fill(col).frame(width: 6, height: 6) }
             Text(hm(minutes)).font(Theme.serif(22)).foregroundStyle(Theme.ivory)
+        }
+    }
+}
+
+struct SleepHeader: View {
+    let block: SleepBlock
+    let isNap: Bool
+    var body: some View {
+        let title = isNap ? "Nap" : "Last night"
+        let early = Int(block.end - block.wake)
+        return VStack(alignment: .leading, spacing: 2) {
+            Eyebrow(text: "\(title) · \(Plan.fmt(block.onset)) → \(Plan.fmt(block.wake))")
+            Text(hm(block.minutes)).font(Theme.serif(40)).foregroundStyle(Theme.ivory)
+            Text("Smart wake at \(Plan.fmt(block.wake)) — light sleep, \(early) min before the alarm")
+                .font(.footnote).foregroundStyle(Theme.muted)
         }
     }
 }
@@ -230,12 +247,13 @@ struct Hypnogram: View {
 // MARK: - Plan
 
 struct PlanView: View {
+    private let planned: Double = (Plan.night.end - Plan.night.onset) + (Plan.nap.end - Plan.nap.onset)
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 2) {
                     Eyebrow(text: "Sleep plan")
-                    Text("Biphasic · \(hm(Plan.night.end - Plan.night.onset + Plan.nap.end - Plan.nap.onset))").font(Theme.serif(26)).foregroundStyle(Theme.ivory)
+                    Text("Biphasic · \(hm(planned))").font(Theme.serif(26)).foregroundStyle(Theme.ivory)
                 }
                 Card {
                     Eyebrow(text: "Nap cycle")
