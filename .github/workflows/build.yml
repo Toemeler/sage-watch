@@ -43,7 +43,7 @@ jobs:
         run: |
           set -o pipefail
           xcodebuild -project Sage.xcodeproj -scheme Sage -configuration Release \
-            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            -destination 'generic/platform=iOS' -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | xcbeautify
 
       - name: Package IPA (entitlements via ldid, re-signed by SideStore on install)
@@ -55,6 +55,24 @@ jobs:
           if [ -d "$WATCH" ]; then ldid -SWatch/SageWatch.entitlements "$WATCH/SageWatch"; echo "watch app embedded"; else echo "::error::watch app not embedded"; exit 1; fi
           test -d "$WATCH/PlugIns/SageComplications.appex" && echo "complications embedded" || { echo "::error::complications not embedded"; ls -R "$WATCH" | head -40; exit 1; }
           ldid -SiOS/Sage.entitlements "$APP/Sage"
+          # guard: the embedded watch app must be a watchOS binary (LC_BUILD_VERSION platform 4), never iOS
+          python3 - "$WATCH/SageWatch" <<'PY'
+import struct, sys
+b = open(sys.argv[1], 'rb').read()
+offs = [0]
+if b[:4] == b'Êþº¾':
+    n = struct.unpack('>I', b[4:8])[0]
+    offs = [struct.unpack('>IIIII', b[8 + 20 * i:28 + 20 * i])[2] for i in range(n)]
+for off in offs:
+    m = b[off:]; ncmds = struct.unpack('<I', m[16:20])[0]; p = 32
+    for _ in range(ncmds):
+        cmd, sz = struct.unpack('<II', m[p:p + 8])
+        if cmd == 0x32:
+            plat = struct.unpack('<I', m[p + 8:p + 12])[0]
+            print('watch slice platform', plat)
+            if plat != 4: sys.exit('watch app is not a watchOS binary')
+        p += sz
+PY
           mkdir -p out/Payload && cp -R "$APP" out/Payload/
           (cd out && zip -qry Sage.ipa Payload)
           ls -la out
