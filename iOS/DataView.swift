@@ -15,6 +15,16 @@ struct DataView: View {
         NavigationStack {
             List {
                 Section {
+                    NavigationLink {
+                        BreathingView()
+                    } label: {
+                        Label("Live breathing", systemImage: "lungs")
+                    }
+                } footer: {
+                    Text("Streams the watch's motion to this screen while it is open and shows your breathing.")
+                }
+
+                Section {
                     Picker("Range", selection: $range) {
                         ForEach(ExportRange.allCases) { r in Text(r.title).tag(r) }
                     }

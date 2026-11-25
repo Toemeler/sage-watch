@@ -116,6 +116,21 @@ final class Outbox: NSObject, ObservableObject, WCSessionDelegate {
         if activationState == .activated { resendAll() }
     }
 
+    // the iPhone's live breathing screen asks for the motion stream (and repeats the request while it is open)
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        replyHandler(handleLive(message))
+    }
+
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        _ = handleLive(message)
+    }
+
+    private func handleLive(_ message: [String: Any]) -> [String: Any] {
+        guard message[LiveLink.commandKey] as? String == LiveLink.breathing else { return [:] }
+        LiveStreamer.shared.request(on: message[LiveLink.onKey] as? Bool ?? false)
+        return [LiveLink.recordingKey: Recorder.shared.isRunning]
+    }
+
     func session(_ session: WCSession, didFinish fileTransfer: WCSessionFileTransfer, error: Error?) {
         let url = fileTransfer.file.fileURL
         guard error == nil else { refreshPending(); return }
