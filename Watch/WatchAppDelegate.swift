@@ -12,8 +12,12 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
         Recorder.shared.recover()
     }
 
-    /// the iPhone app asked the watch to start recording (Data tab, "Start on watch")
+    /// the iPhone app opened Sage: to start recording (Data tab, "Start on watch") or to keep it awake for live breathing
     func handle(_ workoutConfiguration: HKWorkoutConfiguration) {
+        if WatchLaunch.isLive(workoutConfiguration) {
+            LiveStreamer.shared.keepAwake(true)
+            return
+        }
         Recorder.shared.keepRunning = true
         Recorder.shared.start()
     }

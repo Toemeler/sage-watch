@@ -27,7 +27,7 @@ struct BreathingView: View {
                 }
                 .padding(.vertical, 8)
             } footer: {
-                Text("Sit or lie still and rest the arm with the watch on your chest or belly. Each breath tilts the wrist by a degree or two, and Sage picks that up from the watch's motion sensor 10 times a second. Dots mark each breath. Not a medical measurement.")
+                Text("Sit or lie still and rest the arm with the watch on your chest or belly. Each breath tilts the wrist by a degree or two, and Sage picks that up from the watch's motion sensor 10 times a second. Dots mark each breath. While this screen is open Sage keeps running on the watch, also with its screen off, and it opens Sage there if needed. Not a medical measurement.")
             }
         }
         .navigationTitle("Live breathing")

@@ -8,7 +8,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "0.3.8"
+    MARKETING_VERSION: "0.3.9"
     CURRENT_PROJECT_VERSION: "1"
     # unsigned build: the IPA is re-signed on install (Sideloadly / AltStore with a free Apple ID)
     CODE_SIGNING_ALLOWED: NO

@@ -117,17 +117,34 @@ final class Outbox: NSObject, ObservableObject, WCSessionDelegate {
     }
 
     // the iPhone's live breathing screen asks for the motion stream (and repeats the request while it is open)
+    // ...and the alarm screen sends tests, previews and stops (handled on the main queue, where the alarm lives)
     func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        if message[AlarmLink.commandKey] != nil {
+            DispatchQueue.main.async { replyHandler(SmartAlarm.shared.handle(message)) }
+            return
+        }
         replyHandler(handleLive(message))
     }
 
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        if message[AlarmLink.commandKey] != nil {
+            DispatchQueue.main.async { _ = SmartAlarm.shared.handle(message) }
+            return
+        }
         _ = handleLive(message)
+    }
+
+    /// the alarm settings, sent whenever they change on the iPhone (arrive even while Sage was not running)
+    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
+        guard let d = applicationContext[AlarmLink.settingsKey] as? [String: Any] else { return }
+        AlarmSettings(dictionary: d).save()
     }
 
     private func handleLive(_ message: [String: Any]) -> [String: Any] {
         guard message[LiveLink.commandKey] as? String == LiveLink.breathing else { return [:] }
-        LiveStreamer.shared.request(on: message[LiveLink.onKey] as? Bool ?? false)
+        let on = message[LiveLink.onKey] as? Bool ?? false
+        LiveStreamer.shared.request(on: on)
+        DispatchQueue.main.async { LiveStreamer.shared.keepAwake(on) }
         return [LiveLink.recordingKey: Recorder.shared.isRunning]
     }
 

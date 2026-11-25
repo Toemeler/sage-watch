@@ -13,8 +13,14 @@ import CoreMotion
 ///   recorder's motion feed and plays the haptics itself ("inline");
 /// - otherwise a smart-alarm extended runtime session opens at the window start, as before.
 final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDelegate {
+    static let shared = SmartAlarm()
+
     @Published private(set) var ringing = false
     @Published private(set) var scheduledWindow: Plan.WakeWindow?
+    /// a test from the iPhone is vibrating
+    @Published private(set) var testing = false
+    /// a delayed test is waiting to start
+    @Published private(set) var testStartsAt: Date?
 
     private var session: WKExtendedRuntimeSession?
     private let motion = CMMotionManager()
@@ -24,8 +30,11 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
     // inline mode
     private var inline = false
     private var openTimer: Timer?
-    private var hapticTimer: Timer?
-    private var haptics = 0
+
+    // vibration pattern (the real alarm and the test share one player)
+    private var patternTimer: Timer?
+    private var patternRun = 0
+    private var testDelay: Timer?
 
     /// a window that has been rung or dismissed is not armed again
     private var handledUntil = Date.distantPast
@@ -34,11 +43,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
     static let restlessness = 0.018
     static let windowSeconds = 20.0
     static let sampleRate = 10.0
-    /// inline haptics: one tap every 2.5 s for at most ten minutes
-    static let hapticInterval = 2.5
-    static let hapticLimit = 240
-
-    override init() {
+    private override init() {
         super.init()
         NotificationCenter.default.addObserver(forName: .recorderStateChanged, object: nil, queue: .main) { [weak self] _ in
             self?.recorderChanged()
@@ -65,7 +70,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
 
     func stop() {
         handledUntil = max(handledUntil, scheduledWindow?.end ?? Date())
-        hapticTimer?.invalidate(); hapticTimer = nil
+        stopPattern()
         if inline {
             cancelInline()
         } else {
@@ -118,7 +123,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
     private func cancelInline() {
         openTimer?.invalidate(); openTimer = nil
         deadline?.invalidate(); deadline = nil
-        hapticTimer?.invalidate(); hapticTimer = nil
+        if ringing { stopPattern() }
         if inline { Recorder.shared.motionTap = nil }
         inline = false
         ringing = false
@@ -176,30 +181,145 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
 
     private func ring() {
         guard !ringing else { return }
+        let settings = AlarmSettings.load()
         if inline {
+            stopTest()
             ringing = true
             Recorder.shared.motionTap = nil
             deadline?.invalidate()
-            haptics = 0
-            WKInterfaceDevice.current().play(.notification)
-            hapticTimer?.invalidate()
-            hapticTimer = Timer.scheduledTimer(withTimeInterval: Self.hapticInterval, repeats: true) { [weak self] t in
-                guard let self else { t.invalidate(); return }
-                self.haptics += 1
-                WKInterfaceDevice.current().play(.directionUp)
-                if self.haptics >= Self.hapticLimit { t.invalidate() }
-            }
+            // the pattern set on the iPhone, climbing to full strength over its ramp, for at most ten minutes
+            startPattern(settings, ramp: settings.rampSeconds, length: AlarmSettings.alarmSeconds) {}
             return
         }
         guard let s = session, s.state == .running else { return }
+        stopTest()
         ringing = true
         motion.stopAccelerometerUpdates()
         deadline?.invalidate()
-        // a soft tap, then rising taps every 2.5 s until stopped (the system caps the repeats)
-        s.notifyUser(hapticType: .notification) { next in
-            next.pointee = .directionUp
-            return 2.5
+        // the system plays one haptic per repeat here, so the strength ramp and the gap apply but not the taps per pulse
+        let begin = Date()
+        let ramp = settings.rampSeconds
+        s.notifyUser(hapticType: Self.haptic(settings.level(at: 0, ramp: ramp))) { next in
+            next.pointee = Self.haptic(settings.level(at: Date().timeIntervalSince(begin), ramp: ramp))
+            return settings.clamped().gap
         }
+    }
+
+    // MARK: vibration pattern
+
+    /// the system haptic for each strength, softest first
+    static func haptic(_ level: Int) -> WKHapticType {
+        switch AlarmLevel(rawValue: level) ?? .alert {
+        case .click: return .click
+        case .tap: return .directionUp
+        case .knock: return .start
+        case .alert: return .notification
+        case .buzz: return .failure
+        }
+    }
+
+    /// Pulses every `effectiveGap` seconds, each a burst of `taps` taps, climbing from the start to the peak strength
+    /// over `ramp` seconds; ends after `length` seconds and then calls `done`.
+    private func startPattern(_ settings: AlarmSettings, ramp: Double, length: Double, done: @escaping () -> Void) {
+        stopPattern()
+        patternRun += 1
+        let run = patternRun
+        let begin = Date()
+        let s = settings.clamped()
+        let pulse = { [weak self] in
+            guard let self, self.patternRun == run else { return }
+            let type = Self.haptic(s.level(at: Date().timeIntervalSince(begin), ramp: ramp))
+            for offset in s.tapOffsets {
+                if offset == 0 { WKInterfaceDevice.current().play(type); continue }
+                DispatchQueue.main.asyncAfter(deadline: .now() + offset) { [weak self] in
+                    guard let self, self.patternRun == run else { return }
+                    WKInterfaceDevice.current().play(type)
+                }
+            }
+        }
+        pulse()
+        patternTimer = Timer.scheduledTimer(withTimeInterval: s.effectiveGap, repeats: true) { [weak self] t in
+            guard let self, self.patternRun == run else { t.invalidate(); return }
+            if Date().timeIntervalSince(begin) >= length - 0.05 {
+                self.stopPattern()
+                done()
+                return
+            }
+            pulse()
+        }
+    }
+
+    private func stopPattern() {
+        patternRun += 1          // cancels taps still queued inside a burst
+        patternTimer?.invalidate()
+        patternTimer = nil
+    }
+
+    // MARK: test (from the iPhone)
+
+    /// Answers a message from the iPhone's alarm screen; runs on the main queue.
+    func handle(_ message: [String: Any]) -> [String: Any] {
+        switch message[AlarmLink.commandKey] as? String ?? "" {
+        case AlarmLink.test:
+            return test(AlarmSettings(dictionary: message[AlarmLink.settingsKey] as? [String: Any]))
+        case AlarmLink.preview:
+            guard !ringing else { return reply(false, "The real alarm is ringing right now.") }
+            let level = (message[AlarmLink.levelKey] as? NSNumber)?.intValue ?? 0
+            WKInterfaceDevice.current().play(Self.haptic(min(max(level, 0), AlarmSettings.levels.upperBound)))
+            return reply(true, "\(AlarmLevel.name(level)) played on the watch.")
+        case AlarmLink.stop:
+            let was = testing || testStartsAt != nil
+            stopTest()
+            return reply(true, was ? "Test stopped." : "No test was running.")
+        default:
+            return [:]
+        }
+    }
+
+    private func test(_ settings: AlarmSettings) -> [String: Any] {
+        guard !ringing else { return reply(false, "The real alarm is ringing right now.") }
+        stopTest()
+        settings.save()
+        let s = settings.clamped()
+        let recording = Recorder.shared.isRunning
+        let delay = s.testDelayMinutes * 60
+        if delay > 0 {
+            guard recording else {
+                return reply(false, "Record is off on the watch. A delayed test needs Sage to keep running: long-press the face and turn on Record, then try again.")
+            }
+            let at = Date().addingTimeInterval(delay)
+            testStartsAt = at
+            testDelay = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in self?.beginTest(s) }
+            return reply(true, "Test alarm set for \(at.formatted(date: .omitted, time: .shortened)) on the watch (\(Int(s.testSeconds)) s).")
+        }
+        beginTest(s)
+        let climb = s.startLevel == s.peakLevel
+            ? AlarmLevel.name(s.peakLevel)
+            : "\(AlarmLevel.name(s.startLevel)) → \(AlarmLevel.name(s.peakLevel))"
+        let note = recording ? "" : " Record is off, so it only vibrates while Sage is on screen."
+        return reply(true, "Vibrating on the watch for \(Int(s.testSeconds)) s: \(climb).\(note)")
+    }
+
+    private func beginTest(_ s: AlarmSettings) {
+        testDelay?.invalidate(); testDelay = nil
+        testStartsAt = nil
+        guard !ringing else { return }
+        testing = true
+        startPattern(s, ramp: s.testRamp, length: s.testSeconds) { [weak self] in self?.testing = false }
+    }
+
+    /// stops a running test, or cancels one that is waiting; never touches the real alarm
+    func stopTest() {
+        testDelay?.invalidate(); testDelay = nil
+        testStartsAt = nil
+        if testing {
+            testing = false
+            stopPattern()
+        }
+    }
+
+    private func reply(_ ok: Bool, _ text: String) -> [String: Any] {
+        [AlarmLink.okKey: ok, AlarmLink.textKey: text, LiveLink.recordingKey: Recorder.shared.isRunning]
     }
 
     private func finish() {

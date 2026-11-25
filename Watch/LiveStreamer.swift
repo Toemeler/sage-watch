@@ -1,5 +1,6 @@
 import Foundation
 import WatchConnectivity
+import WatchKit
 
 /// Streams the wrist's motion (10 times a second, averaged from the recorder's samples) to the iPhone while its
 /// live breathing screen is open. The iPhone repeats its request every few seconds; without one for 20 s the stream
@@ -11,6 +12,31 @@ final class LiveStreamer {
     private var on = false
     private var lastRequest = Date.distantPast
     private var buffer: [Float] = []
+
+    // main queue: keeping Sage running while the iPhone watches
+    private var startedRecorder = false
+    private var awakeTimer: Timer?
+
+    /// Main queue. While the live screen is open Sage must keep running with the screen dimmed or off, which only a
+    /// workout session allows: if the recorder is off, start it for the live view and stop it again 25 s after the last
+    /// request (unless Record was switched on meanwhile).
+    func keepAwake(_ on: Bool) {
+        awakeTimer?.invalidate()
+        awakeTimer = nil
+        let recorder = Recorder.shared
+        if on {
+            WKApplication.shared().isFrontmostTimeoutExtended = true
+            if !recorder.isRunning {
+                if !recorder.keepRunning { startedRecorder = true }
+                recorder.start()
+            }
+            awakeTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: false) { [weak self] _ in self?.keepAwake(false) }
+        } else {
+            WKApplication.shared().isFrontmostTimeoutExtended = false
+            if startedRecorder && !recorder.keepRunning { recorder.stop() }
+            startedRecorder = false
+        }
+    }
 
     func request(on: Bool) {
         queue.async {
