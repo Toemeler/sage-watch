@@ -1,0 +1,71 @@
+name: iloader for SideStore Watch (Windows)
+
+# Builds iloader with sidestore/patch_iloader.py so its Pairing page also lists the
+# "SideStore Watch" build, and publishes iloader.exe as a pre-release.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "sidestore/patch_iloader.py"
+      - ".github/workflows/iloader.yml"
+
+permissions:
+  contents: write
+
+env:
+  ILOADER_REPO: https://github.com/nab138/iloader
+  ILOADER_SHA: 10b57b7   # main, 2026-11-22 (2.4.2)
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: sage
+
+      - name: Fetch and patch iloader
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone "$ILOADER_REPO" iloader
+          cd iloader
+          git checkout -q "$ILOADER_SHA"
+          python ../sage/sidestore/patch_iloader.py
+          git diff
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Perl and Make
+        run: choco install strawberryperl make --no-progress
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build
+        working-directory: iloader
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun i --frozen-lockfile
+          bun tauri build --no-bundle --config src-tauri/ci.conf.json
+          ls -la src-tauri/target/release/*.exe
+          cp src-tauri/target/release/iloader.exe ../iloader-sidestore-watch.exe
+
+      - name: Publish pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          TAG="iloader-sidestore-watch-${{ github.run_number }}"
+          gh release create "$TAG" iloader-sidestore-watch.exe \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "iloader (SideStore Watch pairing) ${{ github.run_number }}" \
+            --prerelease \
+            --notes "iloader ${ILOADER_SHA} with one change: the Pairing page also lists the app named \"SideStore Watch\" as SideStore, so the pairing file can be placed into it."
