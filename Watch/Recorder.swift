@@ -248,6 +248,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
             "segment": id,
             "start": start.timeIntervalSince1970,
             "raw_motion_hz": rawMotionHz,
+            "barometer": CMAltimeter.isRelativeAltitudeAvailable() ? Self.motionAuthorization : "unavailable",
             "gyroscope": gyroscope,
             "save_workout": saveWorkout,
             "watch": device.model,
@@ -305,7 +306,11 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
 
     private func startPressureAndStatus() {
         if CMAltimeter.isRelativeAltitudeAvailable() {
-            altimeter.startRelativeAltitudeUpdates(to: motionQueue) { [weak self] data, _ in
+            altimeter.startRelativeAltitudeUpdates(to: motionQueue) { [weak self] data, error in
+                if let error {
+                    DispatchQueue.main.async { self?.setError("Pressure: \(error.localizedDescription) (check Settings › Privacy › Motion & Fitness)") }
+                    return
+                }
                 guard let self, let d = data else { return }
                 let t = d.timestamp + self.bootOffset
                 self.pressureFile?.append("\(RecordingFormat.unix(t)),\(String(format: "%.4f", d.pressure.doubleValue)),\(String(format: "%.2f", d.relativeAltitude.doubleValue))", at: t)
@@ -460,6 +465,17 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         isRunning = true
         lastError = nil
         NotificationCenter.default.post(name: .recorderStateChanged, object: self)
+    }
+
+    /// Motion & Fitness permission as plain words, for segment.json (the barometer needs it; the accelerometer does not)
+    private static var motionAuthorization: String {
+        switch CMAltimeter.authorizationStatus() {
+        case .authorized: return "authorized"
+        case .denied: return "denied"
+        case .restricted: return "restricted"
+        case .notDetermined: return "not determined"
+        @unknown default: return "unknown"
+        }
     }
 
     private func setError(_ text: String) {
