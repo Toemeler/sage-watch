@@ -15,6 +15,10 @@ final class RotatingCSV {
     private var chunkEnd: Double = 0
     private var buffer = ""
     private var buffered = 0
+    private var lastFlush: Double = 0
+    /// buffered lines reach the file at least this often (seconds of line time), so a crash or a watch restart
+    /// loses at most this much; before, slow streams (1 line/s, 1 line/min) could sit unwritten for minutes or hours
+    static let maxBufferAge: Double = 20
     private(set) var linesWritten = 0
 
     init(directory: URL, prefix: String, header: String, period: TimeInterval, segment: String) {
@@ -32,7 +36,7 @@ final class RotatingCSV {
         buffer += "\n"
         buffered += 1
         linesWritten += 1
-        if buffered >= 250 { flush() }
+        if buffered >= 250 || t - lastFlush >= Self.maxBufferAge { flush(); lastFlush = t }
     }
 
     func flush() {
@@ -65,5 +69,6 @@ final class RotatingCSV {
         handle = try? FileHandle(forWritingTo: u)
         _ = try? handle?.seekToEnd()
         url = u
+        lastFlush = t
     }
 }
