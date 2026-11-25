@@ -4,6 +4,11 @@
 
 **LiveContainer:** the iPhone app runs; the watch app, complications and Health data need the SideStore install.
 
+## New in 0.3.4
+
+- Every build gets its own build number, so the watch picks up updates from the iPhone by itself.
+- The recorder controls (long-press the face) show the installed version at the bottom.
+
 ## New in 0.3.3
 
 - Steps and heart rate on the face are much larger (steps above 10,000 read as 12.2k).

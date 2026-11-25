@@ -45,6 +45,10 @@ struct RecorderControls: View {
                 Button("Send now") { outbox.resendAll() }
             }
 
+            Section {
+                Text("Sage \(Self.version)").font(.footnote).foregroundStyle(.secondary)
+            }
+
             if recorder.isRunning {
                 Section {
                     Button("Restart with new settings") {
@@ -54,6 +58,11 @@ struct RecorderControls: View {
                 }
             }
         }
+    }
+
+    static var version: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        return "\(info["CFBundleShortVersionString"] as? String ?? "?") (\(info["CFBundleVersion"] as? String ?? "?"))"
     }
 
     private func row(_ title: String, _ value: String) -> some View {
