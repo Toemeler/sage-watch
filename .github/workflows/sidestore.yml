@@ -1,0 +1,122 @@
+name: SideStore for Sage (watch + HealthKit)
+
+# Builds Andris73's watch-companion SideStore with the patches in sidestore/patch.py
+# and publishes SideStore.ipa as a pre-release. See sidestore/README.md.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "sidestore/**"
+      - ".github/workflows/sidestore.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sidestore-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SIDESTORE_REPO: https://github.com/Andris73/SideStore
+  SIDESTORE_SHA: a86f42b1d6d4eb57da0e48a1ce214191ba424f3c   # fix/issue-229-watch-companion, 2026-09-30
+  MINIMUXER_SHA: 2a20ddafdeb96ece8176d4600d8719360e27d8b2   # same branch head (pairedWatchUDIDs), not yet pinned upstream
+  SIDESIGN_2FA_FIX: 752d1ef602aa792a432ffa1e71646dc1ecf7363c # SideStore/SideSign "fix: 2FA failing (#5)"
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: sage
+
+      - name: Fetch SideStore sources
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none "$SIDESTORE_REPO" ss
+          cd ss
+          git checkout -q "$SIDESTORE_SHA"
+          git submodule update --init --recursive
+          git -C Dependencies/minimuxer fetch -q origin "$MINIMUXER_SHA"
+          git -C Dependencies/minimuxer checkout -q "$MINIMUXER_SHA"
+          git -C Dependencies/SideSign fetch -q https://github.com/SideStore/SideSign "$SIDESIGN_2FA_FIX"
+          git -C Dependencies/SideSign -c user.name=ci -c user.email=ci@localhost cherry-pick FETCH_HEAD
+          echo "SideStore  $(git rev-parse HEAD)"
+          echo "minimuxer  $(git -C Dependencies/minimuxer rev-parse HEAD)"
+          echo "SideSign   $(git -C Dependencies/SideSign rev-parse HEAD)"
+
+      - name: Apply Sage patches
+        working-directory: ss
+        run: |
+          python3 ../sage/sidestore/patch.py
+          git diff --stat
+          git -C Dependencies/SideSign diff --stat
+          git -C Dependencies/minimuxer diff --stat
+
+      - name: Tools and Xcode
+        run: |
+          brew install ldid xcbeautify
+          ls -d /Applications/Xcode*.app
+          XCODE=/Applications/Xcode_26.2.app
+          [ -d "$XCODE" ] || XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Build
+        working-directory: ss
+        run: |
+          set -o pipefail
+          VERSION="0.7.0-watch.${{ github.run_number }}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          python3 scripts/ci/workflow.py set-marketing-version "$VERSION"
+          mkdir -p build/logs
+          NSUnbufferedIO=YES make -B build 2>&1 | tee build/logs/build.log | xcbeautify --renderer github-actions
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: ss/build/logs/build.log
+          if-no-files-found: ignore
+
+      - name: Package IPA
+        working-directory: ss
+        run: |
+          set -euo pipefail
+          APP=SideStore.xcarchive/Products/Applications/SideStore.app
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName SideStore Watch" "$APP/Info.plist" \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string SideStore Watch" "$APP/Info.plist"
+          make fakesign
+          make ipa
+          ls -la SideStore.ipa
+          {
+            echo "SideStore for Sage $VERSION"
+            echo "SideStore  $SIDESTORE_REPO @ $(git rev-parse HEAD)"
+            echo "minimuxer  $(git -C Dependencies/minimuxer rev-parse HEAD) + sidestore/patch.py"
+            echo "SideSign   $(git -C Dependencies/SideSign rev-parse HEAD) (incl. $SIDESIGN_2FA_FIX) + sidestore/patch.py"
+            echo "Xcode      $(xcodebuild -version | head -1)"
+          } > BUILD-INFO.txt
+          cat BUILD-INFO.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SideStore-${{ env.VERSION }}
+          path: |
+            ss/SideStore.ipa
+            ss/BUILD-INFO.txt
+
+      - name: Publish pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="sidestore-watch-${{ github.run_number }}"
+          gh release create "$TAG" ss/SideStore.ipa ss/BUILD-INFO.txt \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "SideStore Watch ${{ env.VERSION }}" \
+            --prerelease \
+            --notes-file sage/sidestore/README.md
