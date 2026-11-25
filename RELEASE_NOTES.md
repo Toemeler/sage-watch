@@ -4,6 +4,11 @@
 
 **LiveContainer:** the iPhone app runs; the watch app, complications and Health data need the SideStore install.
 
+## New in 0.3.5
+
+- Steps and heart-rate dials are 25% larger.
+- Long-press the face → *Health* shows steps, heart rate and, if they are missing, the reason in red.
+
 ## New in 0.3.4
 
 - Every build gets its own build number, so the watch picks up updates from the iPhone by itself.

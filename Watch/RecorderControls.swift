@@ -3,6 +3,7 @@ import SwiftUI
 /// Long-press the face to open: recording on/off, what is being captured, and the queue to the iPhone.
 struct RecorderControls: View {
     @EnvironmentObject private var recorder: Recorder
+    @EnvironmentObject private var health: HealthStore
     @ObservedObject private var outbox = Outbox.shared
 
     var body: some View {
@@ -25,6 +26,14 @@ struct RecorderControls: View {
                 }
             } footer: {
                 Text("Keeps Sage in front and records heart rate every ~5 s, wrist motion and air pressure. Changes below apply to the next start.")
+            }
+
+            Section("Health") {
+                row("Steps", health.steps.map(FaceRenderer.grouped) ?? "–")
+                row("Heart rate", health.heartRate.map { "\($0) bpm" } ?? "–")
+                if let p = health.problem {
+                    Text(p).font(.footnote).foregroundStyle(.red)
+                }
             }
 
             Section("Capture") {
