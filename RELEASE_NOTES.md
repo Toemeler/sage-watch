@@ -4,9 +4,12 @@
 
 **LiveContainer:** the iPhone app runs; the watch app, complications and Health data need the SideStore install.
 
-## New in 0.2
+## New in 0.3
 
-- **Silent smart alarm** for the nap and the night. At the start of the wake window (18:15 / 06:00) the watch listens for light sleep through wrist movement and taps you at the first restless moment, at the latest when the window ends (18:30 / 06:30). Keep Sage as the active app on the watch when you go to sleep so it can arm the alarm.
-- **Digit morph:** at every minute change the changed digits morph into the next, with the prototype's escapement overshoot.
-- **Seconds runner:** a bright tick travels the railway track five beats a second while the wrist is up.
-- **Complications:** "Sage · next" for Apple's faces (circular, rectangular, corner, inline) shows the countdown to the nap or the night, and the smart-wake window while you sleep.
+- **Recorder.** Long-press the face → *Record*. Sage runs a Mind & Body session so it stays in front around the clock (wrist raise always brings it back) and records:
+  heart rate about every 5 s, a per-second motion summary, raw motion up to 100 Hz (optionally with the gyroscope), air pressure, and battery/charging once a minute.
+  Files go to the iPhone every 30–60 minutes. Nothing is saved to Apple Health unless *Save to Health* is on.
+- **Data tab on iPhone.** Export the last nap, the last night, the last 24 hours or any range as one zip of CSV files. Recordings and exports are also in the Files app (On My iPhone › Sage).
+- **Start from the iPhone.** Data → *Start recording on the watch*, handy after charging.
+- **Smart alarm** runs inside the recorder while it records (vibration only when the watch is in Silent Mode), and a window you already woke from is no longer armed again.
+- The face shows the live heart rate while recording; a small sage dot at the top means the recorder is on.
