@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 
 @main
 struct SageWatchApp: App {
@@ -38,6 +39,9 @@ struct FaceScreen: View {
     @EnvironmentObject private var recorder: Recorder
     @Environment(\.isLuminanceReduced) private var dimmed
     @State private var showControls = false
+    @State private var battery: Int?
+    @State private var charging = false
+    private let batteryTick = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ZStack {
@@ -61,6 +65,8 @@ struct FaceScreen: View {
         ._statusBarHidden(true)
         .contentShape(Rectangle())
         .onLongPressGesture(minimumDuration: 0.8) { showControls = true }
+        .onAppear(perform: readBattery)
+        .onReceive(batteryTick) { _ in readBattery() }
         .sheet(isPresented: $showControls) {
             RecorderControls().environmentObject(recorder).environmentObject(health)
         }
@@ -75,8 +81,17 @@ struct FaceScreen: View {
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
         // while recording, the face shows the live heart rate from the workout session
         let bpm = recorder.isRunning ? (recorder.bpm ?? health.heartRate) : health.heartRate
-        let state = FaceState(date: date, mode: FaceMode.auto(date), steps: health.steps, heartRate: bpm, dimmed: dimmed)
+        let state = FaceState(date: date, mode: FaceMode.auto(date), steps: health.steps, heartRate: bpm, dimmed: dimmed,
+                              battery: battery, charging: charging)
         FaceRenderer.draw(&ctx, size: size, state: state)
+    }
+
+    /// battery for the plaque, read every 30 s rather than every frame
+    private func readBattery() {
+        let device = WKInterfaceDevice.current()
+        device.isBatteryMonitoringEnabled = true
+        battery = FaceRenderer.batteryPercent(device.batteryLevel)
+        charging = device.batteryState == .charging || device.batteryState == .full
     }
 }
 

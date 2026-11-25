@@ -67,4 +67,11 @@ final class RecordingFormatTests: XCTestCase {
         XCTAssertEqual(FaceRenderer.compactSteps(8431), "8,431")
         XCTAssertEqual(FaceRenderer.compactSteps(12161), "12.2k")
     }
+
+    func testBatteryPercent() {
+        XCTAssertNil(FaceRenderer.batteryPercent(-1))
+        XCTAssertEqual(FaceRenderer.batteryPercent(0.836), 84)
+        XCTAssertEqual(FaceRenderer.batteryPercent(1), 100)
+        XCTAssertEqual(FaceRenderer.batteryPercent(0), 0)
+    }
 }

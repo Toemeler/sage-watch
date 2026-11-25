@@ -7,6 +7,8 @@ struct FaceState {
     var steps: Int?
     var heartRate: Int?
     var dimmed: Bool = false          // always-on (luminance reduced)
+    var battery: Int? = nil           // watch battery in percent; nil where unknown (the plaque then shows only the bolt)
+    var charging: Bool = false
 
     var label: String { mode.label(date) }
 }
@@ -36,7 +38,7 @@ enum FaceRenderer {
                         progress: Double(state.steps ?? 0) / 10_000)
             drawSubdial(&ctx, at: FaceGeometry.subdials[1], value: state.heartRate.map(String.init) ?? "–", unit: "BPM", icon: .heart,
                         progress: Double(state.heartRate ?? 0) / 180)
-            drawPlaque(&ctx)
+            drawPlaque(&ctx, battery: state.battery, charging: state.charging)
         }
     }
 
@@ -220,10 +222,28 @@ enum FaceRenderer {
         return String(format: "%.1fk", Double(n) / 1000)
     }
 
-    private static func drawPlaque(_ ctx: inout GraphicsContext) {
-        let box = CGRect(x: 446.5, y: 766, width: 76.5, height: 50)
+    /// battery level as a whole percentage; nil while watchOS reports no level (monitoring off, simulator)
+    static func batteryPercent(_ level: Float) -> Int? {
+        guard level >= 0 else { return nil }
+        return min(100, max(0, Int((Double(level) * 100).rounded())))
+    }
+
+    /// the plaque under the subdials: the watch battery, with a bolt while charging (gold at 20 % and below);
+    /// just the bolt where no level is known
+    private static func drawPlaque(_ ctx: inout GraphicsContext, battery: Int?, charging: Bool) {
+        let width = battery == nil ? 76.5 : 104
+        let box = CGRect(x: 484.75 - width / 2, y: 766, width: width, height: 50)
         ctx.fill(Path(roundedRect: box, cornerRadius: 11), with: .color(Color(hex: 0x0D0E0C)))
         ctx.stroke(Path(roundedRect: box, cornerRadius: 11), with: .color(P.rim), lineWidth: 3.6)
+        if let battery {
+            let colour = battery <= 20 && !charging ? P.gold : P.ivory
+            var text = Text("\(battery)%").font(.system(size: 26, weight: .semibold, design: .rounded).monospacedDigit()).foregroundColor(colour)
+            if charging {
+                text = Text(Image(systemName: "bolt.fill")).font(.system(size: 18, weight: .semibold)).foregroundColor(P.sageLight) + Text(" ") + text
+            }
+            ctx.draw(text, at: CGPoint(x: box.midX, y: box.midY + 1), anchor: .center)
+            return
+        }
         var bolt = Path()
         let s = 30 / 13.2, c = CGPoint(x: 484.5, y: 791)
         bolt.addLines([(1, -6.6), (-3.8, 0.9), (-0.5, 0.9), (-1.3, 6.6), (3.8, -1), (0.5, -1)].map { CGPoint(x: c.x + $0.0 * s, y: c.y + $0.1 * s) })
