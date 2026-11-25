@@ -4,6 +4,10 @@
 
 **LiveContainer:** the iPhone app runs; the watch app, complications and Health data need the SideStore install.
 
+## New in 0.3.1
+
+- **No more lost heart-rate samples while the screen is off.** watchOS delivers them in batches then; the recorder now writes every sample of a batch, not just the newest.
+
 ## New in 0.3
 
 - **Recorder.** Long-press the face → *Record*. Sage runs a Mind & Body session so it stays in front around the clock (wrist raise always brings it back) and records:
