@@ -79,8 +79,9 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
     // owned by heartQueue
     private var heartFile: RotatingCSV?
     private var statusFile: RotatingCSV?
-    private var lastHeartStart = Date.distantPast
+    private var loggedHeart = Set<Int64>()        // sample start times (ms) already written
     private var heartCount = 0
+    private var heartQuery: HKAnchoredObjectQuery?
 
     private override init() {
         let d = UserDefaults.standard
@@ -159,6 +160,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         }
         startMotion()
         startPressureAndStatus()
+        startHeartQuery(since: now)
         markRunning(since: now)
     }
 
@@ -191,6 +193,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
                 self.openFiles(segment: id)
                 self.startMotion()
                 self.startPressureAndStatus()
+                self.startHeartQuery(since: since)
                 self.markRunning(since: since)
             }
         }
@@ -366,20 +369,48 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
               let quantity = stats.mostRecentQuantity(),
               let interval = stats.mostRecentQuantityDateInterval() else { return }
         let value = quantity.doubleValue(for: Self.bpmUnit)
-        heartQueue.async {
-            guard interval.start > self.lastHeartStart else { return }
-            self.lastHeartStart = interval.start
-            self.heartFile?.append("\(RecordingFormat.unix(interval.start)),\(RecordingFormat.unix(interval.end)),\(String(format: "%.1f", value))",
-                                   at: interval.start.timeIntervalSince1970)
-            self.heartCount += 1
-            if self.heartCount % 12 == 0 { self.heartFile?.flush() }
-            let count = self.heartCount
-            DispatchQueue.main.async {
+        heartQueue.async { self.logHeart(start: interval.start, end: interval.end, bpm: value) }
+    }
+
+    /// runs on heartQueue; both the builder and the anchored query feed it, each sample is written once
+    private func logHeart(start: Date, end: Date, bpm value: Double) {
+        let key = Int64((start.timeIntervalSince1970 * 1000).rounded())
+        guard loggedHeart.insert(key).inserted else { return }
+        if loggedHeart.count > 20_000 { loggedHeart.removeAll(keepingCapacity: true); loggedHeart.insert(key) }
+        heartFile?.append("\(RecordingFormat.unix(start)),\(RecordingFormat.unix(end)),\(String(format: "%.1f", value))",
+                          at: start.timeIntervalSince1970)
+        heartCount += 1
+        if heartCount % 12 == 0 { heartFile?.flush() }
+        let count = heartCount
+        DispatchQueue.main.async {
+            if self.lastBeatAt.map({ end >= $0 }) ?? true {
                 self.bpm = Int(value.rounded())
-                self.lastBeatAt = interval.end
-                self.heartSamples = count
+                self.lastBeatAt = end
             }
+            self.heartSamples = count
         }
+    }
+
+    /// Every heart-rate sample saved while the run lasts, including the batches watchOS delivers late while the
+    /// screen is off (the builder's statistics only expose the newest one of a batch).
+    private func startHeartQuery(since: Date) {
+        guard let type = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
+        if let q = heartQuery { store.stop(q) }
+        let predicate = HKQuery.predicateForSamples(withStart: since.addingTimeInterval(-60), end: nil, options: [])
+        let handler: (HKAnchoredObjectQuery, [HKSample]?, [HKDeletedObject]?, HKQueryAnchor?, Error?) -> Void = { [weak self] _, samples, _, _, _ in
+            guard let self, let quantities = samples as? [HKQuantitySample], !quantities.isEmpty else { return }
+            let rows = quantities.map { ($0.startDate, $0.endDate, $0.quantity.doubleValue(for: Self.bpmUnit)) }.sorted { $0.0 < $1.0 }
+            self.heartQueue.async { for r in rows { self.logHeart(start: r.0, end: r.1, bpm: r.2) } }
+        }
+        let q = HKAnchoredObjectQuery(type: type, predicate: predicate, anchor: nil, limit: HKObjectQueryNoLimit, resultsHandler: handler)
+        q.updateHandler = handler
+        heartQuery = q
+        store.execute(q)
+    }
+
+    private func stopHeartQuery() {
+        if let q = heartQuery { store.stop(q) }
+        heartQuery = nil
     }
 
     func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
@@ -409,6 +440,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
 
     private func finishLocal(end: Date) {
         stopMotion()
+        stopHeartQuery()
         closeFiles()
         if let id = segment, let since = startedAt { writeMeta(segment: id, start: since, end: end) }
         UserDefaults.standard.removeObject(forKey: Keys.segment)
