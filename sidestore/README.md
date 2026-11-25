@@ -14,7 +14,7 @@ Unofficial SideStore build that can install Sage on both the iPhone and the Appl
 
 ## Install
 
-1. **Replace your SideStore.** Download `SideStore.ipa` from this release and install it with iloader on the PC, the same way you installed SideStore before. It keeps SideStore's app ID, so iloader handles the pairing file. The icon is named **SideStore Watch**.
+1. **Replace your SideStore.** Download `SideStore.ipa` from this release and install it with iloader on the PC, the same way you installed SideStore before. It keeps SideStore's app ID and name, so iloader recognises it and places the pairing file. Check Settings in SideStore: the version should end in `-watch.N`.
 2. **Turn on Developer Mode on the watch.** On the watch: Settings → Privacy & Security → Developer Mode → On. The watch restarts and asks you to confirm.
 3. **Sign in to SideStore Watch** with your Apple ID.
 4. **Install Sage.** On the iPhone, download `Sage.ipa` from the latest Sage release. In SideStore Watch, go to My Apps → **+** and pick the file. Keep the watch on your wrist, unlocked, next to the phone.

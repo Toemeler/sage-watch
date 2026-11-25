@@ -87,8 +87,8 @@ jobs:
         run: |
           set -euo pipefail
           APP=SideStore.xcarchive/Products/Applications/SideStore.app
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName SideStore Watch" "$APP/Info.plist" \
-            || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string SideStore Watch" "$APP/Info.plist"
+          # Keep the display name "SideStore": iloader finds the app for pairing-file placement by it.
+          /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$APP/Info.plist"
           make fakesign
           make ipa
           ls -la SideStore.ipa
