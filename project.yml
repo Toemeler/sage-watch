@@ -8,7 +8,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "0.2.0"
+    MARKETING_VERSION: "0.3.0"
     CURRENT_PROJECT_VERSION: "1"
     # unsigned build: the IPA is re-signed on install (Sideloadly / AltStore with a free Apple ID)
     CODE_SIGNING_ALLOWED: NO
@@ -34,6 +34,9 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIUserInterfaceStyle: Dark
         NSHealthShareUsageDescription: Sage shows your steps, heart rate and sleep on the watch face and in the app. Nothing leaves your devices.
+        NSHealthUpdateUsageDescription: The watch recorder runs as a Mind & Body session. It is only saved to Health if you turn that on.
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.sage.companion
@@ -56,9 +59,10 @@ targets:
         WKApplication: true
         WKCompanionAppBundleIdentifier: dev.sage.companion
         UIAppFonts: [PlayfairDisplay-Regular.ttf, PlayfairDisplay-Italic.ttf]
-        NSHealthShareUsageDescription: Sage shows your steps and heart rate on the face. Nothing leaves your devices.
-        NSMotionUsageDescription: The smart alarm feels for light sleep through wrist movement during the wake window. Nothing is stored.
-        WKBackgroundModes: [smart-alarm]
+        NSHealthShareUsageDescription: Sage shows your steps and heart rate on the face and records your heart rate while the recorder runs. Nothing leaves your devices.
+        NSHealthUpdateUsageDescription: The recorder runs as a Mind & Body session to keep Sage on screen and read heart rate every few seconds. It is only saved to Health if you turn that on.
+        NSMotionUsageDescription: Sage records wrist motion and air pressure for your sleep data and feels for light sleep during the wake window. The files go only to your iPhone.
+        WKBackgroundModes: [smart-alarm, workout-processing]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.sage.companion.watchkitapp

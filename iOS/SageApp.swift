@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct SageApp: App {
+    @UIApplicationDelegateAdaptor(PhoneAppDelegate.self) private var appDelegate
     @StateObject private var health = HealthStore()
 
     var body: some Scene {
@@ -34,6 +35,7 @@ struct RootView: View {
             SleepView().tabItem { Label("Sleep", systemImage: "moon") }
             PlanView().tabItem { Label("Plan", systemImage: "list.bullet") }
             FacesView().tabItem { Label("Faces", systemImage: "applewatch") }
+            DataView().tabItem { Label("Data", systemImage: "waveform.path.ecg") }
         }
         .tint(Theme.sage)
     }

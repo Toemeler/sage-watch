@@ -3,7 +3,8 @@
 A biphasic-sleep watch face for Apple Watch SE 3 (44 mm) and its iPhone companion.
 
 - **Watch:** the Sage face full-screen, drawn 1:1 from the design prototype. Ten modes follow the day and the sleep plan (nap 17:00–18:30, night 00:30–06:30 with smart wake).
-- **iPhone:** Today (24-hour ring), Sleep (night and nap stages), Plan, Faces.
+- **iPhone:** Today (24-hour ring), Sleep (night and nap stages), Plan, Faces, Data.
+- **Recorder:** long-press the face → *Record*. A Mind & Body session keeps Sage in front day and night and records heart rate (~5 s), per-second motion, raw motion (up to 100 Hz, optional gyroscope), air pressure and battery. The iPhone's Data tab exports any range as CSV.
 
 ## Build
 

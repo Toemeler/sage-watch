@@ -2,8 +2,10 @@ import SwiftUI
 
 @main
 struct SageWatchApp: App {
+    @WKApplicationDelegateAdaptor(WatchAppDelegate.self) private var appDelegate
     @StateObject private var health = HealthStore()
     @StateObject private var alarm = SmartAlarm()
+    @StateObject private var recorder = Recorder.shared
     @Environment(\.scenePhase) private var phase
 
     var body: some Scene {
@@ -11,19 +13,31 @@ struct SageWatchApp: App {
             FaceScreen()
                 .environmentObject(health)
                 .environmentObject(alarm)
+                .environmentObject(recorder)
                 .task { await health.start() }
-                .onAppear { alarm.scheduleNext() }
-                .onChange(of: phase) { _, p in if p == .active { alarm.scheduleNext() } }
+                .onAppear {
+                    alarm.scheduleNext()
+                    if recorder.keepRunning { recorder.start() }
+                }
+                .onChange(of: phase) { _, p in
+                    guard p == .active else { return }
+                    alarm.scheduleNext()
+                    if recorder.keepRunning && !recorder.isRunning { recorder.start() }
+                    Outbox.shared.resendAll()
+                }
         }
     }
 }
 
 /// The face, full-screen. Active: 30 fps for the digit morph and the seconds runner.
 /// Always-on: one frame a minute, and the renderer drops the dial, numerals and subdials.
+/// Long-press opens the recorder controls.
 struct FaceScreen: View {
     @EnvironmentObject private var health: HealthStore
     @EnvironmentObject private var alarm: SmartAlarm
+    @EnvironmentObject private var recorder: Recorder
     @Environment(\.isLuminanceReduced) private var dimmed
+    @State private var showControls = false
 
     var body: some View {
         ZStack {
@@ -32,10 +46,22 @@ struct FaceScreen: View {
             } else {
                 TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in face(tl.date) }
             }
+            if recorder.isRunning && !dimmed {
+                VStack {
+                    Circle().fill(FaceGeometry.Palette.sage).frame(width: 5, height: 5).padding(.top, 3)
+                    Spacer()
+                }
+                .allowsHitTesting(false)
+            }
             if alarm.ringing { WakeOverlay { alarm.stop() } }
         }
         .ignoresSafeArea()
         .background(Color.black)
+        .contentShape(Rectangle())
+        .onLongPressGesture(minimumDuration: 0.8) { showControls = true }
+        .sheet(isPresented: $showControls) {
+            RecorderControls().environmentObject(recorder)
+        }
     }
 
     private func face(_ date: Date) -> some View {
@@ -45,7 +71,9 @@ struct FaceScreen: View {
     }
 
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
-        let state = FaceState(date: date, mode: FaceMode.auto(date), steps: health.steps, heartRate: health.heartRate, dimmed: dimmed)
+        // while recording, the face shows the live heart rate from the workout session
+        let bpm = recorder.isRunning ? (recorder.bpm ?? health.heartRate) : health.heartRate
+        let state = FaceState(date: date, mode: FaceMode.auto(date), steps: health.steps, heartRate: bpm, dimmed: dimmed)
         FaceRenderer.draw(&ctx, size: size, state: state)
     }
 }
