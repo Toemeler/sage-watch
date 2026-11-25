@@ -20,8 +20,13 @@ struct DataView: View {
                     } label: {
                         Label("Live breathing", systemImage: "lungs")
                     }
+                    NavigationLink {
+                        AlarmView()
+                    } label: {
+                        Label("Vibration alarm", systemImage: "applewatch.radiowaves.left.and.right")
+                    }
                 } footer: {
-                    Text("Streams the watch's motion to this screen while it is open and shows your breathing.")
+                    Text("Live breathing streams the watch's motion to this screen while it is open. Vibration alarm sets how the silent alarm feels and tests it on the watch.")
                 }
 
                 Section {
@@ -105,10 +110,7 @@ struct DataView: View {
     }
 
     private func startOnWatch() {
-        let config = HKWorkoutConfiguration()
-        config.activityType = .mindAndBody
-        config.locationType = .indoor
-        HKHealthStore().startWatchApp(with: config) { ok, error in
+        HKHealthStore().startWatchApp(with: WatchLaunch.configuration(live: false)) { ok, error in
             DispatchQueue.main.async {
                 status = ok ? "Asked the watch to start recording." : "Could not reach the watch: \(error?.localizedDescription ?? "unknown error")"
             }

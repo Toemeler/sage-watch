@@ -5,7 +5,7 @@ import WatchKit
 struct SageWatchApp: App {
     @WKApplicationDelegateAdaptor(WatchAppDelegate.self) private var appDelegate
     @StateObject private var health = HealthStore()
-    @StateObject private var alarm = SmartAlarm()
+    @StateObject private var alarm = SmartAlarm.shared
     @StateObject private var recorder = Recorder.shared
     @Environment(\.scenePhase) private var phase
 
@@ -57,7 +57,11 @@ struct FaceScreen: View {
                 }
                 .allowsHitTesting(false)
             }
-            if alarm.ringing { WakeOverlay { alarm.stop() } }
+            if alarm.ringing {
+                WakeOverlay { alarm.stop() }
+            } else if alarm.testing {
+                WakeOverlay(title: "Test alarm", subtitle: "from the iPhone · stops by itself") { alarm.stopTest() }
+            }
         }
         .ignoresSafeArea()
         .background(Color.black)
@@ -97,6 +101,8 @@ struct FaceScreen: View {
 
 /// Shown while the silent alarm taps: a soft sage sunrise and one large target to stop it.
 struct WakeOverlay: View {
+    var title = "Good morning"
+    var subtitle = "light sleep · woke gently"
     let stop: () -> Void
     @State private var glow = false
 
@@ -104,8 +110,8 @@ struct WakeOverlay: View {
         ZStack {
             RadialGradient(colors: [Color(hex: 0xC9A877).opacity(glow ? 0.45 : 0.15), .black.opacity(0.85)], center: .bottom, startRadius: 4, endRadius: 220)
             VStack(spacing: 8) {
-                Text("Good morning").font(.custom("PlayfairDisplay-Regular", size: 22)).foregroundStyle(FaceGeometry.Palette.ivory)
-                Text("light sleep · woke gently").font(.system(size: 12)).foregroundStyle(FaceGeometry.Palette.sage)
+                Text(title).font(.custom("PlayfairDisplay-Regular", size: 22)).foregroundStyle(FaceGeometry.Palette.ivory)
+                Text(subtitle).font(.system(size: 12)).foregroundStyle(FaceGeometry.Palette.sage)
                 Button(action: stop) {
                     Text("Stop").font(.headline).frame(maxWidth: .infinity)
                 }

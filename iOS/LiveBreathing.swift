@@ -1,5 +1,6 @@
 import Foundation
 import WatchConnectivity
+import HealthKit
 
 /// The iPhone half of live breathing: asks the watch for its motion stream while the screen is open and runs the
 /// breathing detector on what arrives.
@@ -17,13 +18,17 @@ final class LiveBreathing: ObservableObject {
     private var active = false
     private var lastSample: Date?
     private var recorderOff = false
+    private var lastWake = Date.distantPast
+    private let health = HKHealthStore()
 
     func start() {
         active = true
         detector = BreathingDetector()
         wave = []; peaks = []; rate = nil; lastSample = nil; recorderOff = false; receiving = false
         status = "Connecting to the watch…"
+        lastWake = .distantPast
         ask(on: true)
+        if !WCSession.default.isReachable { wakeWatch() }
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in self?.tick() }
     }
@@ -59,12 +64,24 @@ final class LiveBreathing: ObservableObject {
         ask(on: true)
         if let t = lastSample, Date().timeIntervalSince(t) < 3 { return }
         receiving = false
-        if recorderOff {
-            status = "Recording is off on the watch. Long-press the face and turn on Record."
-        } else if !WCSession.default.isReachable {
-            status = "The watch isn't reachable. Keep it close, with Sage open on it."
+        if !WCSession.default.isReachable || recorderOff {
+            wakeWatch()
+            status = "Waking Sage on the watch…"
         } else {
             status = "Waiting for the watch…"
+        }
+    }
+
+    /// Opens Sage on the watch with a live-breathing workout configuration, so it keeps running (and streaming) with
+    /// the watch screen off. At most every 30 s.
+    private func wakeWatch() {
+        guard active, Date().timeIntervalSince(lastWake) > 30 else { return }
+        lastWake = Date()
+        health.startWatchApp(with: WatchLaunch.configuration(live: true)) { ok, error in
+            DispatchQueue.main.async {
+                guard self.active, !ok, !self.receiving else { return }
+                self.status = "Couldn't open Sage on the watch: \(error?.localizedDescription ?? "unknown error"). Keep it close and unlocked."
+            }
         }
     }
 
