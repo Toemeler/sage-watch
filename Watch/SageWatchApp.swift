@@ -62,7 +62,7 @@ struct FaceScreen: View {
         .contentShape(Rectangle())
         .onLongPressGesture(minimumDuration: 0.8) { showControls = true }
         .sheet(isPresented: $showControls) {
-            RecorderControls().environmentObject(recorder)
+            RecorderControls().environmentObject(recorder).environmentObject(health)
         }
     }
 

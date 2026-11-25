@@ -171,7 +171,18 @@ enum FaceRenderer {
 
     enum Icon { case shoe, heart }
 
+    /// the subdials are drawn 25% larger than in the original design, so steps and heart rate read at a glance
+    static let subdialScale = 1.22
+
     private static func drawSubdial(_ ctx: inout GraphicsContext, at p: CGPoint, value: String, unit: String?, icon: Icon, progress: Double) {
+        var g = ctx
+        g.translateBy(x: p.x, y: p.y)
+        g.scaleBy(x: subdialScale, y: subdialScale)
+        g.translateBy(x: -p.x, y: -p.y)
+        drawSubdialUnscaled(&g, at: p, value: value, unit: unit, icon: icon, progress: progress)
+    }
+
+    private static func drawSubdialUnscaled(_ ctx: inout GraphicsContext, at p: CGPoint, value: String, unit: String?, icon: Icon, progress: Double) {
         func circle(_ r: Double) -> Path { Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)) }
         ctx.fill(circle(81), with: .color(Color(hex: 0x090909)))
         var r = 6.0; while r < 72 { ctx.stroke(circle(r), with: .color(.white.opacity(0.025)), lineWidth: 1); r += 3.2 }
