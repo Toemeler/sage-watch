@@ -76,6 +76,8 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
     private var motionCount = 0
     private var tapStride = 1
     private var tapCount = 0
+    private var liveSum = (0.0, 0.0, 0.0)        // averaged into the 10 Hz feed for the iPhone's live breathing
+    private var liveCount = 0
     // owned by heartQueue
     private var heartFile: RotatingCSV?
     private var statusFile: RotatingCSV?
@@ -367,11 +369,17 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         }
         if let line = summarizer.add(t: t, x: x, y: y, z: z) { summaryFile?.append(line, at: t) }
 
+        liveSum.0 += x; liveSum.1 += y; liveSum.2 += z
+        liveCount += 1
         tapCount += 1
         if tapCount >= tapStride {
             tapCount = 0
             let m = (x * x + y * y + z * z).squareRoot()
             DispatchQueue.main.async { self.motionTap?(m) }
+            let n = Double(liveCount)
+            LiveStreamer.shared.add(x: liveSum.0 / n, y: liveSum.1 / n, z: liveSum.2 / n)
+            liveSum = (0, 0, 0)
+            liveCount = 0
         }
         if motionCount % (hz * 10) == 0 {
             let c = motionCount

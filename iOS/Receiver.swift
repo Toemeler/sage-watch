@@ -119,6 +119,12 @@ final class Receiver: NSObject, ObservableObject, WCSessionDelegate {
         DispatchQueue.main.async { self.watchReachable = session.isPaired && session.isWatchAppInstalled }
     }
 
+    // live breathing: motion samples streamed from the watch while that screen is open
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        guard let data = message[LiveLink.samplesKey] as? Data else { return }
+        DispatchQueue.main.async { LiveBreathing.shared.receive(data) }
+    }
+
     func sessionDidBecomeInactive(_ session: WCSession) {}
 
     func sessionDidDeactivate(_ session: WCSession) {
