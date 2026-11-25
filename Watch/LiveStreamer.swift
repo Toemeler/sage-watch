@@ -1,6 +1,5 @@
 import Foundation
 import WatchConnectivity
-import WatchKit
 
 /// Streams the wrist's motion (10 times a second, averaged from the recorder's samples) to the iPhone while its
 /// live breathing screen is open. The iPhone repeats its request every few seconds; without one for 20 s the stream
@@ -25,14 +24,12 @@ final class LiveStreamer {
         awakeTimer = nil
         let recorder = Recorder.shared
         if on {
-            WKApplication.shared().isFrontmostTimeoutExtended = true
             if !recorder.isRunning {
                 if !recorder.keepRunning { startedRecorder = true }
                 recorder.start()
             }
             awakeTimer = Timer.scheduledTimer(withTimeInterval: 25, repeats: false) { [weak self] _ in self?.keepAwake(false) }
         } else {
-            WKApplication.shared().isFrontmostTimeoutExtended = false
             if startedRecorder && !recorder.keepRunning { recorder.stop() }
             startedRecorder = false
         }
