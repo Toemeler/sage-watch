@@ -4,6 +4,10 @@
 
 **LiveContainer:** the iPhone app runs; the watch app, complications and Health data need the SideStore install.
 
+## New in 0.3.2
+
+- The system time in the top-right corner is hidden on the face, so there is only one clock.
+
 ## New in 0.3.1
 
 - **No more lost heart-rate samples while the screen is off.** watchOS delivers them in batches then; the recorder now writes every sample of a batch, not just the newest.

@@ -57,6 +57,8 @@ struct FaceScreen: View {
         }
         .ignoresSafeArea()
         .background(Color.black)
+        // the face is the clock: hide the system time in the top-right corner (underscored but public SwiftUI API, watchOS 6+)
+        ._statusBarHidden(true)
         .contentShape(Rectangle())
         .onLongPressGesture(minimumDuration: 0.8) { showControls = true }
         .sheet(isPresented: $showControls) {
