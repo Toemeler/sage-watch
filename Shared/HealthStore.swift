@@ -16,13 +16,15 @@ final class HealthStore: ObservableObject {
         guard HKHealthStore.isHealthDataAvailable(),
               let stepType = HKQuantityType.quantityType(forIdentifier: .stepCount),
               let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
+        // On the watch the recorder asks for Health access at the same moment; if this request loses that race it
+        // throws, but the access granted through the other request still lets the queries read. So never give up here.
         do {
             try await store.requestAuthorization(toShare: [], read: [stepType, hrType])
-            available = true
         } catch {
-            available = false
-            return
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            try? await store.requestAuthorization(toShare: [], read: [stepType, hrType])
         }
+        available = true
         await refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { await self?.refresh() }
@@ -30,8 +32,8 @@ final class HealthStore: ObservableObject {
     }
 
     func refresh() async {
-        steps = await todaySteps()
-        heartRate = await latestHeartRate()
+        if let s = await todaySteps() { steps = s }
+        if let hr = await latestHeartRate() { heartRate = hr }
     }
 
     private func todaySteps() async -> Int? {
