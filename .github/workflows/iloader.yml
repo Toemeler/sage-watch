@@ -49,13 +49,15 @@ jobs:
 
       - name: Build
         working-directory: iloader
-        shell: bash
+        shell: pwsh   # not bash: Git's /usr/bin/link would shadow MSVC link.exe
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = "Stop"
           bun i --frozen-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           bun tauri build --no-bundle --config src-tauri/ci.conf.json
-          ls -la src-tauri/target/release/*.exe
-          cp src-tauri/target/release/iloader.exe ../iloader-sidestore-watch.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-ChildItem src-tauri/target/release/*.exe
+          Copy-Item src-tauri/target/release/iloader.exe ../iloader-sidestore-watch.exe
 
       - name: Publish pre-release
         env:
