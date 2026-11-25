@@ -62,4 +62,9 @@ final class RecordingFormatTests: XCTestCase {
         XCTAssertEqual(start.day, 24)
         XCTAssertEqual(start.hour, 16)
     }
+
+    func testCompactStepsFitTheSubdial() {
+        XCTAssertEqual(FaceRenderer.compactSteps(8431), "8,431")
+        XCTAssertEqual(FaceRenderer.compactSteps(12161), "12.2k")
+    }
 }

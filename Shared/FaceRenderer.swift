@@ -32,7 +32,7 @@ enum FaceRenderer {
         drawTime(&ctx, state.date, dimmed: state.dimmed)
         drawLabel(&ctx, state.label, dimmed: state.dimmed)
         if !state.dimmed && state.mode != .sleeping {
-            drawSubdial(&ctx, at: FaceGeometry.subdials[0], value: state.steps.map(Self.grouped) ?? "–", unit: nil, icon: .shoe,
+            drawSubdial(&ctx, at: FaceGeometry.subdials[0], value: state.steps.map(Self.compactSteps) ?? "–", unit: nil, icon: .shoe,
                         progress: Double(state.steps ?? 0) / 10_000)
             drawSubdial(&ctx, at: FaceGeometry.subdials[1], value: state.heartRate.map(String.init) ?? "–", unit: "BPM", icon: .heart,
                         progress: Double(state.heartRate ?? 0) / 180)
@@ -189,17 +189,24 @@ enum FaceRenderer {
             let on = j <= lit && progress > 0
             ctx.stroke(t, with: .color(on ? Color(hex: 0xDDD7C7) : Color(hex: 0x6E6C64)), lineWidth: major ? 2.6 : 1.5)
         }
-        // icon
+        // icon, small and high, so the number can be large enough to read at a glance
         switch icon {
-        case .shoe: ctx.fill(shoePath(in: CGRect(x: p.x - 22.75, y: p.y - 25, width: 45.5, height: 26.5)), with: .color(P.icon))
-        case .heart: ctx.fill(heartPath(in: CGRect(x: p.x - 13.75, y: p.y - 27, width: 29, height: 26)), with: .color(P.icon))
+        case .shoe: ctx.fill(shoePath(in: CGRect(x: p.x - 13.5, y: p.y - 47, width: 27, height: 15.7)), with: .color(P.icon))
+        case .heart: ctx.fill(heartPath(in: CGRect(x: p.x - 8.5, y: p.y - 48, width: 17.5, height: 15.7)), with: .color(P.icon))
         }
-        ctx.draw(Text(value).font(.custom("PlayfairDisplay-Regular", size: unit == nil ? 32 : 34)).foregroundColor(P.ivory),
-                 at: CGPoint(x: p.x, y: p.y + 20), anchor: .center)
+        let size: CGFloat = value.count <= 3 ? 58 : 46
+        ctx.draw(Text(value).font(.system(size: size, weight: .semibold, design: .rounded).monospacedDigit()).foregroundColor(P.ivory),
+                 at: CGPoint(x: p.x, y: p.y + 6), anchor: .center)
         if let unit {
-            ctx.draw(Text(unit).font(.custom("PlayfairDisplay-Regular", size: 17)).foregroundColor(Color(hex: 0xD0CAB9)),
-                     at: CGPoint(x: p.x, y: p.y + 48), anchor: .center)
+            ctx.draw(Text(unit).font(.system(size: 15, weight: .medium)).kerning(1.5).foregroundColor(Color(hex: 0xD0CAB9)),
+                     at: CGPoint(x: p.x, y: p.y + 44), anchor: .center)
         }
+    }
+
+    /// steps short enough for the subdial: 8,431 · 12.2k
+    static func compactSteps(_ n: Int) -> String {
+        if n < 10_000 { return grouped(n) }
+        return String(format: "%.1fk", Double(n) / 1000)
     }
 
     private static func drawPlaque(_ ctx: inout GraphicsContext) {

@@ -4,6 +4,11 @@
 
 **LiveContainer:** the iPhone app runs; the watch app, complications and Health data need the SideStore install.
 
+## New in 0.3.3
+
+- Steps and heart rate on the face are much larger (steps above 10,000 read as 12.2k).
+- Steps and heart rate no longer stay empty when the face and the recorder ask for Health access at the same time.
+
 ## New in 0.3.2
 
 - The system time in the top-right corner is hidden on the face, so there is only one clock.
