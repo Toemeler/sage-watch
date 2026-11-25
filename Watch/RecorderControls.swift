@@ -51,7 +51,8 @@ struct RecorderControls: View {
             Section("iPhone") {
                 row("Waiting to send", "\(outbox.pending)")
                 row("Sent", "\(outbox.sent)")
-                Button("Send now") { outbox.resendAll() }
+                // closes the current chunks too, so everything recorded so far reaches the iPhone (do this before updating Sage)
+                Button("Send now") { recorder.shipOpenChunks(); outbox.resendAll() }
             }
 
             Section {

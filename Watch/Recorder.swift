@@ -223,6 +223,19 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         }
     }
 
+    /// Closes the open chunks so they go to the iPhone now ("Send now"); recording carries on in new chunks.
+    func shipOpenChunks() {
+        motionQueue.addOperation {
+            self.summaryFile?.close()
+            self.rawFile?.close()
+            self.pressureFile?.close()
+        }
+        heartQueue.async {
+            self.heartFile?.close()
+            self.statusFile?.close()
+        }
+    }
+
     private func closeFiles() {
         motionQueue.addOperation {
             if let line = self.summarizer.flush() { self.summaryFile?.append(line, at: Date().timeIntervalSince1970) }
