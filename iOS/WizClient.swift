@@ -68,6 +68,8 @@ enum WizClient {
     /// answers a watch message
     static func handle(_ message: [String: Any]) async -> [String: Any] {
         switch message[LampLink.commandKey] as? String {
+        case LampLink.audio:
+            return AudioRoute.current()
         case LampLink.set:
             return await set(message[LampLink.paramsKey] as? [String: Any] ?? [:]).dictionary
         default:

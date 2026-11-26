@@ -6,6 +6,8 @@ enum LampLink {
     static let commandKey = "lamp"          // "status" | "set"
     static let paramsKey = "params"         // setPilot params for "set"
     static let status = "status", set = "set"
+    /// headphones and playback on the iPhone: reply {"bluetooth": Bool, "device": String, "playing": Bool}
+    static let audio = "audio"
 
     /// what the iPhone replies to either command
     struct State: Equatable {

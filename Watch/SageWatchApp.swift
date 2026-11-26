@@ -43,6 +43,8 @@ struct FaceScreen: View {
     @ObservedObject private var lamp = LampModel.shared
     @State private var showLamp = false
     @State private var openLampWhenHome = false
+    @ObservedObject private var audio = AudioModel.shared
+    @State private var showMusic = false
     @Environment(\.scenePhase) private var phase
 
     var body: some View {
@@ -70,6 +72,17 @@ struct FaceScreen: View {
                 .padding(.leading, 12).padding(.bottom, 10)
                 .transition(.opacity)
             }
+            if !dimmed && !alarm.ringing && !alarm.testing {
+                VStack {
+                    if audio.bluetooth { BluetoothBadge().padding(.top, 14) }
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        if audio.playing { MusicButton(audio: audio) { showMusic = true } }
+                    }
+                }
+                .padding(.trailing, 12).padding(.bottom, 10)
+            }
             if alarm.ringing {
                 WakeOverlay(subtitle: alarm.ringingBlock == .nap ? "one cycle done · woke gently" : "light sleep · woke gently") { alarm.stop() }
             } else if alarm.testing {
@@ -87,8 +100,16 @@ struct FaceScreen: View {
             guard g.translation.height < -40, abs(g.translation.width) < abs(g.translation.height) else { return }
             if lamp.home { showLamp = true } else { openLampWhenHome = true; lamp.refresh(force: true) }
         })
-        .onAppear { lamp.refresh(force: true) }
-        .onChange(of: phase) { _, p in if p == .active { lamp.refresh() } }
+        .onAppear { lamp.refresh(force: true); audio.refresh(force: true) }
+        .onChange(of: phase) { _, p in if p == .active { lamp.refresh(); audio.refresh(force: true) } }
+        // while the face is up, check headphones and playback every 20 s
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(20))
+                if phase == .active { audio.refresh() }
+            }
+        }
+        .sheet(isPresented: $showMusic) { NowPlayingView() }
         .onChange(of: lamp.home) { _, home in
             if home && openLampWhenHome { showLamp = true }
             openLampWhenHome = false
