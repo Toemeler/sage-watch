@@ -4,8 +4,6 @@ import SwiftUI
 struct FaceState {
     var date: Date
     var mode: FaceMode
-    var steps: Int?
-    var heartRate: Int?
     var dimmed: Bool = false          // always-on (luminance reduced)
     var battery: Int? = nil           // watch battery in percent; nil where unknown (the plaque then shows only the bolt)
     var charging: Bool = false
@@ -34,10 +32,6 @@ enum FaceRenderer {
         drawTime(&ctx, state.date, dimmed: state.dimmed)
         drawLabel(&ctx, state.label, dimmed: state.dimmed)
         if !state.dimmed && state.mode != .sleeping {
-            drawSubdial(&ctx, at: FaceGeometry.subdials[0], value: state.steps.map(Self.compactSteps) ?? "–", unit: nil, icon: .shoe,
-                        progress: Double(state.steps ?? 0) / 10_000)
-            drawSubdial(&ctx, at: FaceGeometry.subdials[1], value: state.heartRate.map(String.init) ?? "–", unit: "BPM", icon: .heart,
-                        progress: Double(state.heartRate ?? 0) / 180)
             drawPlaque(&ctx, battery: state.battery, charging: state.charging)
         }
     }
@@ -117,7 +111,7 @@ enum FaceRenderer {
         ctx.fill(Path(roundedRect: box, cornerRadius: 13), with: .color(Color(hex: 0x0D0E0C)))
         ctx.stroke(Path(roundedRect: box, cornerRadius: 13), with: .color(P.rim), lineWidth: 3.6)
         ctx.stroke(Path(roundedRect: box.insetBy(dx: 4.5, dy: 4.5), cornerRadius: 10), with: .color(.black), lineWidth: 1.6)
-        let f = DateFormatter(); f.locale = Locale(identifier: "en_US"); f.dateFormat = "EEE d"
+        let f = DateFormatter(); f.locale = Locale(identifier: "en_US"); f.dateFormat = "d"
         ctx.draw(Text(f.string(from: d).uppercased()).font(.custom("PlayfairDisplay-Regular", size: 30)).foregroundColor(P.ivory),
                  at: CGPoint(x: box.midX, y: box.midY + 1), anchor: .center)
     }
@@ -169,66 +163,13 @@ enum FaceRenderer {
                  at: CGPoint(x: 484, y: 535), anchor: .center)
     }
 
-    // MARK: subdials
-
-    enum Icon { case shoe, heart }
-
-    /// the subdials are drawn 25% larger than in the original design, so steps and heart rate read at a glance
-    static let subdialScale = 1.22
-
-    private static func drawSubdial(_ ctx: inout GraphicsContext, at p: CGPoint, value: String, unit: String?, icon: Icon, progress: Double) {
-        var g = ctx
-        g.translateBy(x: p.x, y: p.y)
-        g.scaleBy(x: subdialScale, y: subdialScale)
-        g.translateBy(x: -p.x, y: -p.y)
-        drawSubdialUnscaled(&g, at: p, value: value, unit: unit, icon: icon, progress: progress)
-    }
-
-    private static func drawSubdialUnscaled(_ ctx: inout GraphicsContext, at p: CGPoint, value: String, unit: String?, icon: Icon, progress: Double) {
-        func circle(_ r: Double) -> Path { Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)) }
-        ctx.fill(circle(81), with: .color(Color(hex: 0x090909)))
-        var r = 6.0; while r < 72 { ctx.stroke(circle(r), with: .color(.white.opacity(0.025)), lineWidth: 1); r += 3.2 }
-        ctx.stroke(circle(78), with: .color(Color(hex: 0x6F7563)), lineWidth: 6)
-        ctx.stroke(circle(77), with: .color(Color(hex: 0xA7AD96)), lineWidth: 2.6)
-        ctx.stroke(circle(74.2), with: .color(.black.opacity(0.85)), lineWidth: 1.4)
-        // scale: 43 ticks over ±126°, filled ticks show progress
-        let lit = Int((min(max(progress, 0), 1) * 42).rounded())
-        for j in 0...42 {
-            let a = (-126 + Double(j) * 6) * .pi / 180, major = j % 5 == 1 || j == 21
-            let r1 = 67.0, r2 = major ? 58.0 : 62.5
-            var t = Path()
-            t.move(to: CGPoint(x: p.x + sin(a) * r1, y: p.y - cos(a) * r1))
-            t.addLine(to: CGPoint(x: p.x + sin(a) * r2, y: p.y - cos(a) * r2))
-            let on = j <= lit && progress > 0
-            ctx.stroke(t, with: .color(on ? Color(hex: 0xDDD7C7) : Color(hex: 0x6E6C64)), lineWidth: major ? 2.6 : 1.5)
-        }
-        // icon, small and high, so the number can be large enough to read at a glance
-        switch icon {
-        case .shoe: ctx.fill(shoePath(in: CGRect(x: p.x - 13.5, y: p.y - 47, width: 27, height: 15.7)), with: .color(P.icon))
-        case .heart: ctx.fill(heartPath(in: CGRect(x: p.x - 8.5, y: p.y - 48, width: 17.5, height: 15.7)), with: .color(P.icon))
-        }
-        let size: CGFloat = value.count <= 3 ? 58 : 46
-        ctx.draw(Text(value).font(.system(size: size, weight: .semibold, design: .rounded).monospacedDigit()).foregroundColor(P.ivory),
-                 at: CGPoint(x: p.x, y: p.y + 6), anchor: .center)
-        if let unit {
-            ctx.draw(Text(unit).font(.system(size: 15, weight: .medium)).kerning(1.5).foregroundColor(Color(hex: 0xD0CAB9)),
-                     at: CGPoint(x: p.x, y: p.y + 44), anchor: .center)
-        }
-    }
-
-    /// steps short enough for the subdial: 8,431 · 12.2k
-    static func compactSteps(_ n: Int) -> String {
-        if n < 10_000 { return grouped(n) }
-        return String(format: "%.1fk", Double(n) / 1000)
-    }
-
     /// battery level as a whole percentage; nil while watchOS reports no level (monitoring off, simulator)
     static func batteryPercent(_ level: Float) -> Int? {
         guard level >= 0 else { return nil }
         return min(100, max(0, Int((Double(level) * 100).rounded())))
     }
 
-    /// the plaque under the subdials: the watch battery, with a bolt while charging (gold at 20 % and below);
+    /// the plaque at the bottom: the watch battery, with a bolt while charging (gold at 20 % and below);
     /// just the bolt where no level is known
     private static func drawPlaque(_ ctx: inout GraphicsContext, battery: Int?, charging: Bool) {
         let width = battery == nil ? 76.5 : 104
@@ -249,43 +190,6 @@ enum FaceRenderer {
         bolt.addLines([(1, -6.6), (-3.8, 0.9), (-0.5, 0.9), (-1.3, 6.6), (3.8, -1), (0.5, -1)].map { CGPoint(x: c.x + $0.0 * s, y: c.y + $0.1 * s) })
         bolt.closeSubpath()
         ctx.fill(bolt, with: .color(Color(hex: 0xC0B89E)))
-    }
-
-    // MARK: icon shapes (12 x 6.6 and 10 x 9 design boxes, as in the prototype)
-
-    static func shoePath(in r: CGRect) -> Path {
-        let sx = r.width / 12, sy = r.height / 6.6
-        func p(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: r.minX + x * sx, y: r.minY + y * sy) }
-        var a = Path()
-        a.move(to: p(0.3, 4.6))
-        a.addCurve(to: p(1.1, 2.7), control1: p(0.1, 3.6), control2: p(0.4, 3))
-        a.addCurve(to: p(3.4, 1.2), control1: p(2, 2.4), control2: p(2.7, 2.2))
-        a.addCurve(to: p(4.9, 0.4), control1: p(3.8, 0.6), control2: p(4.3, 0.3))
-        a.addLine(to: p(6.1, 0.7))
-        a.addCurve(to: p(8.5, 2.4), control1: p(6.5, 1.5), control2: p(7.3, 2.1))
-        a.addCurve(to: p(11.9, 4.6), control1: p(10.4, 2.9), control2: p(11.8, 3.6))
-        a.closeSubpath()
-        a.move(to: p(0.2, 5.2)); a.addLine(to: p(11.9, 5.2))
-        a.addCurve(to: p(10.6, 6.5), control1: p(11.9, 6), control2: p(11.4, 6.5))
-        a.addLine(to: p(1.1, 6.5))
-        a.addCurve(to: p(0.2, 5.2), control1: p(0.5, 6.5), control2: p(0.2, 6))
-        a.closeSubpath()
-        return a
-    }
-
-    static func heartPath(in r: CGRect) -> Path {
-        let sx = r.width / 10, sy = r.height / 9
-        func p(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: r.minX + x * sx, y: r.minY + y * sy) }
-        var h = Path()
-        h.move(to: p(5, 9))
-        h.addCurve(to: p(0, 2.7), control1: p(1, 6), control2: p(0, 4.3))
-        h.addCurve(to: p(2.6, 0), control1: p(0, 1.2), control2: p(1.2, 0))
-        h.addCurve(to: p(5, 1.5), control1: p(3.7, 0), control2: p(4.5, 0.6))
-        h.addCurve(to: p(7.4, 0), control1: p(5.5, 0.6), control2: p(6.3, 0))
-        h.addCurve(to: p(10, 2.7), control1: p(8.8, 0), control2: p(10, 1.2))
-        h.addCurve(to: p(5, 9), control1: p(10, 4.3), control2: p(9, 6))
-        h.closeSubpath()
-        return h
     }
 
     static func grouped(_ n: Int) -> String {

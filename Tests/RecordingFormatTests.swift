@@ -63,11 +63,6 @@ final class RecordingFormatTests: XCTestCase {
         XCTAssertEqual(start.hour, 16)
     }
 
-    func testCompactStepsFitTheSubdial() {
-        XCTAssertEqual(FaceRenderer.compactSteps(8431), "8,431")
-        XCTAssertEqual(FaceRenderer.compactSteps(12161), "12.2k")
-    }
-
     func testBatteryPercent() {
         XCTAssertNil(FaceRenderer.batteryPercent(-1))
         XCTAssertEqual(FaceRenderer.batteryPercent(0.836), 84)

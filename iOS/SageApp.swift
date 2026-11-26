@@ -104,16 +104,6 @@ struct TodayView: View {
                                 Text("one cycle after you fall asleep").font(.caption).foregroundStyle(Theme.muted)
                             }
                         }
-                        Card {
-                            Eyebrow(text: "Steps")
-                            Text(health.steps.map(FaceRenderer.grouped) ?? "–").font(Theme.serif(24)).foregroundStyle(Theme.ivory)
-                            ProgressView(value: min(1, Double(health.steps ?? 0) / 10_000)).tint(Theme.sage)
-                        }
-                        Card {
-                            Eyebrow(text: "Heart")
-                            Text(health.heartRate.map(String.init) ?? "–").font(Theme.serif(24)).foregroundStyle(Theme.ivory)
-                            Text(health.available ? "bpm · latest" : "Health not available").font(.caption).foregroundStyle(Theme.muted)
-                        }
         }
     }
 
@@ -121,7 +111,7 @@ struct TodayView: View {
         let mode = FaceMode.auto(d)
         return HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 2) {
-                Eyebrow(text: d.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                Eyebrow(text: d.formatted(.dateTime.day().month(.wide)))
                 Text(greeting(d)).font(Theme.serif(26)).foregroundStyle(Theme.ivory)
             }
             Spacer()
@@ -291,7 +281,7 @@ struct FacePreview: View {
     }
 
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
-        let state = FaceState(date: date, mode: mode ?? FaceMode.auto(date), steps: health.steps, heartRate: health.heartRate)
+        let state = FaceState(date: date, mode: mode ?? FaceMode.auto(date))
         FaceRenderer.draw(&ctx, size: size, state: state)
     }
 }

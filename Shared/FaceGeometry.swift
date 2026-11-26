@@ -6,7 +6,6 @@ enum FaceGeometry {
     static let screen = CGRect(x: 131, y: 63, width: 696, height: 830)
     static let dialCentre = CGPoint(x: 480.5, y: 478)
     static let disc = (centre: CGPoint(x: 482, y: 418), r: 182.0)
-    static let subdials = [CGPoint(x: 358.75, y: 671), CGPoint(x: 613.75, y: 671)]
 
     enum Palette {
         static let ivory = Color(hex: 0xE2D9C9), sage = Color(hex: 0x8C9A7E), sageLight = Color(hex: 0xB9C4AA)

@@ -50,14 +50,6 @@ struct RecorderControls: View {
                 Text("Nap: wakes you when the cycle ends, \(Int(s.napEarliest))–\(Int(s.napLatest)) min after you fall asleep. Stop with the button, a hard shake or the iPhone.")
             }
 
-            Section("Health") {
-                row("Steps", health.steps.map(FaceRenderer.grouped) ?? "–")
-                row("Heart rate", health.heartRate.map { "\($0) bpm" } ?? "–")
-                if let p = health.problem {
-                    Text(p).font(.footnote).foregroundStyle(.red)
-                }
-            }
-
             Section("Capture") {
                 Picker("Raw motion", selection: $recorder.rawMotionHz) {
                     Text("Off").tag(0)

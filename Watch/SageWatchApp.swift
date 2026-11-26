@@ -40,9 +40,6 @@ struct FaceScreen: View {
     @ObservedObject private var activity = ActivityMonitor.shared
     @Environment(\.isLuminanceReduced) private var dimmed
     @State private var showControls = false
-    @State private var battery: Int?
-    @State private var charging = false
-    private let batteryTick = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ZStack {
@@ -70,8 +67,6 @@ struct FaceScreen: View {
         ._statusBarHidden(true)
         .contentShape(Rectangle())
         .onLongPressGesture(minimumDuration: 0.8) { showControls = true }
-        .onAppear(perform: readBattery)
-        .onReceive(batteryTick) { _ in readBattery() }
         .sheet(isPresented: $showControls) {
             RecorderControls().environmentObject(recorder).environmentObject(health)
         }
@@ -84,19 +79,27 @@ struct FaceScreen: View {
     }
 
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
-        // while recording, the face shows the live heart rate from the workout session
-        let bpm = recorder.isRunning ? (recorder.bpm ?? health.heartRate) : health.heartRate
-        let state = FaceState(date: date, mode: FaceMode.auto(date, activity: activity.context), steps: health.steps, heartRate: bpm, dimmed: dimmed,
-                              battery: battery, charging: charging)
+        let power = BatteryReader.read(date)
+        let state = FaceState(date: date, mode: FaceMode.auto(date, activity: activity.context), dimmed: dimmed,
+                              battery: power.percent, charging: power.charging)
         FaceRenderer.draw(&ctx, size: size, state: state)
     }
 
-    /// battery for the plaque, read every 30 s rather than every frame
-    private func readBattery() {
+}
+
+/// Battery for the plaque, read from the frame being drawn (at most every 15 s). A SwiftUI timer stored in the view
+/// was recreated with every re-render of the view and so never fired, which left the plaque on the level at launch.
+enum BatteryReader {
+    private static var last: (at: Date, percent: Int?, charging: Bool)?
+
+    static func read(_ now: Date) -> (percent: Int?, charging: Bool) {
+        if let l = last, abs(now.timeIntervalSince(l.at)) < 15 { return (l.percent, l.charging) }
         let device = WKInterfaceDevice.current()
         device.isBatteryMonitoringEnabled = true
-        battery = FaceRenderer.batteryPercent(device.batteryLevel)
-        charging = device.batteryState == .charging || device.batteryState == .full
+        let state = device.batteryState
+        let value = (now, FaceRenderer.batteryPercent(device.batteryLevel), state == .charging || state == .full)
+        last = value
+        return (value.1, value.2)
     }
 }
 
