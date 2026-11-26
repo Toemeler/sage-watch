@@ -116,16 +116,21 @@ final class NightStore: ObservableObject {
             await SleepHealth.requestAccess()
             let now = Date().timeIntervalSince1970
             let lo = now - Double(days) * 86400
-            let health = await SleepHealth.samples(from: Date(timeIntervalSince1970: lo - 86400), to: Date())
+            // sleeps that ended well before the newest one are final: only the last day and a half is read again
+            let newest = records.map(\.analysis.wake).max()
+            let scanFrom = max(lo, (newest ?? lo) - 36 * 3600)
+            let kept = records.filter { $0.analysis.wake < scanFrom && $0.analysis.onset >= lo }
+            let health = await SleepHealth.samples(from: Date(timeIntervalSince1970: scanFrom - 86400), to: Date())
             let cached = Dictionary(records.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
             let result = await Task.detached(priority: .userInitiated) {
-                Self.analyse(from: lo, to: now, health: health, cached: cached)
+                Self.analyse(from: scanFrom, to: now, health: health, cached: cached)
             }.value
-            records = result.records
-            note = result.note
+            let fresh = result.records.filter { r in !kept.contains { $0.analysis.wake > r.analysis.onset && r.analysis.wake > $0.analysis.onset } }
+            records = (fresh + kept).sorted { $0.analysis.onset > $1.analysis.onset }
+            note = records.isEmpty ? result.note : nil
             busy = false
             refreshing = nil
-            Self.saveCache(result.records)
+            Self.saveCache(records)
             WatchSync.shared.sendLastSleep(lastNight)
         }
     }
@@ -136,7 +141,7 @@ final class NightStore: ObservableObject {
                                             cached: [String: Record]) -> (records: [Record], note: String?) {
         let lib = RecordingLibrary()
         let sec = lib.seconds(lo, now)
-        guard sec.count > 0 else { return ([], "No motion data from the watch in the last two weeks yet.") }
+        guard sec.count > 0 else { return ([], "No motion data from the watch yet.") }
         let charging = lib.charging(lo, now)
         let heartAll = lib.heart(lo - 3600, now)
         let events = lib.events(lo - 86400, now)
