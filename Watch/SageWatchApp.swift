@@ -82,6 +82,17 @@ struct FaceScreen: View {
                     }
                 }
                 .padding(.trailing, 12).padding(.bottom, 10)
+                // tap the cover for pause, skip and back
+                if audio.showsCover {
+                    GeometryReader { geo in
+                        let r = FaceRenderer.viewRect(FaceRenderer.coverRect, in: geo.size)
+                        Color.clear.contentShape(Rectangle())
+                            .frame(width: r.width, height: r.height)
+                            .position(x: r.midX, y: r.midY)
+                            .onTapGesture { showMusic = true }
+                    }
+                    .ignoresSafeArea()
+                }
             }
             if alarm.ringing {
                 WakeOverlay(subtitle: alarm.ringingBlock == .nap ? "one cycle done · woke gently" : "light sleep · woke gently") { alarm.stop() }
@@ -128,7 +139,8 @@ struct FaceScreen: View {
 
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
         let power = BatteryReader.read(date)
-        let state = FaceState(date: date, mode: FaceMode.auto(date), bpm: recorder.bpm ?? health.heartRate, dimmed: dimmed,
+        let state = FaceState(date: date, mode: FaceMode.auto(date), bpm: recorder.bpm ?? health.heartRate,
+                              cover: audio.showsCover ? audio.cover : nil, track: audio.showsCover ? audio.track : nil, dimmed: dimmed,
                               battery: power.percent, charging: power.charging)
         FaceRenderer.draw(&ctx, size: size, state: state)
     }

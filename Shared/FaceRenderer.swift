@@ -5,6 +5,8 @@ struct FaceState {
     var date: Date
     var mode: FaceMode
     var bpm: Int? = nil               // last measured heart rate: the seconds runner swells on each beat
+    var cover: Image? = nil           // Spotify cover while music plays, drawn under the clock
+    var track: String? = nil          // "title · artist" under the cover
     var dimmed: Bool = false          // always-on (luminance reduced)
     var battery: Int? = nil           // watch battery in percent; nil where unknown (the plaque then shows only the bolt)
     var charging: Bool = false
@@ -30,6 +32,7 @@ enum FaceRenderer {
         if !state.dimmed { drawNumerals(&ctx) }
         if !state.dimmed { drawDate(&ctx, state.date) }
         drawTime(&ctx, state.date, dimmed: state.dimmed)
+        if !state.dimmed, let cover = state.cover { drawCover(&ctx, cover, track: state.track) }
         if !state.dimmed && state.mode != .sleeping {
             drawPlaque(&ctx, battery: state.battery, charging: state.charging, date: state.date, dimmed: false)
         }
@@ -178,6 +181,31 @@ enum FaceRenderer {
 
     /// the plaque at the bottom: the watch battery, with a bolt while charging (gold at 20 % and below);
     /// just the bolt where no level is known
+    /// where the cover sits in the reference space (also the tap area on the watch)
+    static let coverRect = CGRect(x: 484 - 76, y: 548, width: 152, height: 152)
+
+    /// maps a rectangle of the reference space to view coordinates for a face drawn into `size`
+    static func viewRect(_ r: CGRect, in size: CGSize) -> CGRect {
+        let src = FaceGeometry.screen
+        let scale = max(size.width / src.width, size.height / src.height)
+        let ox = (size.width - src.width * scale) / 2 - src.minX * scale, oy = (size.height - src.height * scale) / 2 - src.minY * scale
+        return CGRect(x: ox + r.minX * scale, y: oy + r.minY * scale, width: r.width * scale, height: r.height * scale)
+    }
+
+    private static func drawCover(_ ctx: inout GraphicsContext, _ cover: Image, track: String?) {
+        let r = coverRect
+        let shape = Path(roundedRect: r, cornerRadius: 16)
+        ctx.fill(Path(roundedRect: r.offsetBy(dx: 3, dy: 5), cornerRadius: 16), with: .color(.black.opacity(0.6)))
+        var g = ctx
+        g.clip(to: shape)
+        g.draw(cover, in: r)
+        ctx.stroke(shape, with: .color(P.rim), lineWidth: 2.5)
+        if let track, !track.isEmpty {
+            ctx.draw(Text(track).font(.system(size: 19, weight: .medium)).foregroundColor(P.text),
+                     at: CGPoint(x: r.midX, y: r.maxY + 26), anchor: .center)
+        }
+    }
+
     /// the level the bar shows; it eases toward the real level so changes slide instead of jumping
     private static var shownLevel: Double?
 

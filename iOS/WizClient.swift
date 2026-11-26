@@ -69,7 +69,10 @@ enum WizClient {
     static func handle(_ message: [String: Any]) async -> [String: Any] {
         switch message[LampLink.commandKey] as? String {
         case LampLink.audio:
-            return AudioRoute.current()
+            var reply = AudioRoute.current()
+            let track = await Spotify.shared.nowPlayingReply(watchHas: message["artURL"] as? String)
+            reply.merge(track) { _, new in new }
+            return reply
         case LampLink.set:
             return await set(message[LampLink.paramsKey] as? [String: Any] ?? [:]).dictionary
         default:

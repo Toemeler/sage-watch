@@ -249,6 +249,7 @@ struct FacesView: View {
                 Card {
                     ForEach(FaceMode.allCases, id: \.self) { m in modeRow(m) }
                 }
+                SpotifyCard()
             }
             .padding(16)
         }
