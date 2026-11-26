@@ -1,0 +1,298 @@
+<title>Sage Face Preview</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!--
+  1:1 port of Shared/FaceRenderer.swift + FaceGeometry.swift (and the SwiftUI overlays from Watch/SageWatchApp.swift),
+  for iterating on the design fast. Serve the repo root (python -m http.server 8765) and open /tools/face-preview/.
+  Keep this file in step with the Swift renderer when the design is settled.
+-->
+<style>
+  :root { color-scheme: dark; --bg: #1b1c1a; --fg: #cfcbbb; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 13px -apple-system, system-ui, sans-serif;
+         display: flex; gap: 32px; padding-block: 28px; flex-wrap: wrap; align-items: flex-start; justify-content: center;
+         padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  @media (max-width: 440px) { .watch { transform: scale(0.88); transform-origin: top center; margin-bottom: -60px; } }
+  .watch { position: relative; padding: 18px; border-radius: 64px; background: #2a2b29;
+           box-shadow: inset 0 0 0 2px #3a3b38, 0 20px 50px #0008; }
+  .screen { position: relative; width: 368px; height: 448px; border-radius: 46px; overflow: hidden; background: #000; }
+  canvas { display: block; width: 368px; height: 448px; }
+  .overlay { position: absolute; inset: 0; pointer-events: none; }
+  .lamp { position: absolute; left: 12px; bottom: 10px; width: 34px; height: 34px; border-radius: 50%;
+          background: #0d0e0c; border: 1.5px solid #8a917c; display: grid; place-items: center; color: #8c9a7e; }
+  .bt { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); width: 19px; height: 19px; border-radius: 50%;
+        background: #0d0e0c; display: grid; place-items: center; color: #5aa0e6; }
+  .controls { display: grid; grid-template-columns: auto auto; gap: 8px 14px; align-items: center; min-width: 260px; }
+  .controls h2 { grid-column: 1 / -1; margin: 0 0 6px; font: 600 15px system-ui; color: #e2d9c9; }
+  input[type=range] { width: 160px; }
+  .hint { grid-column: 1 / -1; color: #8a877d; font-size: 12px; max-width: 300px; line-height: 1.4; margin-top: 8px; }
+</style>
+<div class="watch"><div class="screen">
+  <canvas id="face" width="736" height="896"></canvas>
+  <div class="overlay">
+    <div class="bt" id="bt" hidden><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 0 0-9 9v6a3 3 0 0 0 3 3h1a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H5v-1a7 7 0 0 1 14 0v1h-2a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h1a3 3 0 0 0 3-3v-6a9 9 0 0 0-9-9z"/></svg></div>
+    <div class="lamp" id="lamp" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg></div>
+  </div>
+</div></div>
+
+<div class="controls">
+  <h2>State</h2>
+  <label>Time</label><input id="time" type="time" step="1">
+  <label>Live clock</label><input id="live" type="checkbox" checked>
+  <label>Heart rate <span id="bpmv"></span></label><input id="bpm" type="range" min="0" max="180" value="64">
+  <label>Battery <span id="batv"></span></label><input id="bat" type="range" min="0" max="100" value="78">
+  <label>Charging</label><input id="charging" type="checkbox">
+  <label>Music playing</label><input id="music" type="checkbox" checked>
+  <label>Headphones</label><input id="bluetooth" type="checkbox" checked>
+  <label>At home (lamp)</label><input id="home" type="checkbox" checked>
+  <label>Sleep face</label><input id="sleeping" type="checkbox">
+  <label>Always-on (dimmed)</label><input id="dimmed" type="checkbox">
+  <p class="hint">Coordinates are the renderer's reference space (screen x 131–827, y 63–893). Change the code here, reload, and port the settled values back to Shared/FaceRenderer.swift.</p>
+</div>
+
+<script>
+// ---------- geometry (FaceGeometry.swift) ----------
+const SCREEN = { x: 131, y: 63, w: 696, h: 830 };
+const DIAL = { x: 480.5, y: 478 };
+const DISC = { x: 479, y: 478, r: 182 };
+const P = { ivory: "#E2D9C9", sage: "#8C9A7E", sageLight: "#B9C4AA", sageDark: "#55604B", num: "#ADB19D",
+            track: "#43443E", text: "#CFCBBB", icon: "#ADB39D", rim: "#8A917C", gold: "#C9A877" };
+const INDICES = [
+  [475,118,0,71,15],[492.5,118,0,71,15],[698,122,30,64,18],[781,293.5,90,54,17.5],[781,467,90,54,17.5],[781,646.5,90,54,17.5],
+  [704,834,-30,64,18],[484.5,852,0,48.5,19],[264,834,30,64,18],[180.5,646.5,90,54,17.5],[180.5,467,90,54,17.5],[180.5,293.5,90,54,17.5],
+  [266,122,-30,64,18]];
+const NUMERALS = [[299,190.5,"55"],[670,190.5,"05"],[241,332.5,"50"],[731,334,"10"],[241,603.5,"40"],[730,603.5,"20"],[299.5,774,"35"],[670,774,"25"]];
+
+function railSdf(rail, px, py) {
+  const hx = rail.w / 2, hy = rail.h / 2, cx = rail.x + hx, cy = rail.y + hy;
+  const qx = Math.abs(px - cx) - (hx - rail.r), qy = Math.abs(py - cy) - (hy - rail.r);
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - rail.r;
+}
+function railHit(rail, t, c) {
+  const dx = Math.sin(t), dy = -Math.cos(t);
+  let lo = 0, hi = 900;
+  for (let i = 0; i < 45; i++) { const m = (lo + hi) / 2; if (railSdf(rail, c.x + dx * m, c.y + dy * m) < 0) lo = m; else hi = m; }
+  const p = { x: c.x + dx * lo, y: c.y + dy * lo }, e = 0.05;
+  let nx = railSdf(rail, p.x + e, p.y) - railSdf(rail, p.x - e, p.y);
+  let ny = railSdf(rail, p.x, p.y + e) - railSdf(rail, p.x, p.y - e);
+  const h = Math.hypot(nx, ny);
+  return { p, n: { x: nx / h, y: ny / h } };
+}
+const OUTER = { x: 153.5, y: 81.5, w: 654, h: 793.5, r: 148 };
+const INNER = { x: 181.5, y: 109.5, w: 598, h: 737.5, r: 120 };
+const TICKS = Array.from({ length: 300 }, (_, i) => railHit(OUTER, i / 300 * 2 * Math.PI, DIAL));
+
+// ---------- glyphs (Glyphs.swift) ----------
+let GLYPHS = null;
+function pathBounds(d) {   // on-curve points only, like CGPath.boundingBoxOfPath
+  const tok = d.match(/[MLHVQCZmlhvqcz]|-?\d*\.?\d+(?:e-?\d+)?/g); let cmd = "M", i = 0, cx = 0, cy = 0;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const add = (x, y) => { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); cx = x; cy = y; };
+  const num = () => parseFloat(tok[i++]);
+  while (i < tok.length) {
+    if (/[a-zA-Z]/.test(tok[i])) { cmd = tok[i++]; if (cmd.toUpperCase() === "Z") continue; }
+    const rel = cmd === cmd.toLowerCase(), U = cmd.toUpperCase();
+    if (U === "M" || U === "L") { const x = num(), y = num(); add(rel ? cx + x : x, rel ? cy + y : y); }
+    else if (U === "H") { const x = num(); add(rel ? cx + x : x, cy); }
+    else if (U === "V") { const y = num(); add(cx, rel ? cy + y : y); }
+    else if (U === "Q") { num(); num(); const x = num(), y = num(); add(rel ? cx + x : x, rel ? cy + y : y); }
+    else if (U === "C") { num(); num(); num(); num(); const x = num(), y = num(); add(rel ? cx + x : x, rel ? cy + y : y); }
+    else i++;
+  }
+  return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
+}
+function loadSet(raw) {
+  const digits = {};
+  for (const [k, v] of Object.entries(raw.digits)) digits[+k] = { path: new Path2D(v.d), adv: v.adv, b: pathBounds(v.d) };
+  return digits;
+}
+function slots(set, t0, t1, x0, x1, h, base) {
+  const z = set[0].b, s = h / z.h, a = set[t0], b = set[t1];
+  const inkW = (a.adv + b.b.maxX) - a.b.minX, sx = (x1 - x0) / (inkW * s);
+  const ox = x0 - a.b.minX * s * sx, baseY = base + z.minY * s;
+  return [{ x: ox, sx: s * sx, sy: s, base: baseY }, { x: ox + a.adv * s * sx, sx: s * sx, sy: s, base: baseY }];
+}
+let REG, ITA, HOUR_SLOTS, MIN_SLOTS;
+
+// ---------- renderer (FaceRenderer.swift) ----------
+let shownLevel = null;
+
+function draw(ctx, st) {
+  ctx.save();
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const scale = Math.max(W / SCREEN.w, H / SCREEN.h);
+  ctx.translate((W - SCREEN.w * scale) / 2, (H - SCREEN.h * scale) / 2);
+  ctx.scale(scale, scale);
+  ctx.translate(-SCREEN.x, -SCREEN.y);
+  ctx.fillStyle = "#000"; ctx.fillRect(SCREEN.x, SCREEN.y, SCREEN.w, SCREEN.h);
+  if (!st.dimmed) drawDial(ctx);
+  drawTrack(ctx, st.dimmed);
+  if (!st.dimmed) drawRunner(ctx, st.date, st.bpm);
+  drawIndices(ctx, st.dimmed);
+  if (!st.dimmed) drawNumerals(ctx);
+  drawTime(ctx, st.date, st.dimmed);
+  if (!st.dimmed && st.music) drawMusic(ctx, st.date);
+  if (!st.dimmed && !st.sleeping) drawBattery(ctx, st.battery, st.charging);
+  ctx.restore();
+}
+
+function drawDial(ctx) {
+  const c = DISC;
+  ctx.beginPath();
+  for (let i = 0; i < 240; i++) {
+    const t = i / 240 * 2 * Math.PI;
+    ctx.moveTo(c.x + Math.sin(t) * 30, c.y - Math.cos(t) * 30); ctx.lineTo(c.x + Math.sin(t) * 700, c.y - Math.cos(t) * 700);
+  }
+  ctx.strokeStyle = "rgba(255,255,255,0.02)"; ctx.lineWidth = 0.6; ctx.stroke();
+  ctx.beginPath(); ctx.arc(c.x, c.y, 182, 0, 2 * Math.PI);
+  ctx.fillStyle = "rgba(0,0,0,0.22)"; ctx.fill(); ctx.strokeStyle = "#262624"; ctx.lineWidth = 3.5; ctx.stroke();
+  ctx.beginPath();
+  for (let R = 24; R < 182; R += 7) {
+    for (let i = 0; i <= 360; i += 4) {
+      const t = i * Math.PI / 180, r = R + 2.2 * Math.sin(t * 18 + R * 0.09);
+      const x = c.x + Math.sin(t) * r, y = c.y - Math.cos(t) * r;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+  ctx.strokeStyle = "rgba(255,255,255,0.035)"; ctx.lineWidth = 1; ctx.stroke();
+}
+
+function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+
+function drawTrack(ctx, dimmed) {
+  ctx.globalAlpha = dimmed ? 0.45 : 1; ctx.strokeStyle = P.track;
+  for (const r of [OUTER, INNER]) { rrect(ctx, r.x, r.y, r.w, r.h, r.r); ctx.lineWidth = 2.2; ctx.stroke(); }
+  ctx.globalAlpha = 1;
+  if (dimmed) return;
+  for (const major of [true, false]) {
+    ctx.beginPath();
+    TICKS.forEach(({ p, n }, i) => {
+      if ((i % 5 === 0) !== major) return;
+      const len = major ? 28 : 9;
+      ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - n.x * len, p.y - n.y * len);
+    });
+    ctx.lineWidth = major ? 2 : 1.4; ctx.stroke();
+  }
+}
+
+function heartbeat(date, bpm) {
+  if (!bpm || bpm <= 20) return 0;
+  const t = date.getTime() / 1000 * bpm / 60, phase = t - Math.floor(t);
+  const lub = Math.exp(-phase * 14), dub = phase > 0.18 ? 0.5 * Math.exp(-(phase - 0.18) * 16) : 0;
+  return Math.min(1, lub + dub);
+}
+
+function drawRunner(ctx, date, bpm) {
+  const sec = date.getSeconds() + date.getMilliseconds() / 1000;
+  const head = Math.floor(sec * 5) % 300, trail = 30, beat = heartbeat(date, bpm);
+  for (let k = 0; k < trail; k++) {
+    const i = (head - k + 300) % 300, { p, n } = TICKS[i], len = (i % 5 === 0 ? 32 : 18) * (1 + 1.1 * beat);
+    const fade = Math.pow(1 - k / trail, 1.3);
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - n.x * len, p.y - n.y * len);
+    ctx.strokeStyle = k === 0 ? `rgba(255,255,255,${fade})` : `rgba(221,235,210,${fade})`;
+    ctx.lineWidth = (k === 0 ? 5 : (i % 5 === 0 ? 3.6 : 3)) * (1 + 0.7 * beat); ctx.stroke();
+  }
+}
+
+function drawIndices(ctx, dimmed) {
+  for (const [cx, cy, rot, len, w] of INDICES) {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot * Math.PI / 180);
+    if (dimmed) ctx.globalAlpha = 0.45;
+    const h = len / 2, b = w / 2, bv = Math.min(w * 0.28, 5);
+    if (!dimmed) { ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(-b + 2, -h + 3, w, len); }
+    ctx.fillStyle = P.sage; ctx.fillRect(-b, -h, w, len);
+    const quad = (pts, col) => { ctx.beginPath(); pts.forEach(([x, y], j) => j ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fillStyle = col; ctx.fill(); };
+    quad([[-b, -h], [-b + bv, -h + bv], [-b + bv, h - bv], [-b, h]], P.sageLight);
+    quad([[b, -h], [b - bv, -h + bv], [b - bv, h - bv], [b, h]], P.sageDark);
+    quad([[-b, -h], [b, -h], [b - bv, -h + bv], [-b + bv, -h + bv]], "#CBD5BE");
+    quad([[-b, h], [b, h], [b - bv, h - bv], [-b + bv, h - bv]], "#46503E");
+    ctx.fillStyle = "#97A589"; ctx.fillRect(-b + bv, -h + bv, w - 2 * bv, len - 2 * bv);
+    ctx.restore();
+  }
+}
+
+function drawNumerals(ctx) {
+  ctx.font = '30px "Playfair"'; ctx.fillStyle = P.num; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  for (const [x, y, s] of NUMERALS) ctx.fillText(s, x, y);
+}
+
+function drawTime(ctx, date, dimmed) {
+  if (!REG) return;
+  const h = date.getHours(), m = date.getMinutes();
+  const digits = [[Math.floor(h / 10), REG, HOUR_SLOTS[0], P.ivory], [h % 10, REG, HOUR_SLOTS[1], P.ivory],
+                  [Math.floor(m / 10), ITA, MIN_SLOTS[0], P.sage], [m % 10, ITA, MIN_SLOTS[1], P.sage]];
+  for (const [n, set, slot, col] of digits) {
+    const g = set[n];
+    const fill = (dx, dy, style) => {
+      ctx.save(); ctx.translate(slot.x + dx, slot.base + dy); ctx.scale(slot.sx, -slot.sy);
+      ctx.fillStyle = style; ctx.fill(g.path); ctx.restore();
+    };
+    if (!dimmed) { fill(3, 5, "rgba(0,0,0,0.35)"); fill(1.5, 2.5, "rgba(0,0,0,0.45)"); }
+    ctx.globalAlpha = dimmed ? 0.7 : 1; fill(0, 0, col); ctx.globalAlpha = 1;
+  }
+}
+
+// four rounded bars bouncing gently, centred under the time (musicRect: x 434...524, y 590...654)
+const MUSIC = { x: 479 - 45, y: 590, w: 90, h: 64 };
+function drawMusic(ctx, date) {
+  const t = date.getTime() / 1000, w = 8, gap = 7, maxH = 34, minH = 8;
+  const x0 = MUSIC.x + MUSIC.w / 2 - (4 * w + 3 * gap) / 2, base = MUSIC.y + MUSIC.h / 2 + maxH / 2;
+  const speeds = [2.1, 2.9, 2.4, 3.3], offsets = [0, 1.3, 2.6, 0.7];
+  ctx.fillStyle = P.sageLight;
+  for (let i = 0; i < 4; i++) {
+    const v = 0.5 + 0.5 * Math.sin(t * speeds[i] * 2 + offsets[i]), hh = minH + (maxH - minH) * v;
+    rrect(ctx, x0 + i * (w + gap), base - hh, w, hh, w / 2); ctx.fill();
+  }
+}
+
+function batteryColour(pct, charging) {
+  if (charging) return P.sageLight;
+  if (pct <= 10) return "#D9503F";
+  if (pct <= 20) return "#E3B341";
+  return P.ivory;
+}
+function drawBattery(ctx, pct, charging) {
+  if (pct == null) return;
+  const target = pct / 100;
+  let level = shownLevel ?? target; level += (target - level) * 0.08; if (Math.abs(level - target) < 0.002) level = target; shownLevel = level;
+  const tr = { x: 479 - 70, y: 800, w: 140, h: 8 };
+  ctx.fillStyle = P.track; rrect(ctx, tr.x, tr.y, tr.w, tr.h, 4); ctx.fill();
+  ctx.fillStyle = batteryColour(pct, charging); rrect(ctx, tr.x, tr.y, Math.max(8, tr.w * level), tr.h, 4); ctx.fill();
+}
+
+// ---------- page ----------
+const $ = id => document.getElementById(id);
+const canvas = $("face"), ctx = canvas.getContext("2d");
+let fixed = null;
+$("time").addEventListener("input", e => { $("live").checked = false; const [h, m, s] = e.target.value.split(":").map(Number); fixed = { h, m, s: s || 0 }; });
+
+function frame() {
+  const now = new Date();
+  let date = now;
+  if (!$("live").checked && fixed) { date = new Date(now); date.setHours(fixed.h, fixed.m, fixed.s); }
+  else $("time").value = now.toTimeString().slice(0, 8);
+  const st = { date, bpm: +$("bpm").value, battery: +$("bat").value, charging: $("charging").checked, music: $("music").checked,
+               sleeping: $("sleeping").checked, dimmed: $("dimmed").checked };
+  $("bpmv").textContent = st.bpm || "–"; $("batv").textContent = st.battery + "%";
+  $("lamp").hidden = !($("home").checked && !st.dimmed);
+  $("bt").hidden = !($("bluetooth").checked && !st.dimmed);
+  draw(ctx, st);
+  requestAnimationFrame(frame);
+}
+
+// the files sit beside the page when published, under Resources/ in the repo
+async function asset(name) {
+  for (const p of [name, "../../Resources/" + name]) { try { const r = await fetch(p); if (r.ok) return r; } catch (e) {} }
+  throw new Error("missing " + name);
+}
+async function loadFont(file, style) {
+  const face = new FontFace("Playfair", await (await asset(file)).arrayBuffer(), { style });
+  document.fonts.add(await face.load());
+}
+Promise.all([asset("glyphs.json").then(r => r.json()), loadFont("PlayfairDisplay-Regular.ttf", "normal"),
+             loadFont("PlayfairDisplay-Italic.ttf", "italic")]).then(([g]) => {
+  REG = loadSet(g.reg); ITA = loadSet(g.ita);
+  HOUR_SLOTS = slots(REG, 1, 0, 265, 442, 151, 553.5);
+  MIN_SLOTS = slots(ITA, 0, 9, 472, 693, 153, 553.5);
+});
+requestAnimationFrame(frame);
+</script>

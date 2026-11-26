@@ -252,7 +252,6 @@ struct FacesView: View {
                     ForEach(FaceMode.allCases, id: \.self) { m in modeRow(m) }
                 }
                 LampsCard()
-                SpotifyCard()
             }
             .padding(16)
         }

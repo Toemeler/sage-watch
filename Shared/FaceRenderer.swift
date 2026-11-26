@@ -5,8 +5,7 @@ struct FaceState {
     var date: Date
     var mode: FaceMode
     var bpm: Int? = nil               // last measured heart rate: the seconds runner swells on each beat
-    var cover: Image? = nil           // Spotify cover while music plays, drawn under the clock
-    var track: String? = nil          // "title · artist" under the cover
+    var music: Bool = false           // something plays on the iPhone: a small equalizer under the time
     var dimmed: Bool = false          // always-on (luminance reduced)
     var battery: Int? = nil           // watch battery in percent; nil where unknown (the plaque then shows only the bolt)
     var charging: Bool = false
@@ -31,7 +30,7 @@ enum FaceRenderer {
         drawIndices(&ctx, dimmed: state.dimmed)
         if !state.dimmed { drawNumerals(&ctx) }
         drawTime(&ctx, state.date, dimmed: state.dimmed)
-        if !state.dimmed, let cover = state.cover { drawCover(&ctx, cover, track: state.track) }
+        if !state.dimmed && state.music { drawMusic(&ctx, state.date) }
         if !state.dimmed && state.mode != .sleeping {
             drawPlaque(&ctx, battery: state.battery, charging: state.charging, date: state.date, dimmed: false)
         }
@@ -170,8 +169,8 @@ enum FaceRenderer {
 
     /// the plaque at the bottom: the watch battery, with a bolt while charging (gold at 20 % and below);
     /// just the bolt where no level is known
-    /// where the cover sits in the reference space (also the tap area on the watch)
-    static let coverRect = CGRect(x: 479 - 60, y: 588, width: 120, height: 120)
+    /// the music indicator's place in the reference space (also the tap area on the watch)
+    static let musicRect = CGRect(x: 479 - 45, y: 590, width: 90, height: 64)
 
     /// maps a rectangle of the reference space to view coordinates for a face drawn into `size`
     static func viewRect(_ r: CGRect, in size: CGSize) -> CGRect {
@@ -181,17 +180,17 @@ enum FaceRenderer {
         return CGRect(x: ox + r.minX * scale, y: oy + r.minY * scale, width: r.width * scale, height: r.height * scale)
     }
 
-    private static func drawCover(_ ctx: inout GraphicsContext, _ cover: Image, track: String?) {
-        let r = coverRect
-        let shape = Path(roundedRect: r, cornerRadius: 16)
-        ctx.fill(Path(roundedRect: r.offsetBy(dx: 3, dy: 5), cornerRadius: 16), with: .color(.black.opacity(0.6)))
-        var g = ctx
-        g.clip(to: shape)
-        g.draw(cover, in: r)
-        ctx.stroke(shape, with: .color(P.rim), lineWidth: 2.5)
-        if let track, !track.isEmpty {
-            ctx.draw(Text(track).font(.system(size: 19, weight: .medium)).foregroundColor(P.text),
-                     at: CGPoint(x: r.midX, y: r.maxY + 22), anchor: .center)
+    /// four rounded bars bouncing gently, centred under the time
+    private static func drawMusic(_ ctx: inout GraphicsContext, _ d: Date) {
+        let t = d.timeIntervalSinceReferenceDate
+        let r = musicRect, w = 8.0, gap = 7.0, maxH = 34.0, minH = 8.0
+        let x0 = r.midX - (4 * w + 3 * gap) / 2, base = r.midY + maxH / 2
+        let speeds = [2.1, 2.9, 2.4, 3.3], offsets = [0.0, 1.3, 2.6, 0.7]
+        for i in 0..<4 {
+            let v = 0.5 + 0.5 * sin(t * speeds[i] * 2 + offsets[i])
+            let h = minH + (maxH - minH) * v
+            let bar = CGRect(x: x0 + Double(i) * (w + gap), y: base - h, width: w, height: h)
+            ctx.fill(Path(roundedRect: bar, cornerRadius: w / 2), with: .color(P.sageLight))
         }
     }
 

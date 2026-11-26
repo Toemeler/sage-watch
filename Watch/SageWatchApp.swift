@@ -75,16 +75,11 @@ struct FaceScreen: View {
                 VStack {
                     if audio.bluetooth { BluetoothBadge().padding(.top, 14) }
                     Spacer()
-                    HStack {
-                        Spacer()
-                        if audio.playing { MusicButton(audio: audio) { showMusic = true } }
-                    }
                 }
-                .padding(.trailing, 12).padding(.bottom, 10)
-                // tap the cover for pause, skip and back
-                if audio.showsCover {
+                // tap the music indicator for pause, skip and back
+                if audio.playing {
                     GeometryReader { geo in
-                        let r = FaceRenderer.viewRect(FaceRenderer.coverRect, in: geo.size)
+                        let r = FaceRenderer.viewRect(FaceRenderer.musicRect.insetBy(dx: -20, dy: -14), in: geo.size)
                         Color.clear.contentShape(Rectangle())
                             .frame(width: r.width, height: r.height)
                             .position(x: r.midX, y: r.midY)
@@ -135,7 +130,7 @@ struct FaceScreen: View {
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
         let power = BatteryReader.read(date)
         let state = FaceState(date: date, mode: FaceMode.auto(date), bpm: recorder.bpm ?? health.heartRate,
-                              cover: audio.showsCover ? audio.cover : nil, track: audio.showsCover ? audio.track : nil, dimmed: dimmed,
+                              music: audio.playing, dimmed: dimmed,
                               battery: power.percent, charging: power.charging)
         FaceRenderer.draw(&ctx, size: size, state: state)
     }

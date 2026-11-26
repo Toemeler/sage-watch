@@ -36,9 +36,6 @@ targets:
         NSHealthShareUsageDescription: Sage shows your steps, heart rate and sleep on the watch face and in the app. Nothing leaves your devices.
         NSHealthUpdateUsageDescription: The watch recorder runs as a Mind & Body session. It is only saved to Health if you turn that on.
         UIFileSharingEnabled: true
-        CFBundleURLTypes:
-          - CFBundleURLName: dev.sage.spotify
-            CFBundleURLSchemes: [sage-spotify]
         NSLocalNetworkUsageDescription: Sage controls your WiZ lamps on your home network from the watch.
         LSSupportsOpeningDocumentsInPlace: true
     settings:
