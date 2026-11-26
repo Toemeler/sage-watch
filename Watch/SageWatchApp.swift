@@ -100,7 +100,8 @@ struct FaceScreen: View {
             }
         }
         .sheet(isPresented: $showMusic) { NowPlayingView() }
-        .sheet(isPresented: $showLamp) { NavigationStack { LampPanel(lamp: lamp) } }
+        // full screen: it slides up like the swipe that opens it, and vertical drags inside can't pull it away
+        .fullScreenCover(isPresented: $showLamp) { NavigationStack { LampPanel(lamp: lamp) } }
         .sheet(isPresented: $showControls) {
             RecorderControls().environmentObject(recorder).environmentObject(health)
         }
@@ -114,8 +115,7 @@ struct FaceScreen: View {
 
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
         let power = BatteryReader.read(date)
-        let state = FaceState(date: date, mode: FaceMode.auto(date), bpm: recorder.bpm ?? health.heartRate,
-                              music: audio.playing, dimmed: dimmed,
+        let state = FaceState(date: date, mode: FaceMode.auto(date), music: audio.playing, dimmed: dimmed,
                               battery: power.percent, charging: power.charging)
         FaceRenderer.draw(&ctx, size: size, state: state)
     }

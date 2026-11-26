@@ -35,7 +35,6 @@
   <h2>State</h2>
   <label>Time</label><input id="time" type="time" step="1">
   <label>Live clock</label><input id="live" type="checkbox" checked>
-  <label>Heart rate <span id="bpmv"></span></label><input id="bpm" type="range" min="0" max="180" value="64">
   <label>Battery <span id="batv"></span></label><input id="bat" type="range" min="0" max="100" value="78">
   <label>Charging</label><input id="charging" type="checkbox">
   <label>Music playing</label><input id="music" type="checkbox" checked>
@@ -121,7 +120,7 @@ function draw(ctx, st) {
   ctx.fillStyle = "#000"; ctx.fillRect(SCREEN.x, SCREEN.y, SCREEN.w, SCREEN.h);
   if (!st.dimmed) drawDial(ctx);
   drawTrack(ctx, st.dimmed);
-  if (!st.dimmed) drawRunner(ctx, st.date, st.bpm);
+  if (!st.dimmed) drawRunner(ctx, st.date);
   drawIndices(ctx, st.dimmed);
   if (!st.dimmed) drawNumerals(ctx);
   drawTime(ctx, st.date, st.dimmed);
@@ -170,22 +169,15 @@ function drawTrack(ctx, dimmed) {
   }
 }
 
-function heartbeat(date, bpm) {
-  if (!bpm || bpm <= 20) return 0;
-  const t = date.getTime() / 1000 * bpm / 60, phase = t - Math.floor(t);
-  const lub = Math.exp(-phase * 14), dub = phase > 0.18 ? 0.5 * Math.exp(-(phase - 0.18) * 16) : 0;
-  return Math.min(1, lub + dub);
-}
-
-function drawRunner(ctx, date, bpm) {
+function drawRunner(ctx, date) {
   const sec = date.getSeconds() + date.getMilliseconds() / 1000;
-  const head = Math.floor(sec * 5) % 300, trail = 30, beat = heartbeat(date, bpm);
+  const head = Math.floor(sec * 5) % 300, trail = 30;
   for (let k = 0; k < trail; k++) {
-    const i = (head - k + 300) % 300, { p, n } = TICKS[i], len = (i % 5 === 0 ? 32 : 18) * (1 + 1.1 * beat);
+    const i = (head - k + 300) % 300, { p, n } = TICKS[i], len = i % 5 === 0 ? 32 : 18;
     const fade = Math.pow(1 - k / trail, 1.3);
     ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - n.x * len, p.y - n.y * len);
     ctx.strokeStyle = k === 0 ? `rgba(255,255,255,${fade})` : `rgba(221,235,210,${fade})`;
-    ctx.lineWidth = (k === 0 ? 5 : (i % 5 === 0 ? 3.6 : 3)) * (1 + 0.7 * beat); ctx.stroke();
+    ctx.lineWidth = k === 0 ? 5 : (i % 5 === 0 ? 3.6 : 3); ctx.stroke();
   }
 }
 
@@ -266,9 +258,9 @@ function frame() {
   let date = now;
   if (!$("live").checked && fixed) { date = new Date(now); date.setHours(fixed.h, fixed.m, fixed.s); }
   else $("time").value = now.toTimeString().slice(0, 8);
-  const st = { date, bpm: +$("bpm").value, battery: +$("bat").value, charging: $("charging").checked, music: $("music").checked,
+  const st = { date, battery: +$("bat").value, charging: $("charging").checked, music: $("music").checked,
                sleeping: $("sleeping").checked, dimmed: $("dimmed").checked };
-  $("bpmv").textContent = st.bpm || "–"; $("batv").textContent = st.battery + "%";
+  $("batv").textContent = st.battery + "%";
   draw(ctx, st);
   requestAnimationFrame(frame);
 }
