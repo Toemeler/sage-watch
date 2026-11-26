@@ -23,6 +23,7 @@ and the Swift app (`Watch/LampPanel.swift`, `Shared/FaceRenderer.swift`).
 ## Proposed features
 
 Proposals wait one round for Tom's answer; unanswered ones are built in the next round, each on its own commit.
+Direction from Tom: focus on the watch app itself; only the watch's smart wake wakes him (no iPhone alarms, no widgets).
 
 | # | Feature | Status |
 |---|---------|--------|
@@ -30,9 +31,9 @@ Proposals wait one round for Tom's answer; unanswered ones are built in the next
 | F2 | **Evening wind-down:** in the hour before the night's bedtime a lamp that is on dims and warms; a manual change pauses it | built (round 2, no answer) |
 | F3 | ~~Single lamps~~ | rejected: Tom has one lamp |
 | F4 | **Crown zoom in the colour wheel:** turning the crown zooms out to see all 61 colours at once, like the app grid | built (round 2, no answer) |
-| F5 | **Wake light from the iPhone alarm too:** when the iPhone's own alarm (Clock app) is the wake-up, start the sunrise from a Shortcuts automation | proposed (round 2) |
+| F5 | ~~Wake light from the iPhone alarm~~ | rejected: only the watch's smart wake wakes Tom |
 | F6 | **Lamp follows the face:** the sleep face (night or nap) turns the lamp off when you fall asleep, detected by the watch | proposed (round 2) |
-| F7 | **Lamp in the Smart Stack:** a widget with the lamp's state; tapping opens the lamp panel directly | proposed (round 2) |
+| F7 | ~~Lamp in the Smart Stack~~ | rejected: not needed, focus on the watch app itself |
 
 ## Iterations
 
