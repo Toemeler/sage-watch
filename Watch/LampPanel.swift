@@ -2,8 +2,12 @@ import SwiftUI
 import WatchKit
 import WatchConnectivity
 
-/// The watch side of lamp control. The watch cannot reach the bulbs itself, so it asks the iPhone; "at home" means
-/// the iPhone answered and at least one bulb replied on the local network.
+/// The watch side of lamp control. The watch cannot reach the bulbs itself (watchOS allows no UDP for regular apps),
+/// so it asks the iPhone; "at home" means the iPhone answered and at least one bulb replied on the local network.
+///
+/// Made to feel instant: the last good state is kept on the watch, so the panel opens with it at once when the lamps
+/// answered within the last 15 minutes, and is corrected when the fresh answer arrives. Messages wait up to 3 s for
+/// the iPhone to become reachable and are retried twice before anything is reported as failed.
 @MainActor
 final class LampModel: ObservableObject {
     static let shared = LampModel()
@@ -18,12 +22,27 @@ final class LampModel: ObservableObject {
     private var pending: [String: Any]?
     private var sending = false
     private var lastLocalChange = Date.distantPast
+    private static let cacheKey = "lampLastState", cacheTimeKey = "lampLastStateTime"
 
-    /// ask the iPhone for the lamp state (at most every 20 s unless forced)
+    init() {
+        let d = UserDefaults.standard
+        if let cached = d.dictionary(forKey: Self.cacheKey), Date().timeIntervalSince1970 - d.double(forKey: Self.cacheTimeKey) < 15 * 60 {
+            state = LampLink.State(cached)
+            if state.home { problem = nil }
+        }
+    }
+
+    private func remember(_ s: LampLink.State) {
+        guard s.home else { return }
+        UserDefaults.standard.set(s.dictionary, forKey: Self.cacheKey)
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.cacheTimeKey)
+    }
+
+    /// ask the iPhone for the lamp state (at most every 10 s unless forced)
     func refresh(force: Bool = false) {
-        guard force || Date().timeIntervalSince(lastCheck) > 20 else { return }
+        guard force || Date().timeIntervalSince(lastCheck) > 10 else { return }
         lastCheck = Date()
-        send([LampLink.commandKey: LampLink.status])
+        Task { await send([LampLink.commandKey: LampLink.status]) }
     }
 
     /// change the lamps; rapid changes (crown, slider) are coalesced so only the latest goes out
@@ -41,7 +60,6 @@ final class LampModel: ObservableObject {
         let pct = min(100, max(10, Int((level * 100).rounded())))
         if !state.on || pct != state.dimming { set(["state": true, "dimming": pct]) }
     }
-    func brightness(_ v: Int) { set(["state": true, "dimming": min(100, max(10, v))]) }
     func temperature(_ k: Int) { set(["state": true, "temp": k, "dimming": state.dimming]) }
     func colour(_ c: (Int, Int, Int)) { set(["state": true, "r": c.0, "g": c.1, "b": c.2, "dimming": state.dimming]) }
 
@@ -57,38 +75,58 @@ final class LampModel: ObservableObject {
         guard !sending, let p = pending else { return }
         pending = nil
         sending = true
-        send([LampLink.commandKey: LampLink.set, LampLink.paramsKey: p]) { [weak self] in
-            self?.sending = false
-            self?.flush()
+        Task {
+            await send([LampLink.commandKey: LampLink.set, LampLink.paramsKey: p])
+            sending = false
+            flush()
         }
     }
 
-    private func send(_ message: [String: Any], done: (() -> Void)? = nil) {
-        let session = WCSession.default
-        guard WCSession.isSupported(), session.activationState == .activated, session.isReachable else {
-            state.home = false
-            problem = "iPhone not reachable. Keep it nearby with Bluetooth on."
-            done?(); return
-        }
+    /// one message to the iPhone: waits for reachability, retries, then takes the reply in
+    private func send(_ message: [String: Any]) async {
         busy = true
-        session.sendMessage(message, replyHandler: { reply in
-            Task { @MainActor in
-                let s = LampLink.State(reply)
-                // keep what the user just set: replies (and the bulbs' own reports) lag behind the slider, and taking
-                // them over would make it jump back after release
-                if self.pending == nil && Date().timeIntervalSince(self.lastLocalChange) > 2.5 { self.state = s }
-                else { self.state.home = s.home; self.state.count = s.count }
-                self.problem = s.home ? nil : "No lamp answered. Open Sage on the iPhone once and allow Local Network, then retry."
-                self.busy = false
-                done?()
+        defer { busy = false }
+        var lastError = "The iPhone did not answer. Open Sage on the iPhone and retry."
+        for attempt in 0..<3 {
+            if attempt > 0 { try? await Task.sleep(for: .milliseconds(attempt == 1 ? 300 : 900)) }
+            guard await reachable(within: attempt == 0 ? 3 : 1) else {
+                lastError = "iPhone not reachable. Keep it nearby with Bluetooth on."
+                continue
             }
-        }, errorHandler: { _ in
-            Task { @MainActor in
-                self.state.home = false; self.busy = false
-                self.problem = "The iPhone did not answer. Open Sage on the iPhone and retry."
-                done?()
+            if let reply = await Self.message(message) {
+                take(LampLink.State(reply))
+                return
             }
-        })
+        }
+        // only a failed status check says we are not home; a failed change keeps the panel as it is
+        if message[LampLink.commandKey] as? String == LampLink.status { state.home = false }
+        problem = lastError
+    }
+
+    private func take(_ s: LampLink.State) {
+        // keep what the user just set: replies (and the bulbs' own reports) lag behind the slider, and taking
+        // them over would make it jump back after release
+        if pending == nil && Date().timeIntervalSince(lastLocalChange) > 2.5 { state = s }
+        else { state.home = s.home; state.count = s.count }
+        problem = s.home ? nil : "No lamp answered. Open Sage on the iPhone once and allow Local Network, then retry."
+        remember(state)
+    }
+
+    private func reachable(within seconds: Double) async -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while true {
+            let s = WCSession.default
+            if WCSession.isSupported(), s.activationState == .activated, s.isReachable { return true }
+            if Date() > deadline { return false }
+            try? await Task.sleep(for: .milliseconds(150))
+        }
+    }
+
+    private static func message(_ m: [String: Any]) async -> [String: Any]? {
+        await withCheckedContinuation { cont in
+            WCSession.default.sendMessage(m, replyHandler: { cont.resume(returning: $0) },
+                                          errorHandler: { _ in cont.resume(returning: nil) })
+        }
     }
 }
 
@@ -354,6 +392,7 @@ struct Honeycomb: View {
     @State private var pan: CGSize = .zero
     @State private var panBase: CGSize = .zero
     @State private var bloomed = false
+    @State private var panning = false
 
     static let diameter: CGFloat = 42
     static let pitch: CGFloat = 47
@@ -399,21 +438,30 @@ struct Honeycomb: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.001)
-                .contentShape(Rectangle())
-                .onTapGesture { cancel() }
             ForEach(Self.cells) { bubble($0) }
         }
         .frame(width: size.width, height: size.height)
-        .simultaneousGesture(DragGesture(minimumDistance: 6)
+        .contentShape(Rectangle())
+        // one gesture decides: a touch that travels is a pan and never picks; a touch that stays put is a tap,
+        // on a bubble it picks that colour, on empty space it goes back to the slider
+        .gesture(DragGesture(minimumDistance: 0)
             .onChanged { g in
+                if !panning && hypot(g.translation.width, g.translation.height) > 6 { panning = true }
+                guard panning else { return }
                 pan = CGSize(width: bound(panBase.width + g.translation.width, Self.panLimit.width),
                              height: bound(panBase.height + g.translation.height, Self.panLimit.height))
             }
-            .onEnded { _ in
-                let l = Self.panLimit
-                panBase = CGSize(width: min(l.width, max(-l.width, pan.width)), height: min(l.height, max(-l.height, pan.height)))
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) { pan = panBase }
+            .onEnded { g in
+                defer { panning = false }
+                if panning {
+                    let l = Self.panLimit
+                    panBase = CGSize(width: min(l.width, max(-l.width, pan.width)), height: min(l.height, max(-l.height, pan.height)))
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) { pan = panBase }
+                } else if let cell = hit(g.location) {
+                    pick(cell.swatch)
+                } else {
+                    cancel()
+                }
             })
         .onAppear {
             // open centred on the colour that is set, as the app grid opens on the last app
@@ -435,21 +483,33 @@ struct Honeycomb: View {
         return v > 0 ? lim + extra : -lim - extra
     }
 
+    /// the bubble under a tap, by its drawn (fisheye) position and size
+    private func hit(_ location: CGPoint) -> Cell? {
+        let p = CGPoint(x: location.x - size.width / 2, y: location.y - size.height / 2)
+        return Self.cells
+            .map { c -> (Cell, CGFloat, CGFloat) in
+                let f = fisheye(CGPoint(x: c.pos.x + pan.width, y: c.pos.y + pan.height))
+                return (c, hypot(p.x - f.point.x, p.y - f.point.y), Self.diameter / 2 * f.scale + 3)
+            }
+            .filter { $0.1 <= $0.2 }
+            .min { $0.1 < $1.1 }?.0
+    }
+
     private func bubble(_ cell: Cell) -> some View {
         let f = fisheye(CGPoint(x: cell.pos.x + pan.width, y: cell.pos.y + pan.height))
         let selected = cell.swatch.matches(state)
-        return Button { pick(cell.swatch) } label: {
-            Circle().fill(cell.swatch.color)
-                .overlay(Circle().strokeBorder(Color.white, lineWidth: selected ? 3 : 0))
-                .overlay(Circle().strokeBorder(Color.black.opacity(0.25), lineWidth: selected ? 1 : 0).padding(3))
-        }
-        .buttonStyle(.plain)
+        return Circle().fill(cell.swatch.color)
+            .overlay(Circle().strokeBorder(Color.white, lineWidth: selected ? 3 : 0))
+            .overlay(Circle().strokeBorder(Color.black.opacity(0.25), lineWidth: selected ? 1 : 0).padding(3))
         .frame(width: Self.diameter, height: Self.diameter)
         .scaleEffect(bloomed ? f.scale : 0.15)
         .opacity(bloomed ? 1 : 0)
         .position(x: size.width / 2 + (bloomed ? f.point.x : 0), y: size.height / 2 + (bloomed ? f.point.y : 0))
         .animation(.spring(response: 0.5, dampingFraction: 0.74).delay(Double(cell.ring) * 0.05), value: bloomed)
+        .accessibilityElement()
         .accessibilityLabel(Text(cell.swatch.name))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { pick(cell.swatch) }
     }
 
     /// Bubble UI model of the app grid: a centre zone where bubbles are full size, and a fringe around it in which

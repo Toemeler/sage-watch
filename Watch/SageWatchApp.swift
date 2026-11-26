@@ -44,6 +44,8 @@ struct FaceScreen: View {
     @State private var showLamp = false
     @ObservedObject private var audio = AudioModel.shared
     @State private var showMusic = false
+    @State private var faceCrown: Double = 0
+    @State private var crownBase: Double = 0
     @Environment(\.scenePhase) private var phase
 
     var body: some View {
@@ -90,6 +92,20 @@ struct FaceScreen: View {
             guard g.translation.height < -40, abs(g.translation.width) < abs(g.translation.height) else { return }
             showLamp = true   // the panel says why when the lamps cannot be reached
         })
+        // turning the crown on the face opens the lamp (a deliberate turn, not a brush)
+        .focusable()
+        .focusEffectDisabled()
+        .digitalCrownRotation($faceCrown, from: -1_000_000, through: 1_000_000, sensitivity: .low,
+                              isContinuous: true, isHapticFeedbackEnabled: false)
+        .onChange(of: faceCrown) { _, v in
+            guard !showLamp, !showControls, !showMusic, !dimmed else { crownBase = v; return }
+            if abs(v - crownBase) > 2.5 {
+                crownBase = v
+                WKInterfaceDevice.current().play(.click)
+                showLamp = true
+            }
+        }
+        .onChange(of: showLamp) { _, _ in crownBase = faceCrown }
         .onAppear { lamp.refresh(force: true); audio.refresh(force: true) }
         .onChange(of: phase) { _, p in if p == .active { lamp.refresh(); audio.refresh(force: true) } }
         // while the face is up, check headphones and playback every 10 s

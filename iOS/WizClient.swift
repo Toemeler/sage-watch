@@ -12,9 +12,9 @@ enum WizClient {
     }
 
     /// one request, one reply; nil after the timeout (bulb off the network, or not at home)
-    static func send(_ ip: String, method: String, params: [String: Any], timeout: Double = 0.8) async -> [String: Any]? {
+    static func send(_ ip: String, method: String, params: [String: Any], timeout: Double = 0.5) async -> [String: Any]? {
         guard let body = try? JSONSerialization.data(withJSONObject: ["method": method, "params": params]) else { return nil }
-        for _ in 0..<2 {   // UDP is lossy: one retry
+        for _ in 0..<3 {   // UDP is lossy: short timeouts, two retries
             if let r = await once(ip, body, timeout) { return r }
         }
         return nil
@@ -54,15 +54,30 @@ enum WizClient {
         var s = LampLink.State(pilot: first)
         s.on = replies.contains { $0["state"] as? Bool == true }
         s.count = replies.count
+        last = s
         return s
     }
 
-    /// setPilot on every bulb, then the new state
+    /// the last state the bulbs reported (or were set to), so a change can answer without a second round trip
+    private static var last = LampLink.State()
+
+    /// setPilot on every bulb; answers with the last known state plus this change
     static func set(_ params: [String: Any]) async -> LampLink.State {
-        await withTaskGroup(of: Void.self) { g in
-            for ip in bulbs { g.addTask { _ = await send(ip, method: "setPilot", params: params) } }
+        let ok = await withTaskGroup(of: Bool.self) { g in
+            for ip in bulbs { g.addTask { await send(ip, method: "setPilot", params: params) != nil } }
+            var n = 0
+            for await r in g where r { n += 1 }
+            return n
         }
-        return await status()
+        guard ok > 0 else { return await status() }
+        var s = last
+        s.home = true; s.count = ok
+        if let on = params["state"] as? Bool { s.on = on }
+        if let d = params["dimming"] as? Int { s.dimming = d }
+        if let t = params["temp"] as? Int { s.temp = t; s.rgb = nil }
+        if let r = params["r"] as? Int, let g = params["g"] as? Int, let b = params["b"] as? Int { s.rgb = (r, g, b); s.temp = nil }
+        last = s
+        return s
     }
 
     /// answers a watch message

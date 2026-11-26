@@ -48,3 +48,19 @@ and the Swift app (`Watch/LampPanel.swift`, `Shared/FaceRenderer.swift`).
   non-mixable audio) is true. The watch checks every 10 s instead of 20 s.
 - **Diagnostics:** the iPhone Faces tab has a live "Music on the watch" card; the watch's long-press menu shows the
   last answer ("Playing", "Nothing playing", "iPhone not reachable", ...) with "Check again".
+
+### 4 · 2026-11-26 — reliability, crown to open, no accidental picks (user feedback)
+- **Feedback:** connecting takes long and fails often; dragging around the colours keeps selecting one; wants the
+  crown to open the lamp; asks whether it could work without the iPhone.
+- **Without the iPhone:** not directly. watchOS only allows UDP for apps with an active audio streaming session, and
+  developers report even that path being revoked after ~35 s ([TN3135 thread](https://developer.apple.com/forums/thread/717615),
+  [revoke cycle](https://developer.apple.com/forums/thread/841590?answerId=902282022)). URLSession (HTTP) does work
+  on the watch, so a small always-on HTTP→UDP bridge at home would remove the iPhone from the path.
+- **Changed:**
+  - Colour grid: one gesture decides; a touch that travels more than 6 pt pans and never picks; a still tap picks the
+    bubble under it by its drawn (fisheye) size, or goes back on empty space.
+  - Face: a deliberate crown turn opens the lamp panel (with a click).
+  - Connection: the watch keeps the last good state (15 min) and opens with it instantly; each message waits up to
+    3 s for the iPhone, then retries twice (0.3 s, 0.9 s); only a failed status check marks "not home".
+    The iPhone answers a change straight from the setPilot replies (no second getPilot round) and uses 0.5 s UDP
+    timeouts with two retries per bulb.
