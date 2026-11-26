@@ -50,15 +50,29 @@ final class LiveDetectionTests: XCTestCase {
 
     func testOnsetWaitsForAFallingHeartRate() {
         var d = OnsetDetector()
-        // up and about at 60 bpm, then lying perfectly still while the heart rate goes up to 75 (something exciting
-        // on screen): not sleep
-        for s in 0..<(75 * 60) {
+        // up and about at 60 bpm, then lying perfectly still from minute 15 while the heart rate goes up to 75
+        // (something exciting on screen): the start of the stillness is never taken as falling asleep
+        var found: Double? = nil
+        for s in 0..<(90 * 60) {
             let t = 2_000_000.0 + Double(s)
             let awake = s < 15 * 60
             if s % 5 == 0 { d.addHeart(t: t, bpm: awake ? 60 : 75) }
             let sd = awake && s % 5 == 0 ? 0.08 : 0.002
-            XCTAssertNil(d.add(MotionSecond(t: t, sd: sd, gx: 0, gy: 0, gz: -1)), "second \(s)")
+            if let o = d.add(MotionSecond(t: t, sd: sd, gx: 0, gy: 0, gz: -1)) { found = o; break }
         }
+        // the reference finds it once the half hour before has the same raised heart rate: 30 minutes in, not 15
+        if let o = found { XCTAssertGreaterThanOrEqual(o, 2_000_000 + 25 * 60) }
+        // the same with the heart settling at 52: found, and dated to the stillness
+        var e = OnsetDetector()
+        var settled: Double? = nil
+        for s in 0..<(60 * 60) {
+            let t = 3_000_000.0 + Double(s)
+            let awake = s < 15 * 60
+            if s % 5 == 0 { e.addHeart(t: t, bpm: awake ? 60 : 52) }
+            let sd = awake && s % 5 == 0 ? 0.08 : 0.002
+            if let o = e.add(MotionSecond(t: t, sd: sd, gx: 0, gy: 0, gz: -1)) { settled = o; break }
+        }
+        XCTAssertEqual(settled ?? 0, 3_000_000 + 15 * 60, accuracy: 6 * 60)
     }
 
     func testWakeRuleWaitsForTheWindowAndClosesIt() {

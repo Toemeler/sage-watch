@@ -19,7 +19,8 @@ struct MotionSecond: Equatable {
 /// minute earlier. An epoch is quiet when fewer than a quarter of the epochs within ±5 minutes of it are moving, so
 /// the verdict on an epoch comes 5 minutes late. Ten quiet minutes in a row, with a heart rate that is not above
 /// the half hour before, make the first of them the moment of falling asleep: reported 15 minutes after it,
-/// dated back to it. On the night of 26 Nov this gave 01:10:30; Apple Health said 01:11.
+/// dated back to it. While the heart has not settled the candidate moves on epoch by epoch, so lying still with a
+/// racing heart is never dated as sleep. On the night of 26 Nov this gave 01:10:30; Apple Health said 01:11.
 struct OnsetDetector {
     static let window = 20          // epochs looked over
     static let confirm = 20         // quiet epochs in a row
@@ -39,7 +40,7 @@ struct OnsetDetector {
 
     mutating func addHeart(t: Double, bpm: Double) {
         heart.append((t, bpm))
-        let cut = t - 3600
+        let cut = t - 7200
         if let i = heart.firstIndex(where: { $0.0 >= cut }), i > 0 { heart.removeFirst(i) }
     }
 
@@ -81,7 +82,15 @@ struct OnsetDetector {
         guard quiet else { runStart = nil; runLength = 0; return }
         if runStart == nil { runStart = centre.start }
         runLength += 1
-        if runLength >= Self.confirm && heartSettled() { onset = runStart }
+        if runLength >= Self.confirm {
+            if heartSettled() {
+                onset = runStart
+            } else if let s = runStart {
+                // still, but the heart has not settled: if this turns into sleep, it starts later
+                runStart = s + NightAnalysis.Params.epoch
+                runLength -= 1
+            }
+        }
     }
 
     private func heartSettled() -> Bool {

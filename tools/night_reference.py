@@ -540,7 +540,8 @@ ONSET_CONFIRM = 20        # quiet epochs in a row before the onset counts (10 mi
 class OnsetDetector:
     """Causal twin of the offline quiet rule: an epoch is quiet when fewer than QUIET_FRACTION of the epochs within
     ±10 of it are moving; ONSET_CONFIRM quiet epochs in a row (and a heart rate not above the half hour before)
-    make the first of them the moment of falling asleep. Feed seconds in time order."""
+    make the first of them the moment of falling asleep. While the heart has not settled the candidate moves on
+    epoch by epoch: lying still with a racing heart is not dated as sleep. Feed seconds in time order."""
 
     def __init__(self):
         self.epoch = None
@@ -554,7 +555,7 @@ class OnsetDetector:
 
     def add_heart(self, t, bpm):
         self.heart.append((t, bpm))
-        cut = t - 3600
+        cut = t - 7200
         while self.heart and self.heart[0][0] < cut:
             self.heart.pop(0)
 
@@ -597,8 +598,13 @@ class OnsetDetector:
         if self.run_start is None:
             self.run_start = centre[0]
         self.run_len += 1
-        if self.run_len >= ONSET_CONFIRM and self._heart_settled():
-            self.onset = self.run_start
+        if self.run_len >= ONSET_CONFIRM:
+            if self._heart_settled():
+                self.onset = self.run_start
+            else:
+                # still, but the heart has not settled: if this turns into sleep, it starts later
+                self.run_start += EPOCH
+                self.run_len -= 1
 
     def _heart_settled(self):
         before = [b for t, b in self.heart if self.run_start - 1800 <= t < self.run_start]

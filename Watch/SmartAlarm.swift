@@ -146,6 +146,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
 
         // night: the window, and the moment you fall asleep before it (for the heart baseline and the record)
         let night = Plan.nextWakeWindow(after: max(now, handledNight), block: .night)
+        if let o = nightOnset, o < night.start.addingTimeInterval(-12 * 3600) { nightOnset = nil }    // last night's
         if night.start <= now {
             if rule == nil || ruleBlock != .night {
                 startRule(.night, onset: nightOnset ?? night.start.addingTimeInterval(-4 * 3600), opens: night.start, closes: night.end)
@@ -460,6 +461,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
             manualNapUntil = nil
         case .night?:
             handledNight = max(handledNight, Plan.nextWakeWindow(after: now.addingTimeInterval(-3600), block: .night).end)
+            nightOnset = nil
         case nil:
             break
         }
