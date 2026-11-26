@@ -55,7 +55,14 @@ struct FaceScreen: View {
             if dimmed {
                 TimelineView(.everyMinute) { tl in face(tl.date) }
             } else {
-                TimelineView(.animation(minimumInterval: 1.0 / 30)) { tl in face(tl.date) }
+                // static layers drawn once; only the runner and the live layer follow the clock, at 20 fps
+                // (the runner steps 5 times a second; 20 fps keeps its fade and the digit morph smooth)
+                layer([.base])
+                TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in layer([.runner], tl.date) }
+                layer([.marks])
+                TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in layer([.live], tl.date) }
+                    .accessibilityElement()
+                    .accessibilityLabel(Text(Date().formatted(date: .omitted, time: .shortened)))
             }
             if recorder.isRunning && !dimmed {
                 VStack {
@@ -133,11 +140,17 @@ struct FaceScreen: View {
             .accessibilityLabel(Text(date.formatted(date: .omitted, time: .shortened)))
     }
 
-    private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
+    private func layer(_ layers: FaceRenderer.Layers, _ date: Date = .now) -> some View {
+        Canvas { ctx, size in draw(&ctx, size, date, layers: layers) }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date, layers: FaceRenderer.Layers = .all) {
         let power = BatteryReader.read(date)
         let state = FaceState(date: date, mode: FaceMode.auto(date), music: audio.playing, dimmed: dimmed,
                               battery: power.percent, charging: power.charging)
-        FaceRenderer.draw(&ctx, size: size, state: state)
+        FaceRenderer.draw(&ctx, size: size, state: state, layers: layers)
     }
 
 }

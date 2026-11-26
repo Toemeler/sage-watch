@@ -32,7 +32,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F3 | ~~Single lamps~~ | rejected: Tom has one lamp |
 | F4 | **Crown zoom in the colour wheel:** turning the crown zooms out to see all 61 colours at once, like the app grid | built (round 2, no answer) |
 | F5 | ~~Wake light from the iPhone alarm~~ | rejected: only the watch's smart wake wakes Tom |
-| F6 | **Lamp follows the face:** the sleep face (night or nap) turns the lamp off when you fall asleep, detected by the watch | proposed (round 2) |
+| F6 | **Off when asleep:** when the watch finds you asleep (night or nap), a lamp that is on fades off in two steps | built (round 3, no answer) |
 | F7 | ~~Lamp in the Smart Stack~~ | rejected: not needed, focus on the watch app itself |
 
 ## Iterations
@@ -134,3 +134,31 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
   near-black dial with its ring of minute ticks (hour marks in sage), an ivory crescent for the night and a small
   sage crescent for the nap: two moons, two sleeps. A first version with a round nap dot read as a smiley and was
   replaced. Ticks and moons sit inside the watch's circular mask.
+
+### 9 · 2026-11-26 — critical round 3: does it work with the iPhone app closed? Face battery cost. F6.
+**Review:**
+1. *Delivery with the iPhone app closed (critical; Tom asked).* Apple documents that `sendMessage` from an active
+   watch app wakes the iOS app in the background ([WCSession](https://developer.apple.com/documentation/watchconnectivity/wcsession.md)),
+   so daytime control works without the iPhone app open. Unknown: whether an app swiped away in the app switcher can
+   be woken. Risk: night steps (sunrise, wind-down, off-when-asleep) are sent while Sage runs in the background
+   with its workout session, and developers report `isReachable` false and `sendMessage` failing in exactly that
+   state ([thread 83612](https://developer.apple.com/forums/thread/83612), [thread 723158](https://developer.apple.com/forums/thread/723158)).
+   Not provable from here; must be measured on the watch.
+2. *Silent failure at night (high).* An automatic step that failed rolled the panel back and set the failure note,
+   which is meant for your own changes, and was then lost.
+3. *Face battery cost (high).* The face redrew everything at 30 fps: 240 sunburst rays, a 22-ring guilloché
+   (~2,000 segments), 300 track ticks and 13 bevelled indices per frame, although only the runner, the time, the
+   music bars and the battery ever change.
+
+**Changed:**
+- Every lamp message is logged on the watch (time, ok/failed, background or not); the long-press menu shows the
+  last contact and a full contact log, so one night answers question 1.
+- Automatic steps that fail are kept quietly (no buzz, no rollback) and sent again when the app comes to the
+  front; for 10 min after the alarm, raising the wrist re-sends full light if it is not on.
+- The face is four layers: the dial/track and the indices/numerals are drawn once; the runner and the live layer
+  (time, music, battery) follow the clock at 20 fps instead of 30.
+- F6 built: off when asleep (switch in the long-press menu), two steps over 20 s so it never snaps dark.
+
+**If the log shows night steps failing in the background:** the dependable fix is the home bridge (watch → HTTP
+over Wi-Fi → bulb), which takes the iPhone out of the path; URLSession works on the watch. Tom said "not now"; it
+stays the recommended fallback.

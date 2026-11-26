@@ -15,23 +15,41 @@ struct FaceState {
 enum FaceRenderer {
     typealias P = FaceGeometry.Palette
 
-    static func draw(_ ctx: inout GraphicsContext, size: CGSize, state: FaceState) {
+    /// The face in four layers, bottom to top. The watch draws `.base` and `.marks` once (they never change while
+    /// awake) and redraws only `.runner` and `.live` with the clock, so the dial's thousands of strokes are not
+    /// re-stroked every frame. The iPhone preview draws `.all` in one canvas.
+    struct Layers: OptionSet {
+        let rawValue: Int
+        static let base = Layers(rawValue: 1)      // black, sunburst, guilloché disc, track rails and ticks
+        static let runner = Layers(rawValue: 2)    // the seconds runner (between the track and the indices)
+        static let marks = Layers(rawValue: 4)     // applied indices and minute numerals
+        static let live = Layers(rawValue: 8)      // time, music bars, battery
+        static let all: Layers = [.base, .runner, .marks, .live]
+    }
+
+    static func draw(_ ctx: inout GraphicsContext, size: CGSize, state: FaceState, layers: Layers = .all) {
         let src = FaceGeometry.screen
         let scale = max(size.width / src.width, size.height / src.height)
         ctx.translateBy(x: (size.width - src.width * scale) / 2, y: (size.height - src.height * scale) / 2)
         ctx.scaleBy(x: scale, y: scale)
         ctx.translateBy(x: -src.minX, y: -src.minY)
 
-        ctx.fill(Path(src), with: .color(.black))
-        if !state.dimmed { drawDial(&ctx) }
-        drawTrack(&ctx, dimmed: state.dimmed)
-        if !state.dimmed { drawRunner(&ctx, state.date) }
-        drawIndices(&ctx, dimmed: state.dimmed)
-        if !state.dimmed { drawNumerals(&ctx) }
-        drawTime(&ctx, state.date, dimmed: state.dimmed)
-        if !state.dimmed && state.music { drawMusic(&ctx, state.date) }
-        if !state.dimmed && state.mode != .sleeping {
-            drawPlaque(&ctx, battery: state.battery, charging: state.charging, date: state.date, dimmed: false)
+        if layers.contains(.base) {
+            ctx.fill(Path(src), with: .color(.black))
+            if !state.dimmed { drawDial(&ctx) }
+            drawTrack(&ctx, dimmed: state.dimmed)
+        }
+        if layers.contains(.runner) && !state.dimmed { drawRunner(&ctx, state.date) }
+        if layers.contains(.marks) {
+            drawIndices(&ctx, dimmed: state.dimmed)
+            if !state.dimmed { drawNumerals(&ctx) }
+        }
+        if layers.contains(.live) {
+            drawTime(&ctx, state.date, dimmed: state.dimmed)
+            if !state.dimmed && state.music { drawMusic(&ctx, state.date) }
+            if !state.dimmed && state.mode != .sleeping {
+                drawPlaque(&ctx, battery: state.battery, charging: state.charging, date: state.date, dimmed: false)
+            }
         }
     }
 
