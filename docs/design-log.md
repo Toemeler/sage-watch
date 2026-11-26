@@ -44,7 +44,9 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F5 | ~~Wake light from the iPhone alarm~~ | rejected: only the watch's smart wake wakes Tom |
 | F6 | **Off when asleep:** when the watch finds you asleep (night or nap), a lamp that is on fades off in two steps | built (round 3, no answer) |
 | F7 | ~~Lamp in the Smart Stack~~ | rejected: not needed, focus on the watch app itself |
-| F8 | **Today ring from your real sleep:** the iPhone Today ring draws your usual nap and night (averages of the recorded ones) as the main arcs, with the plan's presets as a faint outline behind them | proposed (round 4) |
+| F8 | **Today ring from your real sleep:** the iPhone Today ring draws your usual nap and night (averages of the recorded ones) as the main arcs, with the plan's presets as a faint outline behind them | built (round 4, no answer) |
+| F9 | **Nap now from the face:** a long turn of the crown down on the face starts a nap (with a haptic and a 3 s undo), instead of digging into the menu | proposed (round 4) |
+| F10 | **Bedside mode:** while the watch charges at night, the face shows only the time in deep red at minimum brightness (no runner, no music), like a bedside clock that does not light the room | proposed (round 4) |
 
 ## Iterations
 
@@ -203,3 +205,24 @@ stays the recommended fallback.
 - **Changed:** `AudioModel` polls by itself and reads `WKApplication.applicationState` live each time: every 3 s
   until the iPhone has answered, then every 10 s while Sage is in front.
 - **Question from Tom:** the Today ring is drawn from the plan's presets, not from recorded averages → proposed as F8.
+
+### 13 · 2026-11-26 — critical round 4 (repo public, builds back)
+**Review:**
+1. *Night-time crown (high).* A sleeve or the pillow can turn the crown; on the face that opened the lamp panel,
+   whose crown then changes the light in the dark.
+2. *Sunrise vs. you (high).* Up before the window with the lamp on bright, the sunrise's first step (10 %) would
+   have dimmed it. Automation must only ever move in its own direction.
+3. *Panel never closes (medium).* Control Center dismisses itself; ours stayed until X.
+4. *Untested decision logic (process).* Sunrise and wind-down step maths lived inside watch-only code that the iOS
+   test target cannot reach.
+
+**Changed:**
+- `LampRules` (Shared, unit-tested): a sunrise step returns nothing when the lamp is already on and at least as
+  bright; a wind-down step never switches on, never raises brightness or colour temperature, leaves colours alone.
+  The watch automation now uses only these.
+- The crown opens the lamp only outside sleep blocks and after a firmer turn (4 detents instead of 2.5).
+- The lamp panel closes after 30 s unused (not while you touch it or the colour wheel is open).
+- F8 built: the Today ring draws your usual night and nap; the presets stay as a faint outline.
+
+**Verified:** CI build + unit tests (incl. `LampRulesTests`). **Needs the watch:** crown behaviour at night,
+auto-close feel.
