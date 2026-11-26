@@ -23,6 +23,11 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertEqual(FaceRules.doubleTap(sleeping: false, dimmed: false, bedside: true, home: true), .none)
     }
 
+    func testDoubleTapStopsARingingAlarmFirst() {
+        // ringing in the morning window: still a "sleep block" for the face, but double tap must stop the alarm
+        XCTAssertEqual(FaceRules.doubleTap(ringing: true, sleeping: true, dimmed: true, bedside: false, home: true), .stopAlarm)
+    }
+
     func testBedsideOnlyOnTheChargerAtNight() {
         XCTAssertTrue(FaceRules.bedside(hour: 23, charging: true))
         XCTAssertTrue(FaceRules.bedside(hour: 3, charging: true))

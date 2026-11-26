@@ -32,9 +32,10 @@ struct SageWatchApp: App {
     }
 }
 
-/// The face, full-screen. Active: 30 fps for the digit morph and the seconds runner.
-/// Always-on: one frame a minute, and the renderer drops the dial, numerals and subdials.
-/// Long-press opens the recorder controls.
+/// The face, full-screen. Active: the dial drawn once, the runner and time at 20 fps. Always-on and the bedside
+/// clock: one frame a minute. Long-press opens the menu, swipe up or crown up the lamp, crown down a nap,
+/// double tap toggles the lamp. While the alarm rings, only Stop works (and double tap stops it).
+
 struct FaceScreen: View {
     @EnvironmentObject private var health: HealthStore
     @EnvironmentObject private var alarm: SmartAlarm
@@ -128,10 +129,10 @@ struct FaceScreen: View {
         // the face is the clock: hide the system time in the top-right corner (underscored but public SwiftUI API, watchOS 6+)
         ._statusBarHidden(true)
         .contentShape(Rectangle())
-        .onLongPressGesture(minimumDuration: 0.8) { showControls = true }
+        .onLongPressGesture(minimumDuration: 0.8) { if !alarmActive { showControls = true } }
         // swipe up: the lamp panel, when at home (asks the iPhone first if it does not know yet)
         .simultaneousGesture(DragGesture(minimumDistance: 25).onEnded { g in
-            guard g.translation.height < -40, abs(g.translation.width) < abs(g.translation.height) else { return }
+            guard !alarmActive, g.translation.height < -40, abs(g.translation.width) < abs(g.translation.height) else { return }
             showLamp = true   // the panel says why when the lamps cannot be reached
         })
         // turning the crown on the face opens the lamp: a deliberate turn, not a brush, and never during a sleep
@@ -141,7 +142,7 @@ struct FaceScreen: View {
         .digitalCrownRotation($faceCrown, from: -1_000_000, through: 1_000_000, sensitivity: .low,
                               isContinuous: true, isHapticFeedbackEnabled: false)
         .onChange(of: faceCrown) { _, v in
-            guard !showLamp, !showControls, !showMusic, !dimmed else { crownBase = v; return }
+            guard !showLamp, !showControls, !showMusic, !dimmed, !alarmActive else { crownBase = v; return }
             // a pause starts a new gesture; up opens the lamp, a long turn down starts a nap (FaceRules, tested)
             if Date().timeIntervalSince(crownMovedAt) > FaceRules.gesturePause { crownBase = v - (v - crownBase).clamped(to: -1...1) }
             crownMovedAt = Date()
@@ -195,9 +196,14 @@ struct FaceScreen: View {
         }
     }
 
+    /// the alarm (or a test) is tapping: the face's own gestures stand down so a sleepy fumble can only stop it
+    private var alarmActive: Bool { alarm.ringing || alarm.testing }
+
     private func lampDoubleTap() {
-        switch FaceRules.doubleTap(sleeping: FaceMode.auto(Date()) == .sleeping, dimmed: dimmed,
+        switch FaceRules.doubleTap(ringing: alarmActive, sleeping: FaceMode.auto(Date()) == .sleeping, dimmed: dimmed,
                                    bedside: Self.bedside(Date()), home: lamp.home) {
+        case .stopAlarm:
+            if alarm.ringing { alarm.stop() } else { alarm.stopTest() }
         case .toggleLamp:
             WKInterfaceDevice.current().play(.click)
             let on = !lamp.state.on

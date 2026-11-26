@@ -279,3 +279,16 @@ only; the system highlights that control when the gesture fires ([Enabling doubl
 - *Bug caught in review:* the face note showed Undo whenever a nap was armed, so "Lamp off" would have offered an
   Undo that cancels the nap. Each note now carries its own undo action.
 **Verified:** CI build and tests. **Needs the watch:** the gesture itself (watchOS 11 and a watch with double tap).
+
+### 17 · 2026-11-27 — round 8: stabilise instead of adding
+**Review:** ten builds since the first critical round and almost none of it confirmed on the watch; each new
+feature on unverified ones compounds the risk. This round adds nothing new: an end-to-end audit plus a test list.
+**Audit findings (fixed):**
+1. While the alarm rang, the face's gestures stayed live under the wake overlay: swipe up opened the lamp panel
+   over it, the crown could start a nap, long-press opened the menu. Now all stand down while ringing or testing.
+2. Double tap during the alarm did nothing useful (the morning window counts as sleep). Apple's own alarms stop on
+   double tap; Sage's now does too, first in `FaceRules.doubleTap` (tested).
+3. A stale doc comment still said "30 fps".
+**Added:** `docs/test-on-watch.md`, a 10-minute checklist of everything unverified, with the contact log as the
+answer to the open background-delivery question.
+**Process:** no new feature proposals until Tom has run the checklist; rounds continue with audits and fixes.
