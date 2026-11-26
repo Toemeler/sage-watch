@@ -31,7 +31,7 @@ enum FaceRenderer {
         if !state.dimmed { drawDate(&ctx, state.date) }
         drawTime(&ctx, state.date, dimmed: state.dimmed)
         if !state.dimmed && state.mode != .sleeping {
-            drawPlaque(&ctx, battery: state.battery, charging: state.charging)
+            drawPlaque(&ctx, battery: state.battery, charging: state.charging, date: state.date, dimmed: false)
         }
     }
 
@@ -178,25 +178,68 @@ enum FaceRenderer {
 
     /// the plaque at the bottom: the watch battery, with a bolt while charging (gold at 20 % and below);
     /// just the bolt where no level is known
-    private static func drawPlaque(_ ctx: inout GraphicsContext, battery: Int?, charging: Bool) {
-        let width = battery == nil ? 76.5 : 104
+    /// the level the bar shows; it eases toward the real level so changes slide instead of jumping
+    private static var shownLevel: Double?
+
+    /// battery colours: ivory, yellow at 20 % and below, red at 10 % and below (green while charging)
+    static func batteryColour(_ percent: Int, charging: Bool) -> Color {
+        if charging { return P.sageLight }
+        if percent <= 10 { return Color(hex: 0xD9503F) }
+        if percent <= 20 { return Color(hex: 0xE3B341) }
+        return P.ivory
+    }
+
+    /// the plaque at the bottom: the watch battery as a bar that fills with the level, the percentage beside it,
+    /// a light sweeping through the bar while charging and a slow pulse when it is red; just a bolt where no level is known
+    private static func drawPlaque(_ ctx: inout GraphicsContext, battery: Int?, charging: Bool, date: Date, dimmed: Bool) {
+        let width = battery == nil ? 76.5 : 176
         let box = CGRect(x: 484.75 - width / 2, y: 766, width: width, height: 50)
         ctx.fill(Path(roundedRect: box, cornerRadius: 11), with: .color(Color(hex: 0x0D0E0C)))
-        ctx.stroke(Path(roundedRect: box, cornerRadius: 11), with: .color(P.rim), lineWidth: 3.6)
-        if let battery {
-            let colour = battery <= 20 && !charging ? P.gold : P.ivory
-            var text = Text("\(battery)%").font(.system(size: 26, weight: .semibold, design: .rounded).monospacedDigit()).foregroundColor(colour)
-            if charging {
-                text = Text(Image(systemName: "bolt.fill")).font(.system(size: 18, weight: .semibold)).foregroundColor(P.sageLight) + Text(" ") + text
-            }
-            ctx.draw(text, at: CGPoint(x: box.midX, y: box.midY + 1), anchor: .center)
+        ctx.stroke(Path(roundedRect: box, cornerRadius: 11), with: .color(P.rim.opacity(dimmed ? 0.5 : 1)), lineWidth: 3.6)
+        guard let battery else {
+            var bolt = Path()
+            let s = 30 / 13.2, c = CGPoint(x: 484.5, y: 791)
+            bolt.addLines([(1, -6.6), (-3.8, 0.9), (-0.5, 0.9), (-1.3, 6.6), (3.8, -1), (0.5, -1)].map { CGPoint(x: c.x + $0.0 * s, y: c.y + $0.1 * s) })
+            bolt.closeSubpath()
+            ctx.fill(bolt, with: .color(Color(hex: 0xC0B89E)))
             return
         }
-        var bolt = Path()
-        let s = 30 / 13.2, c = CGPoint(x: 484.5, y: 791)
-        bolt.addLines([(1, -6.6), (-3.8, 0.9), (-0.5, 0.9), (-1.3, 6.6), (3.8, -1), (0.5, -1)].map { CGPoint(x: c.x + $0.0 * s, y: c.y + $0.1 * s) })
-        bolt.closeSubpath()
-        ctx.fill(bolt, with: .color(Color(hex: 0xC0B89E)))
+        let target = Double(battery) / 100
+        var level = shownLevel ?? target
+        level += (target - level) * (dimmed ? 1 : 0.08)
+        if abs(level - target) < 0.002 { level = target }
+        shownLevel = level
+
+        let colour = batteryColour(battery, charging: charging)
+        // the bar: a battery outline with a nub, filled to the level
+        let bar = CGRect(x: box.minX + 14, y: box.midY - 11, width: 84, height: 22)
+        ctx.stroke(Path(roundedRect: bar, cornerRadius: 6), with: .color(P.rim), lineWidth: 2)
+        ctx.fill(Path(roundedRect: CGRect(x: bar.maxX + 2, y: bar.midY - 5, width: 4, height: 10), cornerRadius: 1.5), with: .color(P.rim))
+        let inner = bar.insetBy(dx: 3.5, dy: 3.5)
+        let fill = CGRect(x: inner.minX, y: inner.minY, width: max(3, inner.width * level), height: inner.height)
+        var alpha = 1.0
+        if battery <= 10 && !charging && !dimmed {   // slow pulse when red
+            let t = date.timeIntervalSinceReferenceDate
+            alpha = 0.55 + 0.45 * (0.5 + 0.5 * cos(t * 2 * .pi / 1.6))
+        }
+        ctx.fill(Path(roundedRect: fill, cornerRadius: 3.5), with: .color(colour.opacity(alpha)))
+        if charging && !dimmed {   // a light sweeps through the filled part
+            let t = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.8) / 1.8
+            let x = fill.minX + (fill.width + 30) * t - 15
+            var g = ctx
+            g.clip(to: Path(roundedRect: fill, cornerRadius: 3.5))
+            g.fill(Path(CGRect(x: x - 10, y: fill.minY, width: 20, height: fill.height)),
+                   with: .linearGradient(Gradient(colors: [.white.opacity(0), .white.opacity(0.7), .white.opacity(0)]),
+                                         startPoint: CGPoint(x: x - 10, y: 0), endPoint: CGPoint(x: x + 10, y: 0)))
+            var bolt = Path()
+            let s = 16 / 13.2, c = CGPoint(x: bar.midX, y: bar.midY)
+            bolt.addLines([(1, -6.6), (-3.8, 0.9), (-0.5, 0.9), (-1.3, 6.6), (3.8, -1), (0.5, -1)].map { CGPoint(x: c.x + $0.0 * s, y: c.y + $0.1 * s) })
+            bolt.closeSubpath()
+            ctx.fill(bolt, with: .color(.black.opacity(0.75)))
+        }
+        let text = Text("\(battery)%").font(.system(size: 24, weight: .semibold, design: .rounded).monospacedDigit())
+            .foregroundColor(charging ? P.ivory : colour)
+        ctx.draw(text, at: CGPoint(x: (bar.maxX + 6 + box.maxX) / 2, y: box.midY + 1), anchor: .center)
     }
 
     static func grouped(_ n: Int) -> String {
