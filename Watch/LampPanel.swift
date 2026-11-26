@@ -163,8 +163,7 @@ struct LampPanel: View {
     @State private var lastEdge = -1
     @State private var colours = false
     @State private var appeared = false
-    @State private var crown: Double = 0
-    @State private var crownSync = false
+    @State private var crown: Double = 0             // the crown turns endlessly: only its movement is used
     @State private var showValue = false
     @State private var pressTask: Task<Void, Never>?
     @State private var hideTask: Task<Void, Never>?
@@ -241,24 +240,20 @@ struct LampPanel: View {
         .ignoresSafeArea()
         .focusable()
         .focusEffectDisabled()
-        .digitalCrownRotation($crown, from: 0, through: 100, by: 1, sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
+        .digitalCrownRotation($crown, from: -1_000_000, through: 1_000_000, by: 1, sensitivity: .low,
+                              isContinuous: true, isHapticFeedbackEnabled: true)
         .onChange(of: crown) { old, v in
-            if crownSync { crownSync = false; return }
+            let delta = v - old
+            guard abs(delta) < 50 else { return }            // ignore a jump of the binding itself
             if colours {
                 // in the colour wheel the crown zooms, as on the app grid: down shows all 61, up brings them close
                 withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.9)) {
-                    zoom = min(1, max(0.42, zoom + CGFloat(v - old) * 0.012))
+                    zoom = min(1, max(0.42, zoom + CGFloat(delta) * 0.012))
                 }
                 return
             }
-            if touching { syncCrown(); return }
-            withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.9)) { lamp.setLevel(v / 100) }
-            reveal(holding: false)
-        }
-        .onChange(of: modelLevel) { _, _ in if !colours { syncCrown() } }
-        // opening the colours: put the crown at the top of its range so the whole zoom-out is in reach
-        .onChange(of: colours) { _, open in
-            if open && crown != 100 { crownSync = true; crown = 100 }
+            guard !touching else { return }
+            crownBrightness(by: delta)
         }
         .onChange(of: lamp.failedAt) { _, t in
             guard t != nil else { return }
@@ -270,7 +265,6 @@ struct LampPanel: View {
             }
         }
         .onAppear {
-            syncCrown()
             lamp.refresh(force: true)
             // the fill rises into place as the panel opens
             withAnimation(.spring(response: 0.6, dampingFraction: 0.82).delay(0.12)) { appeared = true }
@@ -395,9 +389,18 @@ struct LampPanel: View {
         }
     }
 
-    private func syncCrown() {
-        let target = modelLevel * 100
-        if abs(target - crown) > 0.5 { crownSync = true; crown = target }
+    /// one crown detent = 1 %. Below the 10 % minimum the next turn down switches off, the next turn up from off
+    /// starts at 10 %; reaching 100 % or off gives a click, like a control hitting its end.
+    private func crownBrightness(by delta: Double) {
+        let now = modelLevel
+        var next = now + delta / 100
+        if delta < 0 && now <= 0.1 { next = 0 }
+        if delta > 0 && now == 0 { next = 0.1 }
+        next = min(1, max(0, next))
+        guard next != now else { return }
+        if (next == 0 || next == 1) { WKInterfaceDevice.current().play(.click) }
+        withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.9)) { lamp.setLevel(next) }
+        reveal(holding: false)
     }
 
     private func choose(_ s: Swatch) {
@@ -414,7 +417,6 @@ struct LampPanel: View {
     private func closeColours() {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) { colours = false }
         zoom = 1
-        syncCrown()
     }
 }
 

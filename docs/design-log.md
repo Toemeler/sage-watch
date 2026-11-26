@@ -123,3 +123,13 @@ Proposals wait one round for Tom's answer; unanswered ones are built in the next
   scale together; opening the colours parks the crown at the top of its range so the whole zoom-out is reachable.
 - **Wording:** "Lamp" in the singular everywhere; the iPhone card counts bulbs.
 - **New proposals:** F5–F7 (see the table).
+
+### 8 · 2026-11-26 — endless crown, app icon (user feedback)
+- **Feedback:** "isn't the crown endless?" Yes: the lamp panel bound the crown to a 0–100 range, which made the
+  colour-wheel zoom need a workaround (parking the crown at the top). The crown is now read as movement only
+  (continuous binding): 1 detent = 1 %, below 10 % the next turn down switches off, from off the next turn up starts
+  at 10 %, and reaching 100 % or off clicks once. In the colour wheel the same movement zooms.
+- **App icon** (`tools/make_icon.py` → `iOS/` and `Watch/Assets.xcassets`, preview `docs/app-icon.png`): the face's
+  near-black dial with its ring of minute ticks (hour marks in sage), an ivory crescent for the night and a small
+  sage crescent for the nap: two moons, two sleeps. A first version with a round nap dot read as a smiley and was
+  replaced. Ticks and moons sit inside the watch's circular mask.
