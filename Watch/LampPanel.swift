@@ -405,21 +405,29 @@ struct Honeycomb: View {
         .frame(width: size.width, height: size.height)
         .simultaneousGesture(DragGesture(minimumDistance: 6)
             .onChanged { g in
-                pan = CGSize(width: bound(panBase.width + g.translation.width), height: bound(panBase.height + g.translation.height))
+                pan = CGSize(width: bound(panBase.width + g.translation.width, Self.panLimit.width),
+                             height: bound(panBase.height + g.translation.height, Self.panLimit.height))
             }
             .onEnded { _ in
-                let lim = Self.panLimit
-                panBase = CGSize(width: min(lim, max(-lim, pan.width)), height: min(lim, max(-lim, pan.height)))
+                let l = Self.panLimit
+                panBase = CGSize(width: min(l.width, max(-l.width, pan.width)), height: min(l.height, max(-l.height, pan.height)))
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) { pan = panBase }
             })
-        .onAppear { bloomed = true }
+        .onAppear {
+            // open centred on the colour that is set, as the app grid opens on the last app
+            if let cur = Self.cells.first(where: { $0.swatch.matches(state) }) {
+                panBase = CGSize(width: -cur.pos.x, height: -cur.pos.y)
+                pan = panBase
+            }
+            bloomed = true
+        }
     }
 
-    static let panLimit: CGFloat = 46
+    /// far enough that any bubble, the outer ring included, can be brought to the full-size middle
+    static let panLimit = CGSize(width: 2 * pitch, height: 2 * pitch * sqrt(3) / 2)
 
     /// free inside the limit, rubber band beyond it
-    private func bound(_ v: CGFloat) -> CGFloat {
-        let lim = Self.panLimit
+    private func bound(_ v: CGFloat, _ lim: CGFloat) -> CGFloat {
         guard abs(v) > lim else { return v }
         let extra = LampPanel.rubber(abs(v) - lim, limit: 28)
         return v > 0 ? lim + extra : -lim - extra
@@ -442,14 +450,17 @@ struct Honeycomb: View {
         .accessibilityLabel(Text(cell.swatch.name))
     }
 
-    /// bubbles past the comfortable middle of the screen shrink and are drawn inward, as in the app grid
+    /// Bubble UI model of the app grid: a centre zone where bubbles are full size, and a fringe around it in which
+    /// they ease down to a minimum size while sliding inward, so the edge stays packed instead of clipping.
     private func fisheye(_ p: CGPoint) -> (point: CGPoint, scale: CGFloat) {
-        let hx = size.width / 2 - Self.diameter * 0.55, hy = size.height / 2 - Self.diameter * 0.55
+        let d = Self.diameter
+        let hx = size.width / 2 - d * 0.75, hy = size.height / 2 - d * 0.75      // centre zone (half extents)
+        let fringe = d * 1.1
         let ex = max(0, abs(p.x) - hx), ey = max(0, abs(p.y) - hy)
-        let e = hypot(ex, ey) / Self.diameter
-        guard e > 0 else { return (p, 1) }
-        let len = max(hypot(p.x, p.y), 1)
-        let pull = min(e, 1.5) * Self.diameter * 0.45
-        return (CGPoint(x: p.x - p.x / len * pull, y: p.y - p.y / len * pull), max(0.3, 1 - 0.6 * e))
+        let t = min(1, hypot(ex, ey) / fringe)
+        guard t > 0 else { return (p, 1) }
+        let e = t * t * (3 - 2 * t)                                               // smoothstep
+        let len = max(hypot(p.x, p.y), 1), pull = e * d * 0.5
+        return (CGPoint(x: p.x - p.x / len * pull, y: p.y - p.y / len * pull), 1 - 0.62 * e)
     }
 }

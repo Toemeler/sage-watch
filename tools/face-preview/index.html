@@ -376,20 +376,25 @@ requestAnimationFrame(frame);
   });
   let pan = { x: 0, y: 0 }, panBase = { x: 0, y: 0 }; const panS = { x: new Spring(0, 0.45, 0.75), y: new Spring(0, 0.45, 0.75) };
   let panning = false;
-  const LIM = 46, bound = v => Math.abs(v) <= LIM ? v : Math.sign(v) * (LIM + rubber(Math.abs(v) - LIM, 28));
+  // far enough that any bubble, the outer ring included, can reach the full-size middle
+  const LIMX = 2 * PITCH, LIMY = 2 * PITCH * Math.sqrt(3) / 2;
+  const bound = (v, L) => Math.abs(v) <= L ? v : Math.sign(v) * (L + rubber(Math.abs(v) - L, 28));
+  // Bubble UI model: full-size centre zone, then a fringe where bubbles ease down and slide inward
   function fisheye(x, y) {
-    const hx = AW / 2 - D * 0.55, hy = AH / 2 - D * 0.55;
-    const ex = Math.max(0, Math.abs(x) - hx), ey = Math.max(0, Math.abs(y) - hy), e = Math.hypot(ex, ey) / D;
-    if (e <= 0) return { x, y, s: 1 };
-    const len = Math.max(Math.hypot(x, y), 1), pull = Math.min(e, 1.5) * D * 0.45;
-    return { x: x - x / len * pull, y: y - y / len * pull, s: Math.max(0.3, 1 - 0.6 * e) };
+    const hx = AW / 2 - D * 0.75, hy = AH / 2 - D * 0.75, fringe = D * 1.1;
+    const ex = Math.max(0, Math.abs(x) - hx), ey = Math.max(0, Math.abs(y) - hy), t = Math.min(1, Math.hypot(ex, ey) / fringe);
+    if (t <= 0) return { x, y, s: 1 };
+    const e = t * t * (3 - 2 * t), len = Math.max(Math.hypot(x, y), 1), pull = e * D * 0.5;
+    return { x: x - x / len * pull, y: y - y / len * pull, s: 1 - 0.62 * e };
   }
   const matches = sw => sw.temp ? (!lamp.rgb && lamp.temp === sw.temp) : (lamp.rgb && Math.abs(lamp.rgb[0] - sw.rgb[0]) + Math.abs(lamp.rgb[1] - sw.rgb[1]) + Math.abs(lamp.rgb[2] - sw.rgb[2]) < 12);
 
   function openColours() {
     colours = true; mode.to(1, 0.45, 0.8);
     cells.forEach(c => { c.bloom.jump(0); setTimeout(() => c.bloom.to(1, 0.5, 0.74), c.ring * 50); });
-    pan = { x: 0, y: 0 }; panBase = { x: 0, y: 0 }; panS.x.jump(0); panS.y.jump(0);
+    // open centred on the colour that is set, as the app grid opens on the last app
+    const cur = cells.find(c => matches(c.sw)); const p0 = cur ? { x: -cur.x, y: -cur.y } : { x: 0, y: 0 };
+    pan = { ...p0 }; panBase = { ...p0 }; panS.x.jump(p0.x); panS.y.jump(p0.y);
   }
   function closeColours() { colours = false; mode.to(0, 0.45, 0.85); cells.forEach(c => c.bloom.to(0, 0.3, 1)); }
 
@@ -409,7 +414,7 @@ requestAnimationFrame(frame);
     const p = pt(e), dx = p.x - startX, dy = p.y - startY;
     if (colours) {
       if (!panning && Math.hypot(dx, dy) > 6) panning = true;
-      if (panning) { pan = { x: bound(panBase.x + dx), y: bound(panBase.y + dy) }; panS.x.jump(pan.x); panS.y.jump(pan.y); }
+      if (panning) { pan = { x: bound(panBase.x + dx, LIMX), y: bound(panBase.y + dy, LIMY) }; panS.x.jump(pan.x); panS.y.jump(pan.y); }
       return;
     }
     if (longFired) return;
@@ -424,7 +429,7 @@ requestAnimationFrame(frame);
     if (!touching) return; touching = false;
     if (colours) {
       if (panning) {
-        panBase = { x: Math.max(-LIM, Math.min(LIM, pan.x)), y: Math.max(-LIM, Math.min(LIM, pan.y)) };
+        panBase = { x: Math.max(-LIMX, Math.min(LIMX, pan.x)), y: Math.max(-LIMY, Math.min(LIMY, pan.y)) };
         panS.x.to(panBase.x); panS.y.to(panBase.y); pan = { ...panBase }; return;
       }
       if (longFired) return;   // the release of the long press that opened them
