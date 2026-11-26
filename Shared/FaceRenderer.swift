@@ -5,6 +5,7 @@ struct FaceState {
     var date: Date
     var mode: FaceMode
     var music: Bool = false           // something plays on the iPhone: a small equalizer under the time
+    var bedside: Bool = false         // charging at night: only the time, in dim red (F10)
     var dimmed: Bool = false          // always-on (luminance reduced)
     var battery: Int? = nil           // watch battery in percent; nil where unknown (the plaque then shows only the bolt)
     var charging: Bool = false
@@ -34,6 +35,12 @@ enum FaceRenderer {
         ctx.scaleBy(x: scale, y: scale)
         ctx.translateBy(x: -src.minX, y: -src.minY)
 
+        if state.bedside {
+            // a bedside clock that does not light the room: black, the time in deep red, nothing that moves
+            ctx.fill(Path(src), with: .color(.black))
+            if layers.contains(.live) { drawTime(&ctx, state.date, dimmed: true, tint: bedsideRed) }
+            return
+        }
         if layers.contains(.base) {
             ctx.fill(Path(src), with: .color(.black))
             if !state.dimmed { drawDial(&ctx) }
@@ -125,7 +132,10 @@ enum FaceRenderer {
 
     // MARK: time
 
-    private static func drawTime(_ ctx: inout GraphicsContext, _ d: Date, dimmed: Bool) {
+    /// deep red, dim: barely lights a dark room and keeps night vision
+    static let bedsideRed = Color(hex: 0x8E1B14)
+
+    private static func drawTime(_ ctx: inout GraphicsContext, _ d: Date, dimmed: Bool, tint: Color? = nil) {
         let cal = Calendar.current
         let c = cal.dateComponents([.hour, .minute, .second, .nanosecond], from: d)
         let o = cal.dateComponents([.hour, .minute], from: d.addingTimeInterval(-60))
@@ -148,7 +158,7 @@ enum FaceRenderer {
                 ctx.fill(path.applying(CGAffineTransform(translationX: 3, y: 5)), with: .color(.black.opacity(0.35)))
                 ctx.fill(path.applying(CGAffineTransform(translationX: 1.5, y: 2.5)), with: .color(.black.opacity(0.45)))
             }
-            ctx.fill(path, with: .color(dimmed ? col.opacity(0.7) : col))
+            ctx.fill(path, with: .color(tint ?? (dimmed ? col.opacity(0.7) : col)))
         }
     }
 

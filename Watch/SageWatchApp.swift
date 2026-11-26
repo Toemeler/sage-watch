@@ -48,23 +48,49 @@ struct FaceScreen: View {
     @State private var showMusic = false
     @State private var faceCrown: Double = 0
     @State private var crownBase: Double = 0
+    @State private var crownMovedAt = Date.distantPast
+    @State private var napNote: String?              // "Nap: watching for sleep" with Undo, for 3 s (F9)
+    @State private var napNoteTask: Task<Void, Never>?
     @Environment(\.scenePhase) private var phase
 
     var body: some View {
         ZStack {
-            if dimmed {
-                TimelineView(.everyMinute) { tl in face(tl.date) }
-            } else {
-                // static layers drawn once; only the runner and the live layer follow the clock, at 20 fps
-                // (the runner steps 5 times a second; 20 fps keeps its fade and the digit morph smooth)
-                layer([.base])
-                TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in layer([.runner], tl.date) }
-                layer([.marks])
-                TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in layer([.live], tl.date) }
+            TimelineView(.everyMinute) { minute in
+                if dimmed || Self.bedside(minute.date) {
+                    // always-on and bedside: one frame a minute
+                    face(minute.date)
+                } else {
+                    // static layers drawn once; only the runner and the live layer follow the clock, at 20 fps
+                    // (the runner steps 5 times a second; 20 fps keeps its fade and the digit morph smooth)
+                    ZStack {
+                        layer([.base])
+                        TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in layer([.runner], tl.date) }
+                        layer([.marks])
+                        TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in layer([.live], tl.date) }
+                    }
+                    // the spoken time follows the minute (it was fixed at the first draw before)
                     .accessibilityElement()
-                    .accessibilityLabel(Text(Date().formatted(date: .omitted, time: .shortened)))
+                    .accessibilityLabel(Text(minute.date.formatted(date: .omitted, time: .shortened)))
+                }
             }
-            if recorder.isRunning && !dimmed {
+            if let note = napNote {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 8) {
+                        Text(note).font(.system(size: 13, weight: .semibold)).foregroundStyle(FaceGeometry.Palette.ivory)
+                        if alarm.napArmed {
+                            Button("Undo") { alarm.cancelNap(); hideNapNote() }
+                                .font(.system(size: 13, weight: .semibold)).buttonStyle(.plain)
+                                .foregroundStyle(FaceGeometry.Palette.sageLight)
+                        }
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(Capsule().fill(Color(white: 0.12).opacity(0.95)))
+                    .padding(.bottom, 18)
+                }
+                .transition(.opacity)
+            }
+            if recorder.isRunning && !dimmed && !Self.bedside(Date()) {
                 VStack {
                     Circle().fill(FaceGeometry.Palette.sage).frame(width: 5, height: 5).padding(.top, 3)
                     Spacer()
@@ -109,7 +135,16 @@ struct FaceScreen: View {
                               isContinuous: true, isHapticFeedbackEnabled: false)
         .onChange(of: faceCrown) { _, v in
             guard !showLamp, !showControls, !showMusic, !dimmed, FaceMode.auto(Date()) != .sleeping else { crownBase = v; return }
-            if abs(v - crownBase) > 4 {
+            // a pause of 1.5 s starts a new gesture; up opens the lamp, a long turn down starts a nap (F9)
+            if Date().timeIntervalSince(crownMovedAt) > 1.5 { crownBase = v - (v - crownBase).clamped(to: -1...1) }
+            crownMovedAt = Date()
+            let d = v - crownBase
+            if d < -12 {
+                crownBase = v
+                startNapFromFace()
+                return
+            }
+            if d > 4 {
                 crownBase = v
                 WKInterfaceDevice.current().play(.click)
                 showLamp = true
@@ -136,6 +171,39 @@ struct FaceScreen: View {
             .accessibilityLabel(Text(date.formatted(date: .omitted, time: .shortened)))
     }
 
+    /// charging at night (21:00–07:00): the face becomes a dim red bedside clock (F10)
+    static func bedside(_ d: Date) -> Bool {
+        let h = Calendar.current.component(.hour, from: d)
+        return BatteryReader.read(d).charging && (h >= 21 || h < 7)
+    }
+
+    /// F9: a long turn of the crown down starts a nap, with a short note and Undo
+    private func startNapFromFace() {
+        guard !alarm.ringing else { return }
+        guard recorder.isRunning else {
+            WKInterfaceDevice.current().play(.failure)
+            showNapNote("Naps need Record on")
+            return
+        }
+        alarm.napNow()
+        WKInterfaceDevice.current().play(.start)
+        showNapNote("Nap: watching for sleep")
+    }
+
+    private func showNapNote(_ text: String) {
+        napNoteTask?.cancel()
+        withAnimation(.easeOut(duration: 0.2)) { napNote = text }
+        napNoteTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            hideNapNote()
+        }
+    }
+
+    private func hideNapNote() {
+        withAnimation(.easeIn(duration: 0.25)) { napNote = nil }
+    }
+
     private func layer(_ layers: FaceRenderer.Layers, _ date: Date = .now) -> some View {
         Canvas { ctx, size in draw(&ctx, size, date, layers: layers) }
             .allowsHitTesting(false)
@@ -144,7 +212,7 @@ struct FaceScreen: View {
 
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date, layers: FaceRenderer.Layers = .all) {
         let power = BatteryReader.read(date)
-        let state = FaceState(date: date, mode: FaceMode.auto(date), music: audio.playing, dimmed: dimmed,
+        let state = FaceState(date: date, mode: FaceMode.auto(date), music: audio.playing, bedside: Self.bedside(date), dimmed: dimmed,
                               battery: power.percent, charging: power.charging)
         FaceRenderer.draw(&ctx, size: size, state: state, layers: layers)
     }
@@ -191,4 +259,8 @@ struct WakeOverlay: View {
         }
         .onAppear { withAnimation(.easeInOut(duration: 2).repeatForever()) { glow = true } }
     }
+}
+
+extension Comparable {
+    func clamped(to r: ClosedRange<Self>) -> Self { min(max(self, r.lowerBound), r.upperBound) }
 }

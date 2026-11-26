@@ -40,6 +40,7 @@
   <label>Music playing</label><input id="music" type="checkbox" checked>
   <label>Sleep face</label><input id="sleeping" type="checkbox">
   <label>Always-on (dimmed)</label><input id="dimmed" type="checkbox">
+  <label>Bedside (charging at night)</label><input id="bedside" type="checkbox">
   <p class="hint">Coordinates are the renderer's reference space (screen x 131–827, y 63–893). Change the code here, reload, and port the settled values back to Shared/FaceRenderer.swift.</p>
 </div>
 
@@ -118,6 +119,8 @@ function draw(ctx, st) {
   ctx.scale(scale, scale);
   ctx.translate(-SCREEN.x, -SCREEN.y);
   ctx.fillStyle = "#000"; ctx.fillRect(SCREEN.x, SCREEN.y, SCREEN.w, SCREEN.h);
+  // bedside (charging at night): only the time, deep red and dim
+  if (st.bedside) { drawTime(ctx, st.date, true, "#8E1B14"); ctx.restore(); return; }
   if (!st.dimmed) drawDial(ctx);
   drawTrack(ctx, st.dimmed);
   if (!st.dimmed) drawRunner(ctx, st.date);
@@ -203,7 +206,7 @@ function drawNumerals(ctx) {
   for (const [x, y, s] of NUMERALS) ctx.fillText(s, x, y);
 }
 
-function drawTime(ctx, date, dimmed) {
+function drawTime(ctx, date, dimmed, tint) {
   if (!REG) return;
   const h = date.getHours(), m = date.getMinutes();
   const digits = [[Math.floor(h / 10), REG, HOUR_SLOTS[0], P.ivory], [h % 10, REG, HOUR_SLOTS[1], P.ivory],
@@ -215,7 +218,7 @@ function drawTime(ctx, date, dimmed) {
       ctx.fillStyle = style; ctx.fill(g.path); ctx.restore();
     };
     if (!dimmed) { fill(3, 5, "rgba(0,0,0,0.35)"); fill(1.5, 2.5, "rgba(0,0,0,0.45)"); }
-    ctx.globalAlpha = dimmed ? 0.7 : 1; fill(0, 0, col); ctx.globalAlpha = 1;
+    ctx.globalAlpha = tint ? 1 : (dimmed ? 0.7 : 1); fill(0, 0, tint || col); ctx.globalAlpha = 1;
   }
 }
 
@@ -259,7 +262,7 @@ function frame() {
   if (!$("live").checked && fixed) { date = new Date(now); date.setHours(fixed.h, fixed.m, fixed.s); }
   else $("time").value = now.toTimeString().slice(0, 8);
   const st = { date, battery: +$("bat").value, charging: $("charging").checked, music: $("music").checked,
-               sleeping: $("sleeping").checked, dimmed: $("dimmed").checked };
+               sleeping: $("sleeping").checked, dimmed: $("dimmed").checked, bedside: $("bedside").checked };
   $("batv").textContent = st.battery + "%";
   draw(ctx, st);
   requestAnimationFrame(frame);

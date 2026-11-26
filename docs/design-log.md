@@ -45,8 +45,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F6 | **Off when asleep:** when the watch finds you asleep (night or nap), a lamp that is on fades off in two steps | built (round 3, no answer) |
 | F7 | ~~Lamp in the Smart Stack~~ | rejected: not needed, focus on the watch app itself |
 | F8 | **Today ring from your real sleep:** the iPhone Today ring draws your usual nap and night (averages of the recorded ones) as the main arcs, with the plan's presets as a faint outline behind them | built (round 4, no answer) |
-| F9 | **Nap now from the face:** a long turn of the crown down on the face starts a nap (with a haptic and a 3 s undo), instead of digging into the menu | proposed (round 4) |
-| F10 | **Bedside mode:** while the watch charges at night, the face shows only the time in deep red at minimum brightness (no runner, no music), like a bedside clock that does not light the room | proposed (round 4) |
+| F9 | **Nap from the face:** crown up opens the lamp; a long turn down (12 detents) starts a nap, with a note and Undo for 3 s | built (round 5, no answer) |
+| F10 | **Bedside mode:** while the watch charges at night, the face shows only the time in deep red at minimum brightness (no runner, no music), like a bedside clock that does not light the room | built (round 5, no answer) |
 
 ## Iterations
 
@@ -226,3 +226,24 @@ stays the recommended fallback.
 
 **Verified:** CI build + unit tests (incl. `LampRulesTests`). **Needs the watch:** crown behaviour at night,
 auto-close feel.
+
+### 14 · 2026-11-26 — critical round 5: F9, F10, VoiceOver
+**Review:**
+1. *Crown conflict (F9 design).* Any crown turn on the face opened the lamp, so a "long turn down" for the nap
+   would have opened the lamp first. Resolved by direction: up opens the lamp (4 detents), down starts a nap only
+   after 12 detents; a 1.5 s pause starts a new gesture. Still never during a sleep block.
+2. *VoiceOver (bug).* The face's spoken time was computed once at the first draw and went stale.
+3. *Bedside power (F10 design).* A bedside clock must cost less than the face, not more: one frame a minute, no
+   runner, no dial, no overlays.
+4. *Naps need the recorder.* `napNow` only finds sleep while Record is on; the face says so (with the failure
+   haptic) instead of silently arming a nap watch that cannot work.
+
+**Changed:**
+- F9: crown down 12 detents → nap watch armed, `.start` haptic, "Nap: watching for sleep · Undo" for 3 s.
+- F10: charging between 21:00 and 07:00 → black face with the time in deep red (#8E1B14), one frame a minute;
+  the recording dot and music tap area are hidden. The prototype has a "Bedside" toggle.
+- The spoken time now follows the minute.
+- F9 and F10 share `SageWatchApp.swift` and went in one commit (noted, so a revert takes both).
+
+**Verified:** CI build and tests. **Needs the watch:** crown direction feel, whether watchOS keeps Sage frontmost
+on the charger (Nightstand mode takes over only with an Alarms-app alarm, which Sage does not use).

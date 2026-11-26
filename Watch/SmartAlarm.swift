@@ -171,6 +171,9 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
         return DateInterval(start: start, end: end)
     }
 
+    /// a nap started by hand is being watched for (Undo on the face's note)
+    var napArmed: Bool { (manualNapUntil ?? .distantPast) > Date() }
+
     func napNow() {
         guard !ringing else { return }
         manualNapUntil = Date().addingTimeInterval(90 * 60)
