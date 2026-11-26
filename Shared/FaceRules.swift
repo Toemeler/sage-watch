@@ -19,6 +19,16 @@ enum FaceRules {
         return .none
     }
 
+    enum DoubleTapAction: Equatable { case none, toggleLamp, openLamp }
+
+    /// double tap (pinch twice) on the face: toggles the lamp when the watch knows it is at home, otherwise opens
+    /// the lamp panel (which says why) rather than switching on from a stale state; nothing during a sleep block,
+    /// in always-on or on the bedside clock
+    static func doubleTap(sleeping: Bool, dimmed: Bool, bedside: Bool, home: Bool) -> DoubleTapAction {
+        if sleeping || dimmed || bedside { return .none }
+        return home ? .toggleLamp : .openLamp
+    }
+
     /// the bedside clock: on the charger between 21:00 and 07:00
     static func bedside(hour: Int, charging: Bool) -> Bool {
         charging && (hour >= 21 || hour < 7)

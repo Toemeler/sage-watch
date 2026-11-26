@@ -47,7 +47,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F8 | **Today ring from your real sleep:** the iPhone Today ring draws your usual nap and night (averages of the recorded ones) as the main arcs, with the plan's presets as a faint outline behind them | built (round 4, no answer) |
 | F9 | **Nap from the face:** crown up opens the lamp; a long turn down (12 detents) starts a nap, with a note and Undo for 3 s | built (round 5, no answer) |
 | F10 | **Bedside mode:** while the watch charges at night, the face shows only the time in deep red at minimum brightness (no runner, no music), like a bedside clock that does not light the room | built (round 5, no answer) |
-| F11 | **Double tap toggles the lamp:** on watches with the double-tap gesture (pinch twice), double tap on the face switches the lamp on or off, with the click haptic; nothing during a sleep block | proposed (round 6) |
+| F11 | **Double tap toggles the lamp:** on watches with the double-tap gesture (pinch twice), double tap on the face switches the lamp on or off, with the click haptic; nothing during a sleep block | built (round 7, no answer) |
 
 ## Iterations
 
@@ -266,3 +266,16 @@ on the charger (Nightstand mode takes over only with an Alarms-app alarm, which 
 - Proposal F11 (double tap toggles the lamp).
 
 **Verified:** CI build and tests (`FaceRulesTests`). **Needs the watch:** colour picking at the edge.
+
+### 16 · 2026-11-27 — critical round 7: F11 double tap
+**Research:** double tap is SwiftUI's `handGestureShortcut(.primaryAction)` on a button-like control, watchOS 11+
+only; the system highlights that control when the gesture fires ([Enabling double tap](https://developer.apple.com/documentation/watchos-apps/enabling-double-tap.md),
+[WWDC24 10205](https://developer.apple.com/videos/play/wwdc2024/10205/)). It cannot be tried in the simulator.
+**Review / decisions:**
+- Nothing during a sleep block, in always-on or on the bedside clock (a pinch in sleep must not light the room).
+- If the watch does not know it is home, double tap opens the lamp panel (which says why) instead of toggling from
+  a stale state. Rule in `FaceRules.doubleTap`, tested.
+- A note "Lamp on / Lamp off · Undo" confirms it, since an invisible button gets no visible highlight.
+- *Bug caught in review:* the face note showed Undo whenever a nap was armed, so "Lamp off" would have offered an
+  Undo that cancels the nap. Each note now carries its own undo action.
+**Verified:** CI build and tests. **Needs the watch:** the gesture itself (watchOS 11 and a watch with double tap).

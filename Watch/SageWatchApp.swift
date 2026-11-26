@@ -51,6 +51,7 @@ struct FaceScreen: View {
     @State private var crownMovedAt = Date.distantPast
     @State private var napNote: String?              // "Nap: watching for sleep" with Undo, for 3 s (F9)
     @State private var napNoteTask: Task<Void, Never>?
+    @State private var noteUndo: (() -> Void)?        // what Undo on the current note does (nil: no Undo)
     @Environment(\.scenePhase) private var phase
 
     var body: some View {
@@ -73,13 +74,14 @@ struct FaceScreen: View {
                     .accessibilityLabel(Text(minute.date.formatted(date: .omitted, time: .shortened)))
                 }
             }
+            doubleTapTarget
             if let note = napNote {
                 VStack {
                     Spacer()
                     HStack(spacing: 8) {
                         Text(note).font(.system(size: 13, weight: .semibold)).foregroundStyle(FaceGeometry.Palette.ivory)
-                        if alarm.napArmed {
-                            Button("Undo") { alarm.cancelNap(); hideNapNote() }
+                        if let undo = noteUndo {
+                            Button("Undo") { undo(); hideNapNote() }
                                 .font(.system(size: 13, weight: .semibold)).buttonStyle(.plain)
                                 .foregroundStyle(FaceGeometry.Palette.sageLight)
                         }
@@ -181,6 +183,33 @@ struct FaceScreen: View {
         FaceRules.bedside(hour: Calendar.current.component(.hour, from: d), charging: BatteryReader.read(d).charging)
     }
 
+    /// F11: double tap (pinch twice, watchOS 11+ on watches that support it) toggles the lamp. The gesture needs a
+    /// real button as the scene's primary action; this one is invisible and the decision is FaceRules.doubleTap.
+    @ViewBuilder private var doubleTapTarget: some View {
+        if #available(watchOS 11.0, *) {
+            Button(action: lampDoubleTap) { Color.clear.frame(width: 2, height: 2) }
+                .buttonStyle(.plain)
+                .opacity(0.02)
+                .handGestureShortcut(.primaryAction)
+                .accessibilityHidden(true)       // VoiceOver has the lamp panel and its own actions
+        }
+    }
+
+    private func lampDoubleTap() {
+        switch FaceRules.doubleTap(sleeping: FaceMode.auto(Date()) == .sleeping, dimmed: dimmed,
+                                   bedside: Self.bedside(Date()), home: lamp.home) {
+        case .toggleLamp:
+            WKInterfaceDevice.current().play(.click)
+            let on = !lamp.state.on
+            lamp.toggle()
+            showNapNote(on ? "Lamp on" : "Lamp off", undo: { lamp.toggle() })
+        case .openLamp:
+            showLamp = true
+        case .none:
+            break
+        }
+    }
+
     /// F9: a long turn of the crown down starts a nap, with a short note and Undo
     private func startNapFromFace() {
         guard !alarm.ringing else { return }
@@ -191,11 +220,12 @@ struct FaceScreen: View {
         }
         alarm.napNow()
         WKInterfaceDevice.current().play(.start)
-        showNapNote("Nap: watching for sleep")
+        showNapNote("Nap: watching for sleep", undo: { alarm.cancelNap() })
     }
 
-    private func showNapNote(_ text: String) {
+    private func showNapNote(_ text: String, undo: (() -> Void)? = nil) {
         napNoteTask?.cancel()
+        noteUndo = undo
         withAnimation(.easeOut(duration: 0.2)) { napNote = text }
         napNoteTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(3))
@@ -205,6 +235,7 @@ struct FaceScreen: View {
     }
 
     private func hideNapNote() {
+        noteUndo = nil
         withAnimation(.easeIn(duration: 0.25)) { napNote = nil }
     }
 

@@ -15,6 +15,14 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertEqual(FaceRules.crownAction(delta: -20, sleeping: true), .none)
     }
 
+    func testDoubleTapTogglesOnlyWhenItIsSafe() {
+        XCTAssertEqual(FaceRules.doubleTap(sleeping: false, dimmed: false, bedside: false, home: true), .toggleLamp)
+        XCTAssertEqual(FaceRules.doubleTap(sleeping: false, dimmed: false, bedside: false, home: false), .openLamp)
+        XCTAssertEqual(FaceRules.doubleTap(sleeping: true, dimmed: false, bedside: false, home: true), .none)
+        XCTAssertEqual(FaceRules.doubleTap(sleeping: false, dimmed: true, bedside: false, home: true), .none)
+        XCTAssertEqual(FaceRules.doubleTap(sleeping: false, dimmed: false, bedside: true, home: true), .none)
+    }
+
     func testBedsideOnlyOnTheChargerAtNight() {
         XCTAssertTrue(FaceRules.bedside(hour: 23, charging: true))
         XCTAssertTrue(FaceRules.bedside(hour: 3, charging: true))
