@@ -136,7 +136,7 @@ struct DayRing: View {
 
     var body: some View {
         Canvas { ctx, size in draw(&ctx, size) }
-        .accessibilityLabel(Text("Day ring with night sleep \(Plan.fmt(Plan.night.onset)) to \(Plan.fmt(Plan.night.wake)) and nap \(Plan.fmt(Plan.nap.onset)) to \(Plan.fmt(Plan.nap.wake))"))
+        .accessibilityLabel(Text("Day ring with your usual night \(Plan.fmt(Usual.now.nightOn)) to \(Plan.fmt(Usual.now.nightWake)) and nap \(Plan.fmt(Usual.now.napOn)) to \(Plan.fmt(Usual.now.napWake))"))
     }
 
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize) {
@@ -154,15 +154,20 @@ struct DayRing: View {
         }
         ctx.stroke(Path(ellipseIn: CGRect(x: c.x - R, y: c.y - R, width: 2 * R, height: 2 * R)), with: .color(Color(hex: 0x1D201B)), lineWidth: w)
         ctx.stroke(arc(451, 1008, r: R - w * 1.4), with: .color(Theme.gold.opacity(0.28)), style: StrokeStyle(lineWidth: w * 0.35, lineCap: .round))
-        let nOn = Plan.night.onset - 1440, nWake = Plan.night.wake - 1440
+        // your usual night and nap (averages of the recorded ones) as the arcs; the plan's presets as a faint
+        // outline behind them once your own times are known
+        let u = Usual.now
+        if u.learnedNight { ctx.stroke(arc(Plan.night.onset - 1440, Plan.night.wake - 1440, r: R), with: .color(Theme.sage.opacity(0.22)), style: StrokeStyle(lineWidth: w * 0.35, lineCap: .round)) }
+        if u.learnedNap { ctx.stroke(arc(Plan.nap.onset, Plan.nap.wake, r: R), with: .color(Theme.sage.opacity(0.22)), style: StrokeStyle(lineWidth: w * 0.35, lineCap: .round)) }
+        let nOn = u.nightOn - 1440, nWake = u.nightWake - 1440
         ctx.stroke(arc(nOn, nWake, r: R), with: .color(Theme.sage), style: StrokeStyle(lineWidth: w, lineCap: .round))
-        ctx.stroke(arc(Plan.nap.onset, Plan.nap.wake, r: R), with: .color(Theme.sage.opacity(0.75)), style: StrokeStyle(lineWidth: w, lineCap: .round))
+        ctx.stroke(arc(u.napOn, u.napWake, r: R), with: .color(Theme.sage.opacity(0.75)), style: StrokeStyle(lineWidth: w, lineCap: .round))
         for (a, b) in [(Plan.night.windowStart - 1440, Plan.night.end - 1440), (Plan.nap.windowStart, Plan.nap.end)] {
             ctx.stroke(arc(a, b, r: R + w * 0.95), with: .color(Theme.gold), style: StrokeStyle(lineWidth: w * 0.45, lineCap: .round))
         }
         let nowM = Plan.dayClock(now)
         if nowM > nWake { ctx.stroke(arc(nWake, nowM, r: R - w * 1.05), with: .color(Theme.ivory.opacity(0.5)), lineWidth: w * 0.25) }
-        for (m, t) in [((nOn + nWake) / 2, "night"), ((Plan.nap.onset + Plan.nap.wake) / 2, "nap")] {
+        for (m, t) in [((nOn + nWake) / 2, "night"), ((u.napOn + u.napWake) / 2, "nap")] {
             let a = CGFloat(ang(m).radians)
             ctx.draw(Text(t).font(.system(size: S * 0.036)).foregroundColor(Theme.sage), at: CGPoint(x: c.x + cos(a) * (R - w * 2.5), y: c.y + sin(a) * (R - w * 2.5)))
         }
@@ -176,9 +181,10 @@ struct DayRing: View {
     }
 
     private func subline(_ m: Double) -> String {
-        let toNap = Int(Plan.nap.onset - m)
+        let u = Usual.now
+        let toNap = Int(u.napOn - m)
         if toNap > 0 && toNap < 360 { return String(format: "NAP IN %dH %02dM", toNap / 60, toNap % 60) }
-        let toNight = Int((Plan.night.onset - 1440 + 1440 - m).truncatingRemainder(dividingBy: 1440))
+        let toNight = Int((u.nightOn - 1440 + 1440 - m).truncatingRemainder(dividingBy: 1440))
         return String(format: "SLEEP IN %dH %02dM", toNight / 60, toNight % 60)
     }
 }
@@ -287,5 +293,21 @@ struct FacePreview: View {
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
         let state = FaceState(date: date, mode: mode ?? FaceMode.auto(date))
         FaceRenderer.draw(&ctx, size: size, state: state)
+    }
+}
+
+/// Your usual night and nap for the Today ring: the averages of the recorded ones (Plan.typical, from NightStore),
+/// the plan's presets until two of each are recorded.
+struct Usual {
+    let nightOn: Double, nightWake: Double, napOn: Double, napWake: Double
+    let learnedNight: Bool, learnedNap: Bool
+
+    static var now: Usual {
+        let t = Plan.typical
+        let night = t.flatMap { t in t.nightOnset.flatMap { on in t.nightWake.map { (on, $0) } } }
+        let nap = t.flatMap { t in t.napOnset.flatMap { on in t.napWake.map { (on, $0) } } }
+        return Usual(nightOn: night?.0 ?? Plan.night.onset, nightWake: night?.1 ?? Plan.night.wake,
+                     napOn: nap?.0 ?? Plan.nap.onset, napWake: nap?.1 ?? Plan.nap.wake,
+                     learnedNight: night != nil, learnedNap: nap != nil)
     }
 }
