@@ -162,3 +162,14 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 **If the log shows night steps failing in the background:** the dependable fix is the home bridge (watch → HTTP
 over Wi-Fi → bulb), which takes the iPhone out of the path; URLSession works on the watch. Tom said "not now"; it
 stays the recommended fallback.
+
+### 10 · 2026-11-26 — the lamp dims toward your real sleep times (Tom's request)
+- **Request:** the lamp's dimming should use the average of recorded naps and nights, not the plan's presets.
+- **Changed:** the iPhone computes the average onset and wake of the last 14 recorded naps and nights (once two
+  of each exist; nights averaged on the night clock so 23:50 and 00:30 give 00:10, not noon) and sends them to the
+  watch. The wind-down now dims toward your *usual* bedtime (an hour ahead, every 3 min) and, new, your usual nap
+  time (20 min ahead, every minute). The menu says "Winding down to your usual bedtime 00:12".
+- **Deliberately unchanged:** the plan, the face and the smart alarm. A first pass also moved the Plan tab and the
+  face to the averages; reverted after Tom clarified it was meant for the lamp. The alarm's wake window must never
+  follow averaged wakes: you are always woken inside it, so the average would pull it earlier night after night.
+- **Tests:** `TypicalSleepTests` (midnight crossing, two-recording minimum, sync round trip).

@@ -150,6 +150,12 @@ final class Outbox: NSObject, ObservableObject, WCSessionDelegate {
             AlarmSettings(dictionary: d).save()
             DispatchQueue.main.async { SmartAlarm.shared.scheduleNext() }
         }
+        if let t = TypicalSleep(dictionary: context["typicalSleep"] as? [String: Any]) {
+            DispatchQueue.main.async {
+                Plan.typical = t
+                LampAutomation.shared.rescheduleWindDown()     // the lamp dims before your usual bedtime and nap
+            }
+        }
         if let s = LastSleepSummary(dictionary: context[lastSleepKey] as? [String: Any]),
            let data = try? JSONEncoder().encode(s) {
             UserDefaults.standard.set(data, forKey: lastSleepKey)

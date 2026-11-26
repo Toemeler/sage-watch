@@ -132,6 +132,10 @@ final class NightStore: ObservableObject {
             refreshing = nil
             Self.saveCache(records)
             WatchSync.shared.sendLastSleep(lastNight)
+            let typical = TypicalSleep.from(naps: records.filter { $0.kind == .nap }.map { ($0.analysis.onset, $0.analysis.wake) },
+                                            nights: records.filter { $0.kind == .night }.map { ($0.analysis.onset, $0.analysis.wake) })
+            Plan.typical = typical
+            WatchSync.shared.sendTypical(typical)
         }
     }
 
@@ -274,6 +278,15 @@ final class WatchSync {
                                        averageCycle: full.isEmpty ? nil : full.map(\.minutes).reduce(0, +) / Double(full.count))
         queue.async {
             self.context[Self.lastSleepKey] = summary.dictionary
+            self.push()
+        }
+    }
+
+    static let typicalKey = "typicalSleep"
+
+    func sendTypical(_ t: TypicalSleep) {
+        queue.async {
+            self.context[Self.typicalKey] = t.dictionary
             self.push()
         }
     }
