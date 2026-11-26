@@ -106,6 +106,11 @@ struct FaceScreen: View {
                             .frame(width: r.width, height: r.height)
                             .position(x: r.midX, y: r.midY)
                             .onTapGesture { showMusic = true }
+                            .accessibilityElement()
+                            .accessibilityLabel(Text("Now playing"))
+                            .accessibilityHint(Text("Pause, skip and volume"))
+                            .accessibilityAddTraits(.isButton)
+                            .accessibilityAction { showMusic = true }
                     }
                     .ignoresSafeArea()
                 }
@@ -134,20 +139,20 @@ struct FaceScreen: View {
         .digitalCrownRotation($faceCrown, from: -1_000_000, through: 1_000_000, sensitivity: .low,
                               isContinuous: true, isHapticFeedbackEnabled: false)
         .onChange(of: faceCrown) { _, v in
-            guard !showLamp, !showControls, !showMusic, !dimmed, FaceMode.auto(Date()) != .sleeping else { crownBase = v; return }
-            // a pause of 1.5 s starts a new gesture; up opens the lamp, a long turn down starts a nap (F9)
-            if Date().timeIntervalSince(crownMovedAt) > 1.5 { crownBase = v - (v - crownBase).clamped(to: -1...1) }
+            guard !showLamp, !showControls, !showMusic, !dimmed else { crownBase = v; return }
+            // a pause starts a new gesture; up opens the lamp, a long turn down starts a nap (FaceRules, tested)
+            if Date().timeIntervalSince(crownMovedAt) > FaceRules.gesturePause { crownBase = v - (v - crownBase).clamped(to: -1...1) }
             crownMovedAt = Date()
-            let d = v - crownBase
-            if d < -12 {
+            switch FaceRules.crownAction(delta: v - crownBase, sleeping: FaceMode.auto(Date()) == .sleeping) {
+            case .startNap:
                 crownBase = v
                 startNapFromFace()
-                return
-            }
-            if d > 4 {
+            case .openLamp:
                 crownBase = v
                 WKInterfaceDevice.current().play(.click)
                 showLamp = true
+            case .none:
+                break
             }
         }
         .onChange(of: showLamp) { _, _ in crownBase = faceCrown }
@@ -173,8 +178,7 @@ struct FaceScreen: View {
 
     /// charging at night (21:00–07:00): the face becomes a dim red bedside clock (F10)
     static func bedside(_ d: Date) -> Bool {
-        let h = Calendar.current.component(.hour, from: d)
-        return BatteryReader.read(d).charging && (h >= 21 || h < 7)
+        FaceRules.bedside(hour: Calendar.current.component(.hour, from: d), charging: BatteryReader.read(d).charging)
     }
 
     /// F9: a long turn of the crown down starts a nap, with a short note and Undo

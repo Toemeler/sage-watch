@@ -47,6 +47,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F8 | **Today ring from your real sleep:** the iPhone Today ring draws your usual nap and night (averages of the recorded ones) as the main arcs, with the plan's presets as a faint outline behind them | built (round 4, no answer) |
 | F9 | **Nap from the face:** crown up opens the lamp; a long turn down (12 detents) starts a nap, with a note and Undo for 3 s | built (round 5, no answer) |
 | F10 | **Bedside mode:** while the watch charges at night, the face shows only the time in deep red at minimum brightness (no runner, no music), like a bedside clock that does not light the room | built (round 5, no answer) |
+| F11 | **Double tap toggles the lamp:** on watches with the double-tap gesture (pinch twice), double tap on the face switches the lamp on or off, with the click haptic; nothing during a sleep block | proposed (round 6) |
 
 ## Iterations
 
@@ -247,3 +248,21 @@ auto-close feel.
 
 **Verified:** CI build and tests. **Needs the watch:** crown direction feel, whether watchOS keeps Sage frontmost
 on the charger (Nightstand mode takes over only with an Alarms-app alarm, which Sage does not use).
+
+### 15 · 2026-11-27 — critical round 6
+**Review:**
+1. *Untested decisions (quality gate).* The crown's lamp/nap decision and the bedside rule lived in watch-only view
+   code the iOS test target cannot reach.
+2. *Edge bubbles too small to hit.* The fringe shrinks bubbles to 38 % (about 16 pt) and zooming out shrinks them
+   further; far below a reliable finger target on a 44 mm screen.
+3. *VoiceOver.* The music tap area was an unlabeled clear shape; VoiceOver users could not open Now Playing.
+
+**Changed:**
+- `FaceRules` (Shared, tested): crown up 4 detents → lamp, down 12 → nap, nothing during sleep; bedside = charging
+  and 21:00–07:00. The face uses only these.
+- Colour taps: every bubble's hit area is at least 30 pt across; overlaps go to the nearest centre (Swift and
+  prototype).
+- The music area is a VoiceOver button "Now playing" ("Pause, skip and volume").
+- Proposal F11 (double tap toggles the lamp).
+
+**Verified:** CI build and tests (`FaceRulesTests`). **Needs the watch:** colour picking at the edge.

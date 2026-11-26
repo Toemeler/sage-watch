@@ -450,7 +450,12 @@ requestAnimationFrame(frame);
       }
       if (longFired) return;   // the release of the long press that opened them
       const p = pt(e);
-      const hit = cells.find(c => { const f = fisheye(c.x * zoom + pan.x, c.y * zoom + pan.y); return Math.hypot(p.x - AW / 2 - f.x, p.y - AH / 2 - f.y) < D / 2 * f.s * zoom; });
+      // at least ~30 pt across however small the bubble is drawn; where targets overlap, the nearest centre wins
+      let hit = null, best = Infinity;
+      for (const c of cells) {
+        const f = fisheye(c.x * zoom + pan.x, c.y * zoom + pan.y), d = Math.hypot(p.x - AW / 2 - f.x, p.y - AH / 2 - f.y);
+        if (d <= Math.max(D / 2 * f.s * zoom + 3, 15) && d < best) { best = d; hit = c; }
+      }
       if (hit) { buzz(); if (hit.sw.temp) { lamp.temp = hit.sw.temp; lamp.rgb = null; } else lamp.rgb = hit.sw.rgb; lamp.on = true; level.to(modelLevel(), 0.45, 0.86); }
       closeColours(); return;
     }

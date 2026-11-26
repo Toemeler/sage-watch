@@ -524,6 +524,7 @@ struct Honeycomb: View {
     @State private var panning = false
 
     static let diameter: CGFloat = 42
+    static let minHitRadius: CGFloat = 15
     static let pitch: CGFloat = 47
 
     struct Cell: Identifiable {
@@ -636,7 +637,9 @@ struct Honeycomb: View {
         return Self.cells
             .map { c -> (Cell, CGFloat, CGFloat) in
                 let f = fisheye(CGPoint(x: c.pos.x * zoom + pan.width, y: c.pos.y * zoom + pan.height))
-                return (c, hypot(p.x - f.point.x, p.y - f.point.y), Self.diameter / 2 * f.scale * zoom + 3)
+                // at least ~30 pt across, however small the bubble is drawn at the edge or zoomed out;
+                // where targets overlap, the nearest centre wins
+                return (c, hypot(p.x - f.point.x, p.y - f.point.y), max(Self.diameter / 2 * f.scale * zoom + 3, Self.minHitRadius))
             }
             .filter { $0.1 <= $0.2 }
             .min { $0.1 < $1.1 }?.0
