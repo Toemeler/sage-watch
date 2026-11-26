@@ -43,26 +43,16 @@ final class FaceModeTests: XCTestCase {
 
     func testWeekdaySchedule() {
         let expect: [(Int, Int, FaceMode)] = [
-            (0, 10, .evening), (0, 31, .sleeping), (6, 25, .morning), (9, 40, .afternoon), (12, 0, .lunch),
-            (13, 20, .afternoon), (17, 5, .nap), (18, 30, .afterNap), (19, 0, .evening), (23, 50, .evening)
+            (0, 10, .awake), (0, 31, .sleeping), (6, 25, .awake), (12, 0, .awake), (17, 5, .sleeping), (18, 30, .awake), (23, 50, .awake)
         ]
         for (h, m, mode) in expect {
             XCTAssertEqual(FaceMode.auto(at(h, m), cal), mode, "at \(h):\(m)")
         }
     }
 
-    func testSaturdayHasNoWorkModes() {
-        XCTAssertEqual(FaceMode.auto(at(12, 0, saturday: true), cal), .weekend)
-        XCTAssertEqual(FaceMode.auto(at(10, 0, saturday: true), cal), .weekend)
-        XCTAssertEqual(FaceMode.auto(at(17, 5, saturday: true), cal), .nap)
-    }
-
-    func testAfternoonCountsDownToNap() {
-        XCTAssertEqual(FaceMode.afternoon.label(at(15, 10), cal), "NAP IN 1H 50M")
-    }
-
-    func testEveningCountsDownToSleep() {
-        XCTAssertEqual(FaceMode.evening.label(at(21, 40), cal), "SLEEP IN 2H 50M")
+    func testSaturdayNapIsASleepFace() {
+        XCTAssertEqual(FaceMode.auto(at(12, 0, saturday: true), cal), .awake)
+        XCTAssertEqual(FaceMode.auto(at(17, 5, saturday: true), cal), .sleeping)
     }
 }
 

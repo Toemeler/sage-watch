@@ -29,7 +29,7 @@ struct NextView: View {
     @Environment(\.widgetFamily) private var family
     let entry: NextEntry
 
-    private var asleep: Bool { entry.mode == .sleeping || entry.mode == .nap }
+    private var asleep: Bool { entry.mode == .sleeping }
     private var minutesToSleep: Int { max(0, Int(entry.sleepAt.timeIntervalSince(entry.date) / 60)) }
     private var title: String { entry.sleepBlock == .nap ? "Nap" : "Sleep" }
     private var countdown: String { String(format: "%d:%02d", minutesToSleep / 60, minutesToSleep % 60) }

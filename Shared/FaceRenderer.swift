@@ -4,11 +4,11 @@ import SwiftUI
 struct FaceState {
     var date: Date
     var mode: FaceMode
+    var bpm: Int? = nil               // last measured heart rate: the seconds runner swells on each beat
     var dimmed: Bool = false          // always-on (luminance reduced)
     var battery: Int? = nil           // watch battery in percent; nil where unknown (the plaque then shows only the bolt)
     var charging: Bool = false
 
-    var label: String { mode.label(date) }
 }
 
 /// Draws the face into a GraphicsContext in the reference coordinate space, scaled to fill `size`.
@@ -25,7 +25,7 @@ enum FaceRenderer {
         ctx.fill(Path(src), with: .color(.black))
         if !state.dimmed { drawDial(&ctx) }
         drawTrack(&ctx, dimmed: state.dimmed)
-        if !state.dimmed { drawRunner(&ctx, state.date) }
+        if !state.dimmed { drawRunner(&ctx, state.date, bpm: state.bpm) }
         drawIndices(&ctx, dimmed: state.dimmed)
         if !state.dimmed { drawNumerals(&ctx) }
         if !state.dimmed { drawDate(&ctx, state.date) }
@@ -145,18 +145,28 @@ enum FaceRenderer {
     }
 
     /// seconds runner: a bright tick travels the railway track five beats a second, trailing a fading wake
-    private static func drawRunner(_ ctx: inout GraphicsContext, _ d: Date) {
+    private static func drawRunner(_ ctx: inout GraphicsContext, _ d: Date, bpm: Int?) {
         let c = Calendar.current.dateComponents([.second, .nanosecond], from: d)
         let sec = Double(c.second ?? 0) + Double(c.nanosecond ?? 0) / 1e9
         let head = Int(sec * 5) % 300, ticks = FaceGeometry.ticks
         // a long, bright wake so the seconds read at a glance: the head is ivory and wide, the trail fades over 6 s
         let trail = 30
+        let beat = heartbeat(d, bpm: bpm)
         for k in 0..<trail {
-            let i = (head - k + 300) % 300, (p, n) = ticks[i], len = i % 5 == 0 ? 32.0 : 18.0
+            let i = (head - k + 300) % 300, (p, n) = ticks[i], len = (i % 5 == 0 ? 32.0 : 18.0) * (1 + 1.1 * beat)
             var line = Path(); line.move(to: p); line.addLine(to: CGPoint(x: p.x - n.dx * len, y: p.y - n.dy * len))
             let fade = pow(1 - Double(k) / Double(trail), 1.3)
-            ctx.stroke(line, with: .color(Color(hex: k == 0 ? 0xFFFFFF : 0xDDEBD2).opacity(fade)), lineWidth: k == 0 ? 5 : (i % 5 == 0 ? 3.6 : 3))
+            ctx.stroke(line, with: .color(Color(hex: k == 0 ? 0xFFFFFF : 0xDDEBD2).opacity(fade)), lineWidth: (k == 0 ? 5 : (i % 5 == 0 ? 3.6 : 3)) * (1 + 0.7 * beat))
         }
+    }
+
+    /// 0...1 pulse at the last measured heart rate: a sharp beat and a smaller second one (lub-dub), 0 without a reading
+    static func heartbeat(_ d: Date, bpm: Int?) -> Double {
+        guard let bpm, bpm > 20 else { return 0 }
+        let t = d.timeIntervalSinceReferenceDate * Double(bpm) / 60
+        let phase = t - t.rounded(.down)
+        let lub = exp(-phase * 14), dub = phase > 0.18 ? 0.5 * exp(-(phase - 0.18) * 16) : 0
+        return min(1, lub + dub)
     }
 
 

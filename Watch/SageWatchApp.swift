@@ -107,7 +107,7 @@ struct FaceScreen: View {
 
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
         let power = BatteryReader.read(date)
-        let state = FaceState(date: date, mode: FaceMode.auto(date, activity: activity.context), dimmed: dimmed,
+        let state = FaceState(date: date, mode: FaceMode.auto(date), bpm: recorder.bpm ?? health.heartRate, dimmed: dimmed,
                               battery: power.percent, charging: power.charging)
         FaceRenderer.draw(&ctx, size: size, state: state)
     }

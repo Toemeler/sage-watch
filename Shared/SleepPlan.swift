@@ -89,58 +89,13 @@ enum Plan {
 }
 
 enum FaceMode: String, CaseIterable {
-    case morning, lunch, afternoon, moving, pause, evening, sleeping, nap, afterNap, weekend
+    /// one face for the day, one for the sleep blocks (night and nap). The earlier per-occasion faces
+    /// (morning, lunch, moving, evening, ...) are kept on the branch backup/all-face-modes.
+    case awake, sleeping
 
-    /// The automatic mode: the sleep plan's schedule, overridden by what you are doing. Walking, running or cycling
-    /// (Apple's activity recognition, at least medium confidence) shows "on the move" outside the sleep blocks; the
-    /// ten minutes after you stop show "taking a break".
-    static func auto(_ d: Date, _ cal: Calendar = .current, activity: ActivityContext? = nil) -> FaceMode {
-        let wd = cal.component(.weekday, from: d)          // 1 = Sunday ... 7 = Saturday
-        let weekend = wd == 1 || wd == 7
-        let night = Plan.nightClock(d, cal), day = Plan.dayClock(d, cal), h = day / 60
-        if Plan.inNight(d, cal) { return .sleeping }
-        if Plan.inNap(d, cal) { return .nap }
-        if let a = activity {
-            if a.kind.isMoving && a.confident { return .moving }
-            if let stopped = a.lastMovingEnd, d.timeIntervalSince(stopped) >= 0, d.timeIntervalSince(stopped) < ActivityContext.pauseSeconds,
-               !a.kind.isMoving { return .pause }
-        }
-        if night >= 1440 && night < Plan.night.onset { return .evening }            // 00:00-00:30 is still the wind-down
-        if night >= Plan.night.wake && night < 1440 + 9.5 * 60 { return .morning }
-        if Plan.afterNap(d, cal) { return .afterNap }
-        if day >= Plan.nap.wake { return .evening }
-        if weekend { return .weekend }
-        if h >= 11.75 && h < 13.25 { return .lunch }
-        return .afternoon
+    static func auto(_ d: Date, _ cal: Calendar = .current) -> FaceMode {
+        Plan.inNight(d, cal) || Plan.inNap(d, cal) ? .sleeping : .awake
     }
-
-    /// the line under the time
-    func label(_ d: Date, _ cal: Calendar = .current) -> String {
-        switch self {
-        case .afternoon:
-            let left = Int(Plan.nap.onset - Plan.dayClock(d, cal))
-            let wd = cal.component(.weekday, from: d)
-            if wd != 1 && wd != 7 && left > 0 && left <= 120 { return String(format: "NAP IN %dH %02dM", left / 60, left % 60) }
-            let f = DateFormatter(); f.locale = Locale(identifier: "en_US"); f.timeZone = cal.timeZone; f.dateFormat = "MMMM"
-            return f.string(from: d).uppercased()
-        case .evening:
-            let left = Int(Plan.night.onset - Plan.nightClock(d, cal))
-            return left > 0 && left <= 180 ? String(format: "SLEEP IN %dH %02dM", left / 60, left % 60) : "GOOD EVENING"
-        case .morning:
-            if let s = Self.lastSleep, s.isRecent(d) {
-                return s.cycles > 0 ? "SLEPT \(Self.hm(s.asleepMinutes)) · \(s.cycles) CYCLE\(s.cycles == 1 ? "" : "S")" : "SLEPT \(Self.hm(s.asleepMinutes))"
-            }
-            return "NIGHT \(Self.hm(Plan.night.minutes)) · TOTAL \(Self.hm(Plan.totalSleep))"
-        case .lunch: return "LUNCH BREAK"
-        case .moving: return "ON THE MOVE"
-        case .pause: return "TAKING A BREAK"
-        case .sleeping: return ""
-        case .nap: return "NAP"
-        case .afterNap: return "CYCLE DONE · WOKE \(Plan.fmt(Plan.nap.wake))"
-        case .weekend: return "SUNSET 16:48"
-        }
-    }
-    static func hm(_ m: Double) -> String { let v = Int(m); return "\(v / 60)H \(String(format: "%02d", v % 60))M" }
 
     /// the last night as the iPhone measured it (set on the watch from the iPhone's summary; nil until then)
     static var lastSleep: LastSleepSummary?

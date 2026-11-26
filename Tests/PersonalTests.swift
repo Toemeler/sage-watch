@@ -13,36 +13,16 @@ final class PersonalTests: XCTestCase {
         cal.date(from: DateComponents(year: 2026, month: 11, day: day, hour: h, minute: m))!
     }
 
-    func testWalkingShowsOnTheMoveThenABreak() {
-        let walking = ActivityContext(kind: .walking, confidence: 2, since: at(9, 50), lastMovingEnd: nil)
-        XCTAssertEqual(FaceMode.auto(at(10, 0), cal, activity: walking), .moving)
-        let stopped = ActivityContext(kind: .stationary, confidence: 2, since: at(10, 5), lastMovingEnd: at(10, 5))
-        XCTAssertEqual(FaceMode.auto(at(10, 10), cal, activity: stopped), .pause)
-        XCTAssertEqual(FaceMode.auto(at(10, 20), cal, activity: stopped), .afternoon)    // break over
-        // low confidence walking does not switch
-        let unsure = ActivityContext(kind: .walking, confidence: 0, since: at(9, 50), lastMovingEnd: nil)
-        XCTAssertEqual(FaceMode.auto(at(10, 0), cal, activity: unsure), .afternoon)
+    func testOneFaceAwakeOneAsleep() {
+        XCTAssertEqual(FaceMode.auto(at(10, 0), cal), .awake)
+        XCTAssertEqual(FaceMode.auto(at(17, 5), cal), .sleeping)     // nap
+        XCTAssertEqual(FaceMode.auto(at(2, 0), cal), .sleeping)      // night
     }
 
-    func testSleepBlocksWinOverActivity() {
-        let walking = ActivityContext(kind: .walking, confidence: 2, since: at(17, 0), lastMovingEnd: nil)
-        XCTAssertEqual(FaceMode.auto(at(17, 5), cal, activity: walking), .nap)
-        XCTAssertEqual(FaceMode.auto(at(2, 0), cal, activity: walking), .sleeping)
-        // driving is not "on the move" on foot
-        let driving = ActivityContext(kind: .automotive, confidence: 2, since: at(9, 0), lastMovingEnd: nil)
-        XCTAssertEqual(FaceMode.auto(at(10, 0), cal, activity: driving), .afternoon)
-    }
-
-    func testMorningShowsTheMeasuredNight() {
+    func testLastSleepSummaryRoundTrips() {
         let onset = at(1, 11, day: 26).timeIntervalSince1970, wake = at(6, 1, day: 26).timeIntervalSince1970
         let s = LastSleepSummary(onset: onset, wake: wake, asleepMinutes: 286, cycles: 3, averageCycle: 89)
-        let back = LastSleepSummary(dictionary: s.dictionary)
-        XCTAssertEqual(back, s)
-        FaceMode.lastSleep = s
-        defer { FaceMode.lastSleep = nil }
-        XCTAssertEqual(FaceMode.morning.label(at(7, 0, day: 26), cal), "SLEPT 4H 46M · 3 CYCLES")
-        // a day later the plan's text is back
-        XCTAssertTrue(FaceMode.morning.label(at(7, 0, day: 27), cal).hasPrefix("NIGHT"))
+        XCTAssertEqual(LastSleepSummary(dictionary: s.dictionary), s)
     }
 
     func testNapAndRingSettings() throws {
