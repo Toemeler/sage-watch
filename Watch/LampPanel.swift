@@ -50,7 +50,8 @@ final class LampModel: ObservableObject {
     }
 
     /// change the lamps; rapid changes (crown, slider) are coalesced so only the latest goes out
-    func set(_ params: [String: Any]) {
+    func set(_ params: [String: Any], byUser: Bool = true) {
+        if byUser { LampAutomation.shared.userChanged() }      // you took over: sunrise / wind-down step aside
         lastLocalChange = Date()
         apply(params)
         pending = params
@@ -282,7 +283,7 @@ struct LampPanel: View {
     /// a short note when a change did not reach the lamps; the slider has already gone back to their real state
     private var failureNote: some View {
         VStack {
-            Label("Lamps didn't respond", systemImage: "exclamationmark.triangle.fill")
+            Label("Lamp didn't respond", systemImage: "exclamationmark.triangle.fill")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10).padding(.vertical, 6)
@@ -317,7 +318,7 @@ struct LampPanel: View {
             .onChanged { touch($0, height: h) }
             .onEnded { _ in release() })
         .accessibilityElement()
-        .accessibilityLabel(Text("Lamps"))
+        .accessibilityLabel(Text("Lamp"))
         .accessibilityValue(Text(level > 0 ? "\(Int((level * 100).rounded())) percent" : "Off"))
         .accessibilityAdjustableAction { dir in lamp.setLevel(min(1, max(0, modelLevel + (dir == .increment ? 0.1 : -0.1)))) }
         .accessibilityAction { lamp.toggle() }

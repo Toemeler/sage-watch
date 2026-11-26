@@ -8,6 +8,7 @@ struct RecorderControls: View {
     @ObservedObject private var alarm = SmartAlarm.shared
     @ObservedObject private var activity = ActivityMonitor.shared
     @ObservedObject private var audio = AudioModel.shared
+    @ObservedObject private var automation = LampAutomation.shared
 
     var body: some View {
         List {
@@ -51,8 +52,19 @@ struct RecorderControls: View {
                 Text("Nap: wakes you when the cycle ends, \(Int(s.napEarliest))–\(Int(s.napLatest)) min after you fall asleep. Stop with the button, a hard shake or the iPhone.")
             }
 
-            Section("iPhone") {
-                row("Music", audio.status)
+            Section {
+                Toggle("Sunrise wake", isOn: $automation.sunriseOn)
+                Toggle("Wind-down", isOn: $automation.windDownOn)
+                    .onChange(of: automation.windDownOn) { _, _ in automation.scheduleWindDown() }
+                if !automation.activity.isEmpty { row("Now", automation.activity) }
+            } header: {
+                Text("Lamp")
+            } footer: {
+                Text("Sunrise: the lamp fades up while the wake window is open. Wind-down: in the hour before bed a lamp that is on dims and warms. Changing the lamp yourself pauses either.")
+            }
+
+            Section("Music") {
+                row("iPhone", audio.status)
                 Button("Check again") { audio.refresh(force: true) }
             }
 

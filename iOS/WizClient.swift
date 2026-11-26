@@ -102,8 +102,8 @@ struct LampsCard: View {
 
     var body: some View {
         Card {
-            Eyebrow(text: "WiZ lamps")
-            Text(checking ? "Checking…" : state.home ? "\(state.count) of \(WizClient.bulbs.count) lamps reachable" : "No lamp reachable")
+            Eyebrow(text: "WiZ lamp")
+            Text(checking ? "Checking…" : state.home ? "\(state.count) of \(WizClient.bulbs.count) bulbs reachable" : "Lamp not reachable")
                 .font(Theme.serif(20)).foregroundStyle(Theme.ivory)
             if !state.home && !checking {
                 Text("Be on your home Wi-Fi and allow Local Network for Sage (Settings › Privacy & Security › Local Network).")

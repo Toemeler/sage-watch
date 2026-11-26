@@ -17,11 +17,13 @@ struct SageWatchApp: App {
                 .environmentObject(recorder)
                 .task { await health.start() }
                 .onAppear {
+                    LampAutomation.shared.scheduleWindDown()
                     alarm.scheduleNext()
                     if recorder.keepRunning { recorder.start() }
                 }
                 .onChange(of: phase) { _, p in
                     guard p == .active else { return }
+                    LampAutomation.shared.scheduleWindDown()
                     alarm.scheduleNext()
                     if recorder.keepRunning && !recorder.isRunning { recorder.start() }
                     Outbox.shared.resendAll()

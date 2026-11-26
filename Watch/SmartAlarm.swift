@@ -242,6 +242,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
         let key = "\(block.rawValue)-\(Int(rule?.opens ?? 0))"
         guard openedLogged.insert(key).inserted else { return }
         EventLog.log(.windowOpen, block.rawValue)
+        if let end = ruleWindowEnd { LampAutomation.shared.sunrise(until: end) }
         updateStatus(now: Date())
     }
 
@@ -383,6 +384,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
         ruleBlock = w.block
         ruleWindowEnd = w.end
         EventLog.log(.windowOpen, "\(w.block.rawValue) (fixed)")
+        LampAutomation.shared.sunrise(until: w.end)
         at(w.end) { [weak self] in
             guard let self, !self.ringing, self.sessionWindow == w else { return }
             self.ring(w.block, reason: WakeRule.Reason.latest.rawValue)
@@ -416,6 +418,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
         onsetPurpose = nil
         updateTaps()
         EventLog.log(.ring, "\(block.rawValue) \(reason)")
+        LampAutomation.shared.alarmRang()
         updateStatus(now: Date())
         ringTimeout?.invalidate()
         ringTimeout = Timer.scheduledTimer(withTimeInterval: settings.ringSeconds, repeats: false) { [weak self] _ in self?.stop(.timeout) }
