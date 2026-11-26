@@ -113,7 +113,10 @@ final class Outbox: NSObject, ObservableObject, WCSessionDelegate {
     // MARK: WCSessionDelegate
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        if activationState == .activated { resendAll() }
+        if activationState == .activated {
+            resendAll()
+            Self.apply(session.receivedApplicationContext)
+        }
     }
 
     // the iPhone's live breathing screen asks for the motion stream (and repeats the request while it is open)
@@ -134,10 +137,31 @@ final class Outbox: NSObject, ObservableObject, WCSessionDelegate {
         _ = handleLive(message)
     }
 
-    /// the alarm settings, sent whenever they change on the iPhone (arrive even while Sage was not running)
+    /// the alarm settings and the last night's summary, sent whenever they change on the iPhone (they arrive even
+    /// while Sage was not running)
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
-        guard let d = applicationContext[AlarmLink.settingsKey] as? [String: Any] else { return }
-        AlarmSettings(dictionary: d).save()
+        Self.apply(applicationContext)
+    }
+
+    static let lastSleepKey = "lastSleep"
+
+    static func apply(_ context: [String: Any]) {
+        if let d = context[AlarmLink.settingsKey] as? [String: Any] {
+            AlarmSettings(dictionary: d).save()
+            DispatchQueue.main.async { SmartAlarm.shared.scheduleNext() }
+        }
+        if let s = LastSleepSummary(dictionary: context[lastSleepKey] as? [String: Any]),
+           let data = try? JSONEncoder().encode(s) {
+            UserDefaults.standard.set(data, forKey: lastSleepKey)
+            DispatchQueue.main.async { FaceMode.lastSleep = s }
+        }
+    }
+
+    /// the last night's summary saved from the iPhone's last message
+    static func loadLastSleep() {
+        guard let data = UserDefaults.standard.data(forKey: lastSleepKey),
+              let s = try? JSONDecoder().decode(LastSleepSummary.self, from: data) else { return }
+        FaceMode.lastSleep = s
     }
 
     private func handleLive(_ message: [String: Any]) -> [String: Any] {

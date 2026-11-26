@@ -38,8 +38,17 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
     /// save the session as a workout in Apple Health when it ends (off: the session is discarded, Health stays untouched)
     @Published var saveWorkout: Bool { didSet { UserDefaults.standard.set(saveWorkout, forKey: Keys.save) } }
 
-    /// 10 Hz feed of |acceleration| in g for the smart alarm, delivered on the main queue
+    /// 10 Hz feed of |acceleration| in g, delivered on the main queue
     var motionTap: ((Double) -> Void)?
+    /// one summary per second of motion (spread and gravity), on the main queue: the live sleep detectors
+    var secondTap: ((MotionSecond) -> Void)?
+    /// every heart-rate sample (time, bpm) as it is written, on the main queue
+    var heartTap: ((Double, Double) -> Void)?
+    /// called on the main queue when a deliberate shake is felt while `armShake(true)`
+    var onShake: (() -> Void)?
+
+    /// the running recording's segment (events from the alarm are filed with it)
+    var segmentID: String? { segment }
 
     private enum Keys {
         static let keepRunning = "rec.keepRunning", rawHz = "rec.rawHz", gyro = "rec.gyro", save = "rec.saveWorkout"
@@ -78,9 +87,12 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
     private var tapCount = 0
     private var liveSum = (0.0, 0.0, 0.0)        // averaged into the 10 Hz feed for the iPhone's live breathing
     private var liveCount = 0
+    private var shakeArmed = false
+    private var shake = ShakeDetector()
     // owned by heartQueue
     private var heartFile: RotatingCSV?
     private var statusFile: RotatingCSV?
+    private var activityFile: RotatingCSV?
     private var loggedHeart = Set<Int64>()        // sample start times (ms) already written
     private var heartCount = 0
     private var heartQuery: HKAnchoredObjectQuery?
@@ -211,17 +223,21 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         let wantsRaw = rawMotionHz > 0
         motionQueue.addOperation {
             self.summarizer = MotionSummarizer()
+            let period = RecordingFormat.chunkSeconds
             self.summaryFile = RotatingCSV(directory: dir, prefix: RecordingFormat.summaryPrefix, header: RecordingFormat.summaryHeader,
-                                           period: 3600, segment: id)
-            self.rawFile = wantsRaw ? RotatingCSV(directory: dir, prefix: RecordingFormat.rawPrefix, header: rawHeader, period: 1800, segment: id) : nil
+                                           period: period, segment: id)
+            self.rawFile = wantsRaw ? RotatingCSV(directory: dir, prefix: RecordingFormat.rawPrefix, header: rawHeader, period: period, segment: id) : nil
             self.pressureFile = RotatingCSV(directory: dir, prefix: RecordingFormat.pressurePrefix, header: RecordingFormat.pressureHeader,
-                                            period: 3600, segment: id)
+                                            period: period, segment: id)
         }
         heartQueue.async {
+            let period = RecordingFormat.chunkSeconds
             self.heartFile = RotatingCSV(directory: dir, prefix: RecordingFormat.heartPrefix, header: RecordingFormat.heartHeader,
-                                         period: 3600, segment: id)
+                                         period: period, segment: id)
             self.statusFile = RotatingCSV(directory: dir, prefix: RecordingFormat.statusPrefix, header: RecordingFormat.statusHeader,
-                                          period: 3600, segment: id)
+                                          period: period, segment: id)
+            self.activityFile = RotatingCSV(directory: dir, prefix: RecordingFormat.activityPrefix, header: RecordingFormat.activityHeader,
+                                            period: period, segment: id)
         }
     }
 
@@ -235,6 +251,24 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         heartQueue.async {
             self.heartFile?.close()
             self.statusFile?.close()
+            self.activityFile?.close()
+        }
+    }
+
+    /// One activity change (written at once: these lines are few and precious).
+    func logActivity(at t: Double, _ kind: ActivityKind, confidence: Int) {
+        let line = "\(RecordingFormat.unix(t)),\(kind.rawValue),\(confidence)"
+        heartQueue.async {
+            self.activityFile?.append(line, at: t)
+            self.activityFile?.flush()
+        }
+    }
+
+    /// Feeds |a| at the full sampling rate to the shake detector while armed (only while the alarm rings).
+    func armShake(_ on: Bool) {
+        motionQueue.addOperation {
+            self.shakeArmed = on
+            self.shake.reset()
         }
     }
 
@@ -251,8 +285,10 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         heartQueue.async {
             self.heartFile?.close()
             self.statusFile?.close()
+            self.activityFile?.close()
             self.heartFile = nil
             self.statusFile = nil
+            self.activityFile = nil
         }
     }
 
@@ -367,7 +403,13 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
                 raw.append("\(RecordingFormat.unix(t)),\(f(x)),\(f(y)),\(f(z))", at: t)
             }
         }
-        if let line = summarizer.add(t: t, x: x, y: y, z: z) { summaryFile?.append(line, at: t) }
+        if let line = summarizer.add(t: t, x: x, y: y, z: z) {
+            summaryFile?.append(line, at: t)
+            if let second = summarizer.lastSecond { DispatchQueue.main.async { self.secondTap?(second) } }
+        }
+        if shakeArmed && shake.add(t: t, magnitude: (x * x + y * y + z * z).squareRoot()) {
+            DispatchQueue.main.async { self.onShake?() }
+        }
 
         liveSum.0 += x; liveSum.1 += y; liveSum.2 += z
         liveCount += 1
@@ -408,7 +450,9 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         heartCount += 1
         if heartCount % 12 == 0 { heartFile?.flush() }
         let count = heartCount
+        let sampleTime = start.timeIntervalSince1970
         DispatchQueue.main.async {
+            self.heartTap?(sampleTime, value)
             if self.lastBeatAt.map({ end >= $0 }) ?? true {
                 self.bpm = Int(value.rounded())
                 self.lastBeatAt = end
@@ -485,6 +529,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         startedAt = since
         isRunning = true
         lastError = nil
+        ActivityMonitor.shared.logCurrent()
         NotificationCenter.default.post(name: .recorderStateChanged, object: self)
     }
 

@@ -54,9 +54,15 @@ struct NextView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(asleep ? "Smart wake" : "\(title) \(Plan.fmt(Plan.dayClock(entry.sleepAt)))")
                     .font(.headline).widgetAccentable()
-                if asleep {
+                if asleep && entry.window.block == .nap {
+                    Text("one cycle").monospacedDigit()
+                    Text("after you fall asleep").foregroundStyle(.secondary)
+                } else if asleep {
                     Text("\(Plan.fmt(Plan.dayClock(entry.window.start)))–\(Plan.fmt(Plan.dayClock(entry.window.end)))").monospacedDigit()
                     Text("light sleep, silent taps").foregroundStyle(.secondary)
+                } else if entry.sleepBlock == .nap {
+                    Text("in \(minutesToSleep / 60)h \(String(format: "%02d", minutesToSleep % 60))m").monospacedDigit()
+                    Text("wakes after one cycle").foregroundStyle(.secondary)
                 } else {
                     Text("in \(minutesToSleep / 60)h \(String(format: "%02d", minutesToSleep % 60))m").monospacedDigit()
                     Text("wake \(Plan.fmt(Plan.dayClock(entry.window.predicted)))").foregroundStyle(.secondary)

@@ -37,6 +37,7 @@ struct FaceScreen: View {
     @EnvironmentObject private var health: HealthStore
     @EnvironmentObject private var alarm: SmartAlarm
     @EnvironmentObject private var recorder: Recorder
+    @ObservedObject private var activity = ActivityMonitor.shared
     @Environment(\.isLuminanceReduced) private var dimmed
     @State private var showControls = false
     @State private var battery: Int?
@@ -58,7 +59,7 @@ struct FaceScreen: View {
                 .allowsHitTesting(false)
             }
             if alarm.ringing {
-                WakeOverlay { alarm.stop() }
+                WakeOverlay(subtitle: alarm.ringingBlock == .nap ? "one cycle done · woke gently" : "light sleep · woke gently") { alarm.stop() }
             } else if alarm.testing {
                 WakeOverlay(title: "Test alarm", subtitle: "from the iPhone · stops by itself") { alarm.stopTest() }
             }
@@ -85,7 +86,7 @@ struct FaceScreen: View {
     private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ date: Date) {
         // while recording, the face shows the live heart rate from the workout session
         let bpm = recorder.isRunning ? (recorder.bpm ?? health.heartRate) : health.heartRate
-        let state = FaceState(date: date, mode: FaceMode.auto(date), steps: health.steps, heartRate: bpm, dimmed: dimmed,
+        let state = FaceState(date: date, mode: FaceMode.auto(date, activity: activity.context), steps: health.steps, heartRate: bpm, dimmed: dimmed,
                               battery: battery, charging: charging)
         FaceRenderer.draw(&ctx, size: size, state: state)
     }
@@ -117,6 +118,7 @@ struct WakeOverlay: View {
                 }
                 .tint(FaceGeometry.Palette.sage)
                 .padding(.top, 6)
+                Text("or shake your wrist hard").font(.system(size: 11)).foregroundStyle(FaceGeometry.Palette.ivory.opacity(0.6))
             }
             .padding()
         }

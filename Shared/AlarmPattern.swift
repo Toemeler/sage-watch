@@ -32,6 +32,11 @@ struct AlarmSettings: Equatable {
     var taps = 1
     var testSeconds = 20.0
     var testDelayMinutes = 0.0
+    /// the real alarm stops by itself after this long (you can always stop it earlier: Stop, a hard shake, the iPhone)
+    var ringMinutes = 3.0
+    /// nap: the earliest and latest wake, in minutes after the moment you fell asleep
+    var napEarliest = 70.0
+    var napLatest = 100.0
 
     static let levels = 0...(AlarmLevel.allCases.count - 1)
     static let rampRange = 0.0...10.0
@@ -39,11 +44,14 @@ struct AlarmSettings: Equatable {
     static let tapsRange = 1...4
     static let testRange = 10.0...60.0
     static let delayRange = 0.0...30.0
+    static let ringRange = 1.0...10.0
+    static let napEarliestRange = 50.0...90.0
+    static let napLatestRange = 60.0...130.0
+    /// the nap's wake window is at least this wide
+    static let napMinimumWindow = 10.0
 
     /// seconds between the taps of one pulse (closer taps tend to merge into one)
     static let tapSpacing = 0.6
-    /// the real alarm keeps pulsing for ten minutes unless stopped
-    static let alarmSeconds = 600.0
 
     /// every value inside its range, and the peak never below the start
     func clamped() -> AlarmSettings {
@@ -55,6 +63,9 @@ struct AlarmSettings: Equatable {
         s.taps = Self.clamp(taps, Self.tapsRange)
         s.testSeconds = Self.clamp(testSeconds.isFinite ? testSeconds : 20, Self.testRange)
         s.testDelayMinutes = Self.clamp(testDelayMinutes.isFinite ? testDelayMinutes : 0, Self.delayRange)
+        s.ringMinutes = Self.clamp(ringMinutes.isFinite ? ringMinutes : 3, Self.ringRange)
+        s.napEarliest = Self.clamp(napEarliest.isFinite ? napEarliest : 70, Self.napEarliestRange)
+        s.napLatest = max(Self.clamp(napLatest.isFinite ? napLatest : 100, Self.napLatestRange), s.napEarliest + Self.napMinimumWindow)
         return s
     }
 
@@ -79,6 +90,7 @@ struct AlarmSettings: Equatable {
     }
 
     var rampSeconds: Double { clamped().rampMinutes * 60 }
+    var ringSeconds: Double { clamped().ringMinutes * 60 }
     var testRamp: Double { clamped().testSeconds * 0.6 }
 
     /// (seconds from the start, level) of every pulse in the first `length` seconds
@@ -98,7 +110,8 @@ struct AlarmSettings: Equatable {
     var dictionary: [String: Any] {
         let s = clamped()
         return ["start": s.startLevel, "peak": s.peakLevel, "ramp": s.rampMinutes, "gap": s.gap,
-                "taps": s.taps, "test": s.testSeconds, "delay": s.testDelayMinutes]
+                "taps": s.taps, "test": s.testSeconds, "delay": s.testDelayMinutes,
+                "ring": s.ringMinutes, "napEarliest": s.napEarliest, "napLatest": s.napLatest]
     }
 
     init() {}
@@ -115,6 +128,9 @@ struct AlarmSettings: Equatable {
         if let v = number("taps") { s.taps = v.intValue }
         if let v = number("test") { s.testSeconds = v.doubleValue }
         if let v = number("delay") { s.testDelayMinutes = v.doubleValue }
+        if let v = number("ring") { s.ringMinutes = v.doubleValue }
+        if let v = number("napEarliest") { s.napEarliest = v.doubleValue }
+        if let v = number("napLatest") { s.napLatest = v.doubleValue }
         self = s.clamped()
     }
 
@@ -136,9 +152,11 @@ enum AlarmLink {
     static let commandKey = "alarm"            // iPhone → watch: test, preview or stop
     static let test = "test"                   // play the pattern (after the delay in the settings)
     static let preview = "preview"             // one pulse at `levelKey`
-    static let stop = "stop"                   // stop a test, or cancel one that is waiting
+    static let stop = "stop"                   // stop the ringing alarm or a test, or cancel a test that is waiting
+    static let napNow = "nap"                  // watch for the moment you fall asleep now, wake one cycle later
     static let levelKey = "level"
     static let settingsKey = "alarmSettings"   // settings dictionary: in a test message and in the application context
     static let okKey = "ok"                    // watch → iPhone in the reply
     static let textKey = "text"
+    static let ringingKey = "ringing"          // watch → iPhone in the reply: is the real alarm ringing?
 }

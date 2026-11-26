@@ -54,6 +54,7 @@ final class Receiver: NSObject, ObservableObject, WCSessionDelegate {
         for dir in dirs {
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: dir.path, isDirectory: &isDir), isDir.boolValue else { continue }
+            if dir.lastPathComponent == "events" { continue }          // alarm events while nothing recorded
             let names = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
             var bytes: Int64 = 0
             for n in names {

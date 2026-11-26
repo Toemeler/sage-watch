@@ -91,15 +91,22 @@ enum Plan {
 enum FaceMode: String, CaseIterable {
     case morning, lunch, afternoon, moving, pause, evening, sleeping, nap, afterNap, weekend
 
-    /// the automatic schedule (port of modes.js autoMode, activity sensing not wired yet)
-    static func auto(_ d: Date, _ cal: Calendar = .current) -> FaceMode {
+    /// The automatic mode: the sleep plan's schedule, overridden by what you are doing. Walking, running or cycling
+    /// (Apple's activity recognition, at least medium confidence) shows "on the move" outside the sleep blocks; the
+    /// ten minutes after you stop show "taking a break".
+    static func auto(_ d: Date, _ cal: Calendar = .current, activity: ActivityContext? = nil) -> FaceMode {
         let wd = cal.component(.weekday, from: d)          // 1 = Sunday ... 7 = Saturday
         let weekend = wd == 1 || wd == 7
         let night = Plan.nightClock(d, cal), day = Plan.dayClock(d, cal), h = day / 60
         if Plan.inNight(d, cal) { return .sleeping }
+        if Plan.inNap(d, cal) { return .nap }
+        if let a = activity {
+            if a.kind.isMoving && a.confident { return .moving }
+            if let stopped = a.lastMovingEnd, d.timeIntervalSince(stopped) >= 0, d.timeIntervalSince(stopped) < ActivityContext.pauseSeconds,
+               !a.kind.isMoving { return .pause }
+        }
         if night >= 1440 && night < Plan.night.onset { return .evening }            // 00:00-00:30 is still the wind-down
         if night >= Plan.night.wake && night < 1440 + 9.5 * 60 { return .morning }
-        if Plan.inNap(d, cal) { return .nap }
         if Plan.afterNap(d, cal) { return .afterNap }
         if day >= Plan.nap.wake { return .evening }
         if weekend { return .weekend }
@@ -119,7 +126,11 @@ enum FaceMode: String, CaseIterable {
         case .evening:
             let left = Int(Plan.night.onset - Plan.nightClock(d, cal))
             return left > 0 && left <= 180 ? String(format: "SLEEP IN %dH %02dM", left / 60, left % 60) : "GOOD EVENING"
-        case .morning: return "NIGHT \(Self.hm(Plan.night.minutes)) · TOTAL \(Self.hm(Plan.totalSleep))"
+        case .morning:
+            if let s = Self.lastSleep, s.isRecent(d) {
+                return s.cycles > 0 ? "SLEPT \(Self.hm(s.asleepMinutes)) · \(s.cycles) CYCLE\(s.cycles == 1 ? "" : "S")" : "SLEPT \(Self.hm(s.asleepMinutes))"
+            }
+            return "NIGHT \(Self.hm(Plan.night.minutes)) · TOTAL \(Self.hm(Plan.totalSleep))"
         case .lunch: return "LUNCH BREAK"
         case .moving: return "ON THE MOVE"
         case .pause: return "TAKING A BREAK"
@@ -130,6 +141,75 @@ enum FaceMode: String, CaseIterable {
         }
     }
     static func hm(_ m: Double) -> String { let v = Int(m); return "\(v / 60)H \(String(format: "%02d", v % 60))M" }
+
+    /// the last night as the iPhone measured it (set on the watch from the iPhone's summary; nil until then)
+    static var lastSleep: LastSleepSummary?
+}
+
+// MARK: - what you are doing, and the last night
+
+/// Apple's activity recognition, in Sage's words.
+enum ActivityKind: String, CaseIterable, Codable {
+    case stationary, walking, running, cycling, automotive, unknown
+
+    var isMoving: Bool { self == .walking || self == .running || self == .cycling }
+
+    var label: String {
+        switch self {
+        case .stationary: return "Still"
+        case .walking: return "Walking"
+        case .running: return "Running"
+        case .cycling: return "Cycling"
+        case .automotive: return "Driving"
+        case .unknown: return "Unknown"
+        }
+    }
+}
+
+/// what the watch knows right now about your activity
+struct ActivityContext: Equatable {
+    /// "taking a break" lasts this long after you stop moving
+    static let pauseSeconds: Double = 600
+
+    var kind: ActivityKind
+    /// 0 low, 1 medium, 2 high
+    var confidence: Int
+    var since: Date
+    /// when you last stopped walking, running or cycling
+    var lastMovingEnd: Date?
+    var confident: Bool { confidence >= 1 }
+}
+
+/// The last sleep as the iPhone analysed it, sent to the watch for the morning face.
+struct LastSleepSummary: Codable, Equatable {
+    var onset: Double
+    var wake: Double
+    var asleepMinutes: Double
+    var cycles: Int
+    var averageCycle: Double?
+
+    /// shown until noon after waking
+    func isRecent(_ d: Date) -> Bool {
+        let t = d.timeIntervalSince1970
+        return t >= wake && t - wake < 8 * 3600
+    }
+
+    var dictionary: [String: Any] {
+        var d: [String: Any] = ["onset": onset, "wake": wake, "asleep": asleepMinutes, "cycles": cycles]
+        if let a = averageCycle { d["avgCycle"] = a }
+        return d
+    }
+
+    init(onset: Double, wake: Double, asleepMinutes: Double, cycles: Int, averageCycle: Double?) {
+        self.onset = onset; self.wake = wake; self.asleepMinutes = asleepMinutes; self.cycles = cycles; self.averageCycle = averageCycle
+    }
+
+    init?(dictionary d: [String: Any]?) {
+        guard let d, let onset = (d["onset"] as? NSNumber)?.doubleValue, let wake = (d["wake"] as? NSNumber)?.doubleValue,
+              let asleep = (d["asleep"] as? NSNumber)?.doubleValue else { return nil }
+        self.init(onset: onset, wake: wake, asleepMinutes: asleep, cycles: (d["cycles"] as? NSNumber)?.intValue ?? 0,
+                  averageCycle: (d["avgCycle"] as? NSNumber)?.doubleValue)
+    }
 }
 
 // MARK: - calendar: concrete windows and events
@@ -157,6 +237,15 @@ extension Plan {
         for off in -1...1 {
             all.append(WakeWindow(block: .nap, start: date(now, off, nap.windowStart, cal), end: date(now, off, nap.end, cal), predicted: date(now, off, nap.wake, cal)))
             all.append(WakeWindow(block: .night, start: date(now, off, night.windowStart, cal), end: date(now, off, night.end, cal), predicted: date(now, off, night.wake, cal)))
+        }
+        return all.filter { $0.end > now }.min { $0.start < $1.start }!
+    }
+
+    /// the next window of one block that has not ended yet
+    static func nextWakeWindow(after now: Date, block: Block, _ cal: Calendar = .current) -> WakeWindow {
+        let b = block == .nap ? nap : night
+        let all = (-1...1).map { off in
+            WakeWindow(block: block, start: date(now, off, b.windowStart, cal), end: date(now, off, b.end, cal), predicted: date(now, off, b.wake, cal))
         }
         return all.filter { $0.end > now }.min { $0.start < $1.start }!
     }

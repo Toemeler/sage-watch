@@ -5,3 +5,4 @@ out/
 DerivedData/
 .DS_Store
 *.ipa
+__pycache__/
