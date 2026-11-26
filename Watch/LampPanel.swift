@@ -169,6 +169,7 @@ struct LampPanel: View {
     @State private var pressTask: Task<Void, Never>?
     @State private var hideTask: Task<Void, Never>?
     @State private var showFailure = false
+    @State private var zoom: CGFloat = 1             // colour wheel: the crown zooms out to see all of it
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func tint(_ s: LampLink.State) -> Color {
@@ -228,7 +229,7 @@ struct LampPanel: View {
                     .opacity(showValue && !colours ? 1 : 0)
                     .allowsHitTesting(false)
                 if colours {
-                    Honeycomb(state: lamp.state, size: geo.size, reduceMotion: reduceMotion, pick: choose, cancel: closeColours)
+                    Honeycomb(state: lamp.state, size: geo.size, reduceMotion: reduceMotion, zoom: zoom, pick: choose, cancel: closeColours)
                         .transition(reduceMotion ? .opacity
                                     : .asymmetric(insertion: .scale(scale: 0.45).combined(with: .opacity),
                                                   removal: .scale(scale: 1.2).combined(with: .opacity)))
@@ -241,9 +242,16 @@ struct LampPanel: View {
         .focusable()
         .focusEffectDisabled()
         .digitalCrownRotation($crown, from: 0, through: 100, by: 1, sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
-        .onChange(of: crown) { _, v in
+        .onChange(of: crown) { old, v in
             if crownSync { crownSync = false; return }
-            if colours || touching { syncCrown(); return }
+            if colours {
+                // in the colour wheel the crown zooms, as on the app grid: down shows all 61, up brings them close
+                withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.9)) {
+                    zoom = min(1, max(0.42, zoom + CGFloat(v - old) * 0.012))
+                }
+                return
+            }
+            if touching { syncCrown(); return }
             withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.9)) { lamp.setLevel(v / 100) }
             reveal(holding: false)
         }
@@ -401,6 +409,8 @@ struct LampPanel: View {
 
     private func closeColours() {
         withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) { colours = false }
+        zoom = 1
+        syncCrown()
     }
 }
 
@@ -441,6 +451,7 @@ struct Honeycomb: View {
     let state: LampLink.State
     let size: CGSize
     var reduceMotion = false
+    var zoom: CGFloat = 1
     let pick: (Swatch) -> Void
     let cancel: () -> Void
 
@@ -515,13 +526,13 @@ struct Honeycomb: View {
             .onChanged { g in
                 if !panning && hypot(g.translation.width, g.translation.height) > 6 { panning = true }
                 guard panning else { return }
-                pan = CGSize(width: bound(panBase.width + g.translation.width, Self.panLimit.width),
-                             height: bound(panBase.height + g.translation.height, Self.panLimit.height))
+                pan = CGSize(width: bound(panBase.width + g.translation.width, Self.panLimit.width * zoom),
+                             height: bound(panBase.height + g.translation.height, Self.panLimit.height * zoom))
             }
             .onEnded { g in
                 defer { panning = false }
                 if panning {
-                    let l = Self.panLimit
+                    let l = CGSize(width: Self.panLimit.width * zoom, height: Self.panLimit.height * zoom)
                     panBase = CGSize(width: min(l.width, max(-l.width, pan.width)), height: min(l.height, max(-l.height, pan.height)))
                     withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) { pan = panBase }
                 } else if let cell = hit(g.location) {
@@ -530,6 +541,12 @@ struct Honeycomb: View {
                     cancel()
                 }
             })
+        .onChange(of: zoom) { _, z in
+            // keep the view inside the smaller grid when zooming out
+            let l = CGSize(width: Self.panLimit.width * z, height: Self.panLimit.height * z)
+            panBase = CGSize(width: min(l.width, max(-l.width, panBase.width)), height: min(l.height, max(-l.height, panBase.height)))
+            if !panning { pan = panBase }
+        }
         .onAppear {
             // open centred on the colour that is set, as the app grid opens on the last app
             if let cur = Self.cells.first(where: { $0.swatch.matches(state) }) {
@@ -555,21 +572,21 @@ struct Honeycomb: View {
         let p = CGPoint(x: location.x - size.width / 2, y: location.y - size.height / 2)
         return Self.cells
             .map { c -> (Cell, CGFloat, CGFloat) in
-                let f = fisheye(CGPoint(x: c.pos.x + pan.width, y: c.pos.y + pan.height))
-                return (c, hypot(p.x - f.point.x, p.y - f.point.y), Self.diameter / 2 * f.scale + 3)
+                let f = fisheye(CGPoint(x: c.pos.x * zoom + pan.width, y: c.pos.y * zoom + pan.height))
+                return (c, hypot(p.x - f.point.x, p.y - f.point.y), Self.diameter / 2 * f.scale * zoom + 3)
             }
             .filter { $0.1 <= $0.2 }
             .min { $0.1 < $1.1 }?.0
     }
 
     private func bubble(_ cell: Cell) -> some View {
-        let f = fisheye(CGPoint(x: cell.pos.x + pan.width, y: cell.pos.y + pan.height))
+        let f = fisheye(CGPoint(x: cell.pos.x * zoom + pan.width, y: cell.pos.y * zoom + pan.height))
         let selected = cell.swatch.matches(state)
         return Circle().fill(cell.swatch.color)
             .overlay(Circle().strokeBorder(Color.white, lineWidth: selected ? 3 : 0))
             .overlay(Circle().strokeBorder(Color.black.opacity(0.25), lineWidth: selected ? 1 : 0).padding(3))
         .frame(width: Self.diameter, height: Self.diameter)
-        .scaleEffect(bloomed || reduceMotion ? f.scale : 0.15)
+        .scaleEffect((bloomed || reduceMotion ? f.scale : 0.15) * zoom)
         .opacity(bloomed ? 1 : 0)
         .position(x: size.width / 2 + (bloomed || reduceMotion ? f.point.x : 0), y: size.height / 2 + (bloomed || reduceMotion ? f.point.y : 0))
         .animation(reduceMotion ? .easeInOut(duration: 0.2)
