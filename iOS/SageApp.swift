@@ -252,6 +252,7 @@ struct FacesView: View {
                     ForEach(FaceMode.allCases, id: \.self) { m in modeRow(m) }
                 }
                 LampsCard()
+                AudioCard()
             }
             .padding(16)
         }

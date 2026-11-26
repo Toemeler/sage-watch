@@ -7,6 +7,7 @@ struct RecorderControls: View {
     @ObservedObject private var outbox = Outbox.shared
     @ObservedObject private var alarm = SmartAlarm.shared
     @ObservedObject private var activity = ActivityMonitor.shared
+    @ObservedObject private var audio = AudioModel.shared
 
     var body: some View {
         List {
@@ -48,6 +49,11 @@ struct RecorderControls: View {
             } footer: {
                 let s = AlarmSettings.load().clamped()
                 Text("Nap: wakes you when the cycle ends, \(Int(s.napEarliest))–\(Int(s.napLatest)) min after you fall asleep. Stop with the button, a hard shake or the iPhone.")
+            }
+
+            Section("iPhone") {
+                row("Music", audio.status)
+                Button("Check again") { audio.refresh(force: true) }
             }
 
             Section("Capture") {

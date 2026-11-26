@@ -38,3 +38,13 @@ and the Swift app (`Watch/LampPanel.swift`, `Shared/FaceRenderer.swift`).
   The percentage shows large (40 pt) in the middle while it changes, dark on the fill and white on the track.
   The bulb icon sits at the bottom. With no room to grow, the press feedback is a slightly brighter track,
   and the rubber band is a gentle stretch of the whole slider (at most 7 % of the height) away from the fixed edge.
+
+### 3 · 2026-11-26 — music indicator missing while listening (user report)
+- **Report:** music was playing but the bars above the battery did not show.
+- **Likely cause:** the iPhone answered with `AVAudioSession.isOtherAudioPlaying` only, from an app that never set an
+  audio category; that read is unreliable for apps like Spotify.
+- **Changed:** the iPhone sets the quietest category (ambient, mix with others; never activated, so nothing pauses)
+  and reports playing when either `isOtherAudioPlaying` or `secondaryAudioShouldBeSilencedHint` (another app plays
+  non-mixable audio) is true. The watch checks every 10 s instead of 20 s.
+- **Diagnostics:** the iPhone Faces tab has a live "Music on the watch" card; the watch's long-press menu shows the
+  last answer ("Playing", "Nothing playing", "iPhone not reachable", ...) with "Check again".

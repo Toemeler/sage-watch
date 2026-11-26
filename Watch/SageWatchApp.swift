@@ -92,10 +92,10 @@ struct FaceScreen: View {
         })
         .onAppear { lamp.refresh(force: true); audio.refresh(force: true) }
         .onChange(of: phase) { _, p in if p == .active { lamp.refresh(); audio.refresh(force: true) } }
-        // while the face is up, check headphones and playback every 20 s
+        // while the face is up, check headphones and playback every 10 s
         .task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(20))
+                try? await Task.sleep(for: .seconds(10))
                 if phase == .active { audio.refresh() }
             }
         }
