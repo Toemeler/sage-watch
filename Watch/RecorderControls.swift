@@ -9,6 +9,7 @@ struct RecorderControls: View {
     @ObservedObject private var activity = ActivityMonitor.shared
     @ObservedObject private var audio = AudioModel.shared
     @ObservedObject private var automation = LampAutomation.shared
+    @ObservedObject private var lamp = LampModel.shared
 
     var body: some View {
         List {
@@ -56,11 +57,16 @@ struct RecorderControls: View {
                 Toggle("Sunrise wake", isOn: $automation.sunriseOn)
                 Toggle("Wind-down", isOn: $automation.windDownOn)
                     .onChange(of: automation.windDownOn) { _, _ in automation.scheduleWindDown() }
+                Toggle("Off when asleep", isOn: $automation.offWhenAsleepOn)
                 if !automation.activity.isEmpty { row("Now", automation.activity) }
+                if let c = lamp.contacts.first {
+                    row("Last contact", "\(c.at.formatted(date: .omitted, time: .shortened)) \(c.ok ? "ok" : "failed")\(c.background ? " · background" : "")")
+                }
+                NavigationLink("Contact log") { LampContactLog() }
             } header: {
                 Text("Lamp")
             } footer: {
-                Text("Sunrise: the lamp fades up while the wake window is open. Wind-down: in the hour before bed a lamp that is on dims and warms. Changing the lamp yourself pauses either.")
+                Text("Sunrise: the lamp fades up while the wake window is open. Wind-down: in the hour before bed a lamp that is on dims and warms. Off when asleep: the lamp fades off once the watch sees you sleeping. Changing the lamp yourself pauses these. Night steps go through the iPhone while Sage runs in the background; the contact log shows whether they arrived.")
             }
 
             Section("Music") {
@@ -114,5 +120,25 @@ struct RecorderControls: View {
             Text(value).foregroundStyle(.secondary)
         }
         .font(.footnote)
+    }
+}
+
+/// Every lamp message of the last while: when, whether it arrived, and whether Sage was in the background then.
+struct LampContactLog: View {
+    @ObservedObject private var lamp = LampModel.shared
+
+    var body: some View {
+        List(lamp.contacts) { c in
+            HStack {
+                Image(systemName: c.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundStyle(c.ok ? FaceGeometry.Palette.sage : Color(hex: 0xD9503F))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(c.what).font(.system(size: 14))
+                    Text("\(c.at.formatted(date: .omitted, time: .standard))\(c.background ? " · background" : "")")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            }
+        }
+        .navigationTitle("Contact log")
     }
 }

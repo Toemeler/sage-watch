@@ -22,8 +22,26 @@ final class LampModel: ObservableObject {
     /// the last state the lamps confirmed; a change that never arrives falls back to it
     private var confirmed: LampLink.State?
 
+    /// every message to the iPhone, newest first (kept across launches), so it can be seen whether night-time
+    /// steps reach the lamp while the watch app is in the background
+    struct Contact: Codable, Identifiable {
+        var id: Double { at.timeIntervalSince1970 }
+        let at: Date
+        let ok: Bool
+        let background: Bool
+        let what: String
+    }
+    @Published private(set) var contacts: [Contact] = {
+        guard let d = UserDefaults.standard.data(forKey: "lampContacts") else { return [] }
+        return (try? JSONDecoder().decode([Contact].self, from: d)) ?? []
+    }()
+
     private var lastCheck = Date.distantPast
     private var pending: [String: Any]?
+    private var pendingByUser = true
+    /// an automatic change (sunrise, wind-down, asleep) that could not get through; sent again when the app comes
+    /// to the front (the iPhone is reachable for sure then)
+    private var deferred: (params: [String: Any], at: Date)?
     private var sending = false
     private var lastLocalChange = Date.distantPast
     private static let cacheKey = "lampLastState", cacheTimeKey = "lampLastStateTime"
@@ -55,7 +73,16 @@ final class LampModel: ObservableObject {
         lastLocalChange = Date()
         apply(params)
         pending = params
+        pendingByUser = byUser
         flush()
+    }
+
+    /// the app came to the front: send an automatic change that failed in the background (if under 30 min old)
+    func retryDeferred() {
+        guard let d = deferred else { return }
+        deferred = nil
+        guard Date().timeIntervalSince(d.at) < 30 * 60, pending == nil else { return }
+        set(d.params, byUser: false)
     }
 
     func toggle() { set(["state": !state.on]) }
@@ -78,19 +105,24 @@ final class LampModel: ObservableObject {
 
     private func flush() {
         guard !sending, let p = pending else { return }
+        let byUser = pendingByUser
         pending = nil
         sending = true
         Task {
-            await send([LampLink.commandKey: LampLink.set, LampLink.paramsKey: p])
+            let ok = await send([LampLink.commandKey: LampLink.set, LampLink.paramsKey: p], byUser: byUser)
+            if !ok && !byUser { deferred = (p, Date()) }
             sending = false
             flush()
         }
     }
 
     /// one message to the iPhone: waits for reachability, retries, then takes the reply in
-    private func send(_ message: [String: Any]) async {
+    @discardableResult
+    private func send(_ message: [String: Any], byUser: Bool = true) async -> Bool {
         busy = true
         defer { busy = false }
+        let background = WKApplication.shared().applicationState != .active
+        let what = (message[LampLink.commandKey] as? String == LampLink.status ? "check" : "change") + (byUser ? "" : " (auto)")
         var lastError = "The iPhone did not answer. Open Sage on the iPhone and retry."
         for attempt in 0..<3 {
             if attempt > 0 { try? await Task.sleep(for: .milliseconds(attempt == 1 ? 300 : 900)) }
@@ -100,18 +132,28 @@ final class LampModel: ObservableObject {
             }
             if let reply = await Self.message(message) {
                 take(LampLink.State(reply))
-                return
+                note(Contact(at: Date(), ok: true, background: background, what: what))
+                return true
             }
         }
-        // a failed status check says we are not home; a failed change must not leave the panel showing a state the
-        // lamps never took: fall back to what they last confirmed and say so
+        note(Contact(at: Date(), ok: false, background: background, what: what))
+        // a failed status check says we are not home; a failed change you made must not leave the panel showing a
+        // state the lamp never took: fall back to what it last confirmed and say so. A failed automatic change is
+        // kept quietly and sent again later (no buzz at night).
         if message[LampLink.commandKey] as? String == LampLink.status {
             state.home = false
-        } else if pending == nil {
+        } else if pending == nil && byUser {
             if let c = confirmed { state = c }
             failedAt = Date()
         }
         problem = lastError
+        return false
+    }
+
+    private func note(_ c: Contact) {
+        contacts.insert(c, at: 0)
+        if contacts.count > 40 { contacts.removeLast(contacts.count - 40) }
+        if let d = try? JSONEncoder().encode(contacts) { UserDefaults.standard.set(d, forKey: "lampContacts") }
     }
 
     private func take(_ s: LampLink.State) {

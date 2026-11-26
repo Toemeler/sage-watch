@@ -22,6 +22,11 @@ final class LampAutomation: ObservableObject {
     @Published var windDownOn = UserDefaults.standard.object(forKey: "lampWindDown") as? Bool ?? true {
         didSet { UserDefaults.standard.set(windDownOn, forKey: "lampWindDown") }
     }
+    @Published var offWhenAsleepOn = UserDefaults.standard.object(forKey: "lampOffAsleep") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(offWhenAsleepOn, forKey: "lampOffAsleep") }
+    }
+    /// when the alarm last rang with the sunrise on: full light is sent again when you raise your wrist
+    private var rangAt: Date?
     /// what it is doing right now, for the menu
     @Published private(set) var activity = ""
 
@@ -57,7 +62,36 @@ final class LampAutomation: ObservableObject {
         sunriseTask?.cancel(); sunriseTask = nil
         activity = ""
         guard sunriseOn, running || LampModel.shared.state.on else { return }
+        rangAt = Date()
         LampModel.shared.set(["state": true, "dimming": 100, "temp": 4500], byUser: false)
+    }
+
+    /// the app came to the front (wrist raised): in the minutes after the alarm, make sure the light really is on,
+    /// since the step sent while the app was in the background may not have reached the iPhone
+    func appBecameActive() {
+        LampModel.shared.retryDeferred()
+        if let r = rangAt, Date().timeIntervalSince(r) < 10 * 60, !LampModel.shared.state.on || LampModel.shared.state.dimming < 100 {
+            LampModel.shared.set(["state": true, "dimming": 100, "temp": 4500], byUser: false)
+        }
+        if let r = rangAt, Date().timeIntervalSince(r) >= 10 * 60 { rangAt = nil }
+    }
+
+    // MARK: asleep (F6)
+
+    /// the watch found that you fell asleep (night or nap): a lamp that is on fades off, the wind-down stops
+    func fellAsleep() {
+        windDownTask?.cancel(); windDownTask = nil
+        guard offWhenAsleepOn else { return }
+        activity = "Off: you fell asleep"
+        let lamp = LampModel.shared
+        guard lamp.state.on else { return }
+        // two steps rather than a cut, so a half-asleep glance never sees the room snap dark
+        let from = lamp.state.dimming
+        Task { @MainActor in
+            lamp.set(["state": true, "dimming": max(10, from / 3)], byUser: false)
+            try? await Task.sleep(for: .seconds(20))
+            lamp.set(["state": false], byUser: false)
+        }
     }
 
     /// a manual change stops a running sunrise (you took over)

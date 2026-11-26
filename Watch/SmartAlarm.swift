@@ -252,6 +252,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
         onsetDetector = nil
         onsetPurpose = nil
         EventLog.log(.asleep, purpose.rawValue, at: onset)
+        Task { @MainActor in LampAutomation.shared.fellAsleep() }
         switch purpose {
         case .nap:
             let s = AlarmSettings.load().clamped()

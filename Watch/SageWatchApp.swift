@@ -109,7 +109,9 @@ struct FaceScreen: View {
         }
         .onChange(of: showLamp) { _, _ in crownBase = faceCrown }
         .onAppear { lamp.refresh(force: true); audio.refresh(force: true) }
-        .onChange(of: phase) { _, p in if p == .active { lamp.refresh(); audio.refresh(force: true) } }
+        .onChange(of: phase) { _, p in
+            if p == .active { lamp.refresh(); audio.refresh(force: true); LampAutomation.shared.appBecameActive() }
+        }
         // while the face is up, check headphones and playback every 10 s
         .task {
             while !Task.isCancelled {
@@ -121,7 +123,7 @@ struct FaceScreen: View {
         // full screen: it slides up like the swipe that opens it, and vertical drags inside can't pull it away
         .fullScreenCover(isPresented: $showLamp) { NavigationStack { LampPanel(lamp: lamp) } }
         .sheet(isPresented: $showControls) {
-            RecorderControls().environmentObject(recorder).environmentObject(health)
+            NavigationStack { RecorderControls().environmentObject(recorder).environmentObject(health) }
         }
     }
 
