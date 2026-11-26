@@ -28,7 +28,7 @@ struct AlarmView: View {
                 Button(role: .destructive) {
                     send([AlarmLink.commandKey: AlarmLink.stop])
                 } label: {
-                    Label("Stop test", systemImage: "stop.circle")
+                    Label("Stop alarm or test", systemImage: "stop.circle")
                 }
 
                 if let status {
@@ -36,6 +36,31 @@ struct AlarmView: View {
                 }
             } footer: {
                 Text("The test plays the whole climb from the first to the last strength in its first 60 %, then stays at full strength. Stop it here or on the watch.")
+            }
+
+            Section {
+                sliderRow("Wake at the earliest", value: $settings.napEarliest, range: AlarmSettings.napEarliestRange, step: 5,
+                          text: "\(Int(settings.napEarliest)) min")
+                sliderRow("Wake at the latest", value: $settings.napLatest, range: AlarmSettings.napLatestRange, step: 5,
+                          text: "\(Int(settings.napLatest)) min")
+                Button {
+                    send([AlarmLink.commandKey: AlarmLink.napNow])
+                } label: {
+                    Label("Nap now", systemImage: "powersleep")
+                }
+            } header: {
+                Text("Nap")
+            } footer: {
+                Text("Around \(Plan.fmt(Plan.nap.onset)) (\(Plan.fmt(Plan.nap.onset - 60))–\(Plan.fmt(Plan.nap.onset + 90))), or after \"Nap now\", the watch finds the moment you fall asleep from your wrist going still. It wakes you as soon as the cycle ends (you stir or your heart rate rises) between these two times after falling asleep, and at the latest one. No sleep found: no alarm. Needs Record on.")
+            }
+
+            Section {
+                sliderRow("Alarm stops itself after", value: $settings.ringMinutes, range: AlarmSettings.ringRange, step: 1,
+                          text: minutes(settings.ringMinutes))
+            } header: {
+                Text("Alarm")
+            } footer: {
+                Text("Stop it earlier with the Stop button on the watch, with a few hard shakes of the wrist (works with the screen dark, also in Sleep Focus) or here.")
             }
 
             Section {
@@ -71,7 +96,7 @@ struct AlarmView: View {
             Section {
                 Button("Reset to default") { settings = AlarmSettings() }
             } footer: {
-                Text("Saved on the watch too: the smart alarm (18:15–18:30 and 06:00–06:30) vibrates the same way. Silent mode mutes any tick sound but not the taps.")
+                Text("Saved on the watch too: the nap and the morning alarm (\(Plan.fmt(Plan.night.windowStart))–\(Plan.fmt(Plan.night.end))) vibrate the same way. Silent mode mutes any tick sound but not the taps.")
             }
         }
         .navigationTitle("Vibration alarm")
@@ -82,8 +107,13 @@ struct AlarmView: View {
                 settings = s
                 return
             }
+            if s.napLatest < s.napEarliest + AlarmSettings.napMinimumWindow {
+                s.napLatest = min(AlarmSettings.napLatestRange.upperBound, s.napEarliest + AlarmSettings.napMinimumWindow)
+                settings = s
+                return
+            }
             s.save()
-            sync(s)
+            WatchSync.shared.sendSettings(s)
         }
     }
 
@@ -134,13 +164,6 @@ struct AlarmView: View {
     }
 
     // MARK: watch link
-
-    /// the latest settings reach the watch even while Sage isn't running there
-    private func sync(_ s: AlarmSettings) {
-        let session = WCSession.default
-        guard WCSession.isSupported(), session.activationState == .activated, session.isPaired, session.isWatchAppInstalled else { return }
-        try? session.updateApplicationContext([AlarmLink.settingsKey: s.dictionary])
-    }
 
     private func send(_ message: [String: Any]) {
         guard WCSession.isSupported() else { status = "This iPhone has no paired watch."; return }

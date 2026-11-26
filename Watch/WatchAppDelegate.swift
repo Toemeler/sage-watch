@@ -4,7 +4,9 @@ import HealthKit
 /// Launch-time wiring: the iPhone link, workout recovery after a relaunch, and starts requested from the iPhone.
 final class WatchAppDelegate: NSObject, WKApplicationDelegate {
     func applicationDidFinishLaunching() {
+        Outbox.loadLastSleep()
         Outbox.shared.activate()
+        ActivityMonitor.shared.start()
     }
 
     /// watchOS relaunched Sage while its workout session was still running

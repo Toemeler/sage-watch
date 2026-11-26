@@ -8,7 +8,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "0.3.9"
+    MARKETING_VERSION: "0.4.0"
     CURRENT_PROJECT_VERSION: "1"
     # unsigned build: the IPA is re-signed on install (Sideloadly / AltStore with a free Apple ID)
     CODE_SIGNING_ALLOWED: NO
@@ -61,7 +61,7 @@ targets:
         UIAppFonts: [PlayfairDisplay-Regular.ttf, PlayfairDisplay-Italic.ttf]
         NSHealthShareUsageDescription: Sage shows your steps and heart rate on the face and records your heart rate while the recorder runs. Nothing leaves your devices.
         NSHealthUpdateUsageDescription: The recorder runs as a Mind & Body session to keep Sage on screen and read heart rate every few seconds. It is only saved to Health if you turn that on.
-        NSMotionUsageDescription: Sage records wrist motion and air pressure for your sleep data and feels for light sleep during the wake window. The files go only to your iPhone.
+        NSMotionUsageDescription: Sage records wrist motion, air pressure and what you are doing (still, walking, running, cycling, driving) for your sleep and day data, and feels for the moment you fall asleep and wake. The files go only to your iPhone.
         WKBackgroundModes: [smart-alarm, workout-processing]
     settings:
       base:
@@ -91,7 +91,12 @@ targets:
   SageTests:
     type: bundle.unit-test
     platform: iOS
-    sources: [Tests]
+    sources:
+      - path: Tests
+        excludes: ["Fixtures/**"]
+      - path: Tests/Fixtures
+        type: folder
+        buildPhase: resources
     dependencies:
       - target: Sage
     settings:

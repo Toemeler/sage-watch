@@ -65,6 +65,7 @@ func hm(_ minutes: Double) -> String { let m = Int(minutes); return "\(m / 60)h 
 
 struct TodayView: View {
     @EnvironmentObject private var health: HealthStore
+    @ObservedObject private var nights = NightStore.shared
 
     var body: some View {
         TimelineView(.everyMinute) { tl in
@@ -77,20 +78,31 @@ struct TodayView: View {
                 .padding(16)
             }
             .background(Theme.bg)
+            .onAppear { nights.refresh() }
         }
     }
 
     private var statsGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         Card {
-                            Eyebrow(text: "Night")
-                            Text(hm(Plan.night.minutes)).font(Theme.serif(24)).foregroundStyle(Theme.ivory)
-                            Text("woke \(Plan.fmt(Plan.night.wake)) · light sleep").font(.caption).foregroundStyle(Theme.muted)
+                            Eyebrow(text: "Last night")
+                            if let n = nights.lastNight?.analysis {
+                                Text(hm(n.summary.asleepMinutes)).font(Theme.serif(24)).foregroundStyle(Theme.ivory)
+                                Text("\(clock(n.onset)) → \(clock(n.wake)) · \(n.completeCycles.count) cycles").font(.caption).foregroundStyle(Theme.muted)
+                            } else {
+                                Text("–").font(Theme.serif(24)).foregroundStyle(Theme.ivory)
+                                Text("plan \(Plan.fmt(Plan.night.onset))–\(Plan.fmt(Plan.night.end))").font(.caption).foregroundStyle(Theme.muted)
+                            }
                         }
                         Card {
-                            Eyebrow(text: "Nap cycle")
-                            Text(Plan.fmt(Plan.nap.onset)).font(Theme.serif(24)).foregroundStyle(Theme.ivory)
-                            Text("smart wake \(Plan.fmt(Plan.nap.windowStart))–\(Plan.fmt(Plan.nap.end))").font(.caption).foregroundStyle(Theme.muted)
+                            Eyebrow(text: "Nap")
+                            if let n = nights.lastNap?.analysis, Calendar.current.isDateInToday(Date(timeIntervalSince1970: n.onset)) {
+                                Text(hm(n.summary.asleepMinutes)).font(Theme.serif(24)).foregroundStyle(Theme.ivory)
+                                Text("\(clock(n.onset)) → \(clock(n.wake))").font(.caption).foregroundStyle(Theme.muted)
+                            } else {
+                                Text(Plan.fmt(Plan.nap.onset)).font(Theme.serif(24)).foregroundStyle(Theme.ivory)
+                                Text("one cycle after you fall asleep").font(.caption).foregroundStyle(Theme.muted)
+                            }
                         }
                         Card {
                             Eyebrow(text: "Steps")
@@ -179,79 +191,10 @@ struct DayRing: View {
     }
 }
 
-// MARK: - Sleep: night | nap
-
-struct SleepView: View {
-    @State private var showNap = false
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Picker("Block", selection: $showNap) { Text("Night").tag(false); Text("Nap").tag(true) }.pickerStyle(.segmented)
-                SleepHeader(block: showNap ? Plan.nap : Plan.night, isNap: showNap)
-                Card { Hypnogram(block: showNap ? Plan.nap : Plan.night).frame(height: 96) }
-                statsGrid(showNap ? Plan.nap : Plan.night)
-            }
-            .padding(16)
-        }
-        .background(Theme.bg)
-    }
-
-    private func statsGrid(_ block: SleepBlock) -> some View {
-        let t = totals(block)
-        return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-            stat("Deep", t[.deep] ?? 0, Theme.sage)
-            stat("Light", t[.light] ?? 0, Theme.sageDark)
-            stat("REM", t[.rem] ?? 0, Theme.rem)
-            Card { Eyebrow(text: "Cycles"); Text("\(block.nCycles)").font(Theme.serif(22)).foregroundStyle(Theme.ivory) }
-        }
-    }
-
-    private func totals(_ b: SleepBlock) -> [Stage: Double] {
-        var t: [Stage: Double] = [:]; for s in b.samples { t[s.stage, default: 0] += 4 }; return t
-    }
-    private func stat(_ name: String, _ minutes: Double, _ col: Color) -> some View {
-        Card {
-            HStack { Eyebrow(text: name); Spacer(); Circle().fill(col).frame(width: 6, height: 6) }
-            Text(hm(minutes)).font(Theme.serif(22)).foregroundStyle(Theme.ivory)
-        }
-    }
-}
-
-struct SleepHeader: View {
-    let block: SleepBlock
-    let isNap: Bool
-    var body: some View {
-        let title = isNap ? "Nap" : "Last night"
-        let early = Int(block.end - block.wake)
-        return VStack(alignment: .leading, spacing: 2) {
-            Eyebrow(text: "\(title) · \(Plan.fmt(block.onset)) → \(Plan.fmt(block.wake))")
-            Text(hm(block.minutes)).font(Theme.serif(40)).foregroundStyle(Theme.ivory)
-            Text("Smart wake at \(Plan.fmt(block.wake)) — light sleep, \(early) min before the alarm")
-                .font(.footnote).foregroundStyle(Theme.muted)
-        }
-    }
-}
-
-struct Hypnogram: View {
-    let block: SleepBlock
-    var body: some View { Canvas { ctx, size in draw(&ctx, size) } }
-
-    private func draw(_ ctx: inout GraphicsContext, _ size: CGSize) {
-            let s = block.samples, bw = size.width / CGFloat(max(1, s.count)), base = size.height - 6
-        for (i, st) in s.enumerated() {
-            let h: CGFloat = st.stage == .awake ? 0.12 : st.stage == .rem ? 0.38 : st.stage == .light ? 0.6 : 1
-            let col: Color = st.stage == .awake ? Color(hex: 0xC98F7A) : st.stage == .rem ? Theme.rem : st.stage == .deep ? Color(hex: 0xCFE0C4) : Theme.sage
-            ctx.fill(Path(roundedRect: CGRect(x: CGFloat(i) * bw + 0.4, y: base - h * (base - 2), width: max(0.6, bw - 0.8), height: h * (base - 2)), cornerRadius: 1.5), with: .color(col))
-        }
-        let x = (block.windowStart - block.onset) / 4 * bw
-        ctx.fill(Path(CGRect(x: x, y: size.height - 3, width: size.width - x, height: 3)), with: .color(Theme.gold.opacity(0.8)))
-    }
-}
-
 // MARK: - Plan
 
 struct PlanView: View {
+    @ObservedObject private var nights = NightStore.shared
     private let planned: Double = (Plan.night.end - Plan.night.onset) + (Plan.nap.end - Plan.nap.onset)
     var body: some View {
         ScrollView {
@@ -260,10 +203,14 @@ struct PlanView: View {
                     Eyebrow(text: "Sleep plan")
                     Text("Biphasic · \(hm(planned))").font(Theme.serif(26)).foregroundStyle(Theme.ivory)
                 }
+                rhythm
                 Card {
+                    let s = AlarmSettings.load().clamped()
                     Eyebrow(text: "Nap cycle")
-                    Text("\(Plan.fmt(Plan.nap.onset)) → \(Plan.fmt(Plan.nap.end))").font(Theme.serif(22)).foregroundStyle(Theme.ivory)
-                    row("Smart wake in light sleep", "last \(Int(Plan.nap.end - Plan.nap.windowStart)) min")
+                    Text("around \(Plan.fmt(Plan.nap.onset))").font(Theme.serif(22)).foregroundStyle(Theme.ivory)
+                    row("Wakes you", "\(Int(s.napEarliest))–\(Int(s.napLatest)) min after you fall asleep")
+                    row("Earlier", "as soon as the cycle ends")
+                    row("Sleep found", "\(Plan.fmt(Plan.nap.onset - 60))–\(Plan.fmt(Plan.nap.onset + 90)), or \"Nap now\"")
                 }
                 Card {
                     Eyebrow(text: "Night")
@@ -279,7 +226,22 @@ struct PlanView: View {
         .background(Theme.bg)
     }
     private func row(_ a: String, _ b: String) -> some View {
-        HStack { Text(a).font(.subheadline).foregroundStyle(Theme.ivory); Spacer(); Text(b).font(.subheadline).foregroundStyle(Theme.muted) }.padding(.top, 4)
+        HStack { Text(a).font(.subheadline).foregroundStyle(Theme.ivory); Spacer(); Text(b).font(.subheadline).foregroundStyle(Theme.muted).multilineTextAlignment(.trailing) }.padding(.top, 4)
+    }
+
+    /// your measured cycle and what it means for bedtime
+    @ViewBuilder private var rhythm: some View {
+        if let avg = nights.averageCycle {
+            Card {
+                Eyebrow(text: "Your rhythm")
+                Text("\(Int(avg.rounded()))-minute cycles").font(Theme.serif(22)).foregroundStyle(Theme.ivory)
+                row("Measured over", "\(nights.nightsWithCycles) night\(nights.nightsWithCycles == 1 ? "" : "s")")
+                ForEach([4, 3], id: \.self) { n in
+                    row("\(n) full cycles by \(Plan.fmt(Plan.night.end))", "asleep by \(Plan.fmt(Plan.night.end - Double(n) * avg))")
+                }
+                Text("Falling asleep takes a while: be in bed a bit before.").font(.caption).foregroundStyle(Theme.muted).padding(.top, 4)
+            }
+        }
     }
 }
 

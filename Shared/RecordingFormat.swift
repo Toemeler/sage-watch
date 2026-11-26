@@ -23,6 +23,14 @@ enum RecordingFormat {
     /// once a minute: battery, charging (on the charger = off the wrist) and running totals
     static let statusPrefix = "status"
     static let statusHeader = "unix_time,battery,battery_state,last_bpm,heart_samples,motion_samples"
+    /// the smart alarm's log: when a wake window opened, when you fell asleep for a nap, when and why it rang and stopped
+    static let eventsPrefix = "events"
+    static let eventsHeader = "unix_time,event,detail"
+    /// what Apple's motion coprocessor says you are doing, one line per change
+    static let activityPrefix = "activity"
+    static let activityHeader = "unix_time,activity,confidence"
+    /// every stream rotates on 10-minute boundaries: an update or a crash loses at most the open 10 minutes
+    static let chunkSeconds: Double = 600
     static let metaName = "segment.json"
     static let compressedSuffix = ".zz"
 
@@ -53,11 +61,38 @@ enum RecordingFormat {
         }
     }
 
+    /// "hr_20261125-170012.csv" -> the unix time the chunk was opened (the watch's local time, same zone as the iPhone)
+    static func openedAt(_ file: String) -> Double? {
+        guard let underscore = file.firstIndex(of: "_") else { return nil }
+        let stamp = file[file.index(after: underscore)...].prefix(15)
+        guard stamp.count == 15 else { return nil }
+        return stampParser.date(from: String(stamp))?.timeIntervalSince1970
+    }
+
+    private static let stampParser: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyyMMdd-HHmmss"
+        return f
+    }()
+
     /// which data stream a chunk file belongs to, from its name ("hr_20261125-170012.csv" -> "hr")
     static func stream(ofFile name: String) -> String? {
         guard name.hasSuffix(".csv"), let underscore = name.firstIndex(of: "_") else { return nil }
         return String(name[name.startIndex..<underscore])
     }
+}
+
+/// What the smart alarm writes to the events stream.
+enum AlarmEvent: String {
+    case windowOpen = "window_open"         // a wake window began (detail: night / nap)
+    case asleep = "asleep"                  // the moment you fell asleep (time = that moment; detail: nap / night)
+    case ring = "ring"                      // the alarm started (detail: block and reason)
+    case stop = "stop"                      // the alarm stopped (detail: button, shake, iphone, timeout, ended)
+    case napArmed = "nap_armed"             // "Nap now"
+    case napCancelled = "nap_cancelled"
+    case testStart = "test_start"
+    case testStop = "test_stop"
 }
 
 /// Folds accelerometer samples into one summary line per second.
@@ -71,6 +106,8 @@ struct MotionSummarizer {
     private var sx = 0.0, sy = 0.0, sz = 0.0
     private var activity = 0.0
     private var previous: Double?
+    /// the second most recently finished, as numbers (the live sleep detectors read it)
+    private(set) var lastSecond: MotionSecond?
 
     /// Adds one sample. When the sample starts a new second, the finished line of the previous second is returned.
     mutating func add(t: Double, x: Double, y: Double, z: Double) -> String? {
@@ -100,6 +137,7 @@ struct MotionSummarizer {
         let variance = n > 1 ? max(0, (sum2 - count * mean * mean) / (count - 1)) : 0
         let f = RecordingFormat.f4
         let line = "\(second),\(n),\(f(mean)),\(f(variance.squareRoot())),\(f(sx / count)),\(f(sy / count)),\(f(sz / count)),\(f(activity))"
+        lastSecond = MotionSecond(t: Double(second), sd: variance.squareRoot(), gx: sx / count, gy: sy / count, gz: sz / count)
         n = 0
         sum = 0; sum2 = 0
         sx = 0; sy = 0; sz = 0

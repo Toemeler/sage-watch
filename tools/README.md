@@ -13,3 +13,16 @@ Writes `summary.txt`, `summary.json`, `epochs.csv` and `night.png`. Needs Python
 Sleep/wake from wrist motion is dependable. The stage labels are estimates: deep-like = lowest, steadiest heart rate
 and breathing; REM-like = still body with irregular heart rate and breathing (not in the first 45 minutes).
 Cycles end at each REM-like stretch of at least 4 minutes.
+
+## night_reference.py and make_fixtures.py
+
+`night_reference.py` is the reference for the app's night analysis (`Shared/NightAnalysis.swift`) and the watch's
+live detectors (`Shared/SleepOnset.swift`): the same steps in plain Python, so every threshold can be checked and
+tuned on real exports.
+
+    python3 tools/night_reference.py EXPORT_DIR --from "2026-11-26 00:00" --to "2026-11-26 09:00" [--onset ... --wake ...]
+
+`make_fixtures.py` cuts a night out of an export into `Tests/Fixtures` and records what the reference finds; the
+unit tests then require the Swift code to find the same. After changing a rule: change both, rerun
+`make_fixtures.py`, and let the tests compare. Parameters live in one place on each side (`NightAnalysis.Params`
+and the constants at the top of the reference).

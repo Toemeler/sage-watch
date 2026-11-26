@@ -5,6 +5,8 @@ struct RecorderControls: View {
     @EnvironmentObject private var recorder: Recorder
     @EnvironmentObject private var health: HealthStore
     @ObservedObject private var outbox = Outbox.shared
+    @ObservedObject private var alarm = SmartAlarm.shared
+    @ObservedObject private var activity = ActivityMonitor.shared
 
     var body: some View {
         List {
@@ -26,6 +28,26 @@ struct RecorderControls: View {
                 }
             } footer: {
                 Text("Keeps Sage in front and records heart rate every ~5 s, wrist motion and air pressure. Changes below apply to the next start.")
+            }
+
+            Section {
+                if !alarm.status.isEmpty {
+                    Text(alarm.status).font(.footnote)
+                }
+                if alarm.nap != nil || alarm.status.hasPrefix("Nap: waiting") {
+                    Button("Cancel nap alarm", role: .destructive) { alarm.cancelNap() }
+                } else {
+                    Button("Nap now") { alarm.napNow() }
+                        .disabled(!recorder.isRunning || alarm.ringing)
+                }
+                if let a = activity.context {
+                    row("Doing", "\(a.kind.label) since \(a.since.formatted(date: .omitted, time: .shortened))")
+                }
+            } header: {
+                Text("Alarm")
+            } footer: {
+                let s = AlarmSettings.load().clamped()
+                Text("Nap: wakes you when the cycle ends, \(Int(s.napEarliest))–\(Int(s.napLatest)) min after you fall asleep. Stop with the button, a hard shake or the iPhone.")
             }
 
             Section("Health") {
