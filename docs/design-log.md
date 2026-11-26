@@ -26,10 +26,13 @@ Proposals wait one round for Tom's answer; unanswered ones are built in the next
 
 | # | Feature | Status |
 |---|---------|--------|
-| F1 | **Sunrise wake light:** the lamps fade up warm over the last minutes before the smart alarm rings (night and nap) | proposed (round 1) |
-| F2 | **Evening wind-down:** as the sleep plan's bedtime nears, the lamps dim and warm step by step; a tap on the watch pauses it | proposed (round 1) |
-| F3 | **Single lamps:** swipe sideways on the lamp panel to control each bulb on its own (All, bulb 1, 2, 3) | proposed (round 1) |
-| F4 | **Crown zoom in the colour wheel:** turning the crown zooms out to see all 61 colours at once, like the app grid | proposed (round 1) |
+| F1 | **Sunrise wake light:** the lamp fades up warm while the wake window is open; full light when the alarm rings (night and nap) | built (round 2, no answer) |
+| F2 | **Evening wind-down:** in the hour before the night's bedtime a lamp that is on dims and warms; a manual change pauses it | built (round 2, no answer) |
+| F3 | ~~Single lamps~~ | rejected: Tom has one lamp |
+| F4 | **Crown zoom in the colour wheel:** turning the crown zooms out to see all 61 colours at once, like the app grid | built (round 2, no answer) |
+| F5 | **Wake light from the iPhone alarm too:** when the iPhone's own alarm (Clock app) is the wake-up, start the sunrise from a Shortcuts automation | proposed (round 2) |
+| F6 | **Lamp follows the face:** the sleep face (night or nap) turns the lamp off when you fall asleep, detected by the watch | proposed (round 2) |
+| F7 | **Lamp in the Smart Stack:** a widget with the lamp's state; tapping opens the lamp panel directly | proposed (round 2) |
 
 ## Iterations
 
@@ -102,3 +105,21 @@ Proposals wait one round for Tom's answer; unanswered ones are built in the next
 - Reduce Motion: no rubber band, no zoom or blur into the colours (a crossfade), bubbles appear in place.
 - The percentage is drawn twice and masked at the fill edge: dark over the fill, white over the track.
 - VoiceOver names: "Candle", "Warm white" … "Daylight", and "Pastel red", "Soft azure", "Vivid magenta" ….
+
+### 7 · 2026-11-26 — critical round 2: F1, F2, F4; one lamp
+- **Answers:** F3 rejected (one lamp); F1, F2, F4 unanswered → built, F1+F2 on one commit (they share the automation
+  engine), F4 on its own.
+- **Review of the new features before building:**
+  - The iPhone cannot run a 30-minute fade in the background (it is woken per message for a few seconds), so the
+    *watch* drives both: it stays awake through the night with the recorder and sends one step every 20 s
+    (sunrise) or 3 min (wind-down). Each step is one coalesced message, so a lost one is just the next step late.
+  - Nothing automatic may buzz or show an error at 6 am or at bedtime: automatic changes never trigger the failure
+    note (it only shows on an open panel) and never count as yours.
+  - Wind-down must never switch the lamp *on*, only soften a lamp that is on; any change by hand pauses it for the
+    evening (you know better than the plan). Sunrise steps aside the same way.
+  - Sunrise curve: dimming 10 → 80 % and 2200 → 4200 K, eased quadratically (slow at first, as dawn is); the alarm
+    takes it to 100 % / 4500 K. The nap gets the sunrise but no wind-down.
+- **F4:** in the colour wheel the crown zooms (0.42–1×): positions, bubble sizes, pan limits and the hit test all
+  scale together; opening the colours parks the crown at the top of its range so the whole zoom-out is reachable.
+- **Wording:** "Lamp" in the singular everywhere; the iPhone card counts bulbs.
+- **New proposals:** F5–F7 (see the table).

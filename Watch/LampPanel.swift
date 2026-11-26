@@ -255,7 +255,11 @@ struct LampPanel: View {
             withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.9)) { lamp.setLevel(v / 100) }
             reveal(holding: false)
         }
-        .onChange(of: modelLevel) { _, _ in syncCrown() }
+        .onChange(of: modelLevel) { _, _ in if !colours { syncCrown() } }
+        // opening the colours: put the crown at the top of its range so the whole zoom-out is in reach
+        .onChange(of: colours) { _, open in
+            if open && crown != 100 { crownSync = true; crown = 100 }
+        }
         .onChange(of: lamp.failedAt) { _, t in
             guard t != nil else { return }
             WKInterfaceDevice.current().play(.failure)
