@@ -20,6 +20,17 @@ and the Swift app (`Watch/LampPanel.swift`, `Shared/FaceRenderer.swift`).
   [Deconstructing the Apple Watch Bubble UI](https://blakesanie.substack.com/p/deconstructing-the-iconic-apple-watch),
   [tempertemper](https://www.tempertemper.net/blog/apple-watchs-default-app-view-is-bad)
 
+## Proposed features
+
+Proposals wait one round for Tom's answer; unanswered ones are built in the next round, each on its own commit.
+
+| # | Feature | Status |
+|---|---------|--------|
+| F1 | **Sunrise wake light:** the lamps fade up warm over the last minutes before the smart alarm rings (night and nap) | proposed (round 1) |
+| F2 | **Evening wind-down:** as the sleep plan's bedtime nears, the lamps dim and warm step by step; a tap on the watch pauses it | proposed (round 1) |
+| F3 | **Single lamps:** swipe sideways on the lamp panel to control each bulb on its own (All, bulb 1, 2, 3) | proposed (round 1) |
+| F4 | **Crown zoom in the colour wheel:** turning the crown zooms out to see all 61 colours at once, like the app grid | proposed (round 1) |
+
 ## Iterations
 
 ### 1 · 2026-11-26 — honeycomb reach and focus
@@ -70,3 +81,24 @@ and the Swift app (`Watch/LampPanel.swift`, `Shared/FaceRenderer.swift`).
 - **Changed:** the honeycomb grew from 2 to 4 rings and became a colour wheel: whites in the centre and first ring,
   then 12 pastels (40 % saturation), 18 richer hues (72 %) and 24 vivid ones (100 %), 61 bubbles in all. The pan
   reaches the outermost ring; the bloom staggers 40 ms per ring.
+
+### 6 · 2026-11-26 — critical round 1
+**Review (senior design/engineering pass):**
+1. *Failure honesty (high).* A change that never reached the bulbs left the slider showing a state the room did not
+   have: optimistic UI without reconciliation. Production apps roll back and say so.
+2. *Reduce Motion (high, accessibility).* Bloom, rubber band, zoom and blur all ignored the system setting.
+3. *Percentage legibility (medium).* The label flipped from white to dark at 55 % while the fill edge crossed it,
+   so for a few percent it sat half on the fill in the wrong colour. Control Center splits the glyphs at the edge.
+4. *VoiceOver (medium).* 48 of 61 bubbles were announced as "Colour".
+5. *Noted, not fixed yet:* the crown does nothing in the colour wheel (HIG: the crown should always do something
+   visible) → proposed as F4; a failed status check while the panel is open swaps it for the error view abruptly;
+   pastel RGB on WiZ bulbs is dimmer than the swatch suggests (RGB LEDs only, no white channel mixed in).
+6. *Research:* `WKHapticType.directionUp/Down` pair with tones, so they would beep on every toggle; `.click` stays
+   for touches, `.failure` is right for a change that failed. [WKHapticType](https://developer.apple.com/documentation/watchkit/wkhaptictype.md)
+
+**Changed:**
+- A change that fails after all retries falls back to the last state the lamps confirmed, plays `.failure` and
+  shows "Lamps didn't respond" for 2.5 s (the prototype has a button to simulate it).
+- Reduce Motion: no rubber band, no zoom or blur into the colours (a crossfade), bubbles appear in place.
+- The percentage is drawn twice and masked at the fill edge: dark over the fill, white over the track.
+- VoiceOver names: "Candle", "Warm white" … "Daylight", and "Pastel red", "Soft azure", "Vivid magenta" ….

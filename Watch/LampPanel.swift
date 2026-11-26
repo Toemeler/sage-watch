@@ -16,7 +16,11 @@ final class LampModel: ObservableObject {
     @Published private(set) var busy = false
     /// why the lamps are not available, in plain words (nil while at home)
     @Published private(set) var problem: String? = "Checking…"
+    /// when a change last failed to reach the lamps (the panel flashes a note and plays the failure haptic)
+    @Published private(set) var failedAt: Date?
     var home: Bool { state.home }
+    /// the last state the lamps confirmed; a change that never arrives falls back to it
+    private var confirmed: LampLink.State?
 
     private var lastCheck = Date.distantPast
     private var pending: [String: Any]?
@@ -98,8 +102,14 @@ final class LampModel: ObservableObject {
                 return
             }
         }
-        // only a failed status check says we are not home; a failed change keeps the panel as it is
-        if message[LampLink.commandKey] as? String == LampLink.status { state.home = false }
+        // a failed status check says we are not home; a failed change must not leave the panel showing a state the
+        // lamps never took: fall back to what they last confirmed and say so
+        if message[LampLink.commandKey] as? String == LampLink.status {
+            state.home = false
+        } else if pending == nil {
+            if let c = confirmed { state = c }
+            failedAt = Date()
+        }
         problem = lastError
     }
 
@@ -109,6 +119,7 @@ final class LampModel: ObservableObject {
         if pending == nil && Date().timeIntervalSince(lastLocalChange) > 2.5 { state = s }
         else { state.home = s.home; state.count = s.count }
         problem = s.home ? nil : "No lamp answered. Open Sage on the iPhone once and allow Local Network, then retry."
+        if s.home { confirmed = s }
         remember(state)
     }
 
@@ -156,6 +167,8 @@ struct LampPanel: View {
     @State private var showValue = false
     @State private var pressTask: Task<Void, Never>?
     @State private var hideTask: Task<Void, Never>?
+    @State private var showFailure = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func tint(_ s: LampLink.State) -> Color {
         if let c = s.rgb { return Color(red: Double(c.0) / 255, green: Double(c.1) / 255, blue: Double(c.2) / 255) }
@@ -206,21 +219,20 @@ struct LampPanel: View {
             let w = geo.size.width - 6, h = geo.size.height - 6
             ZStack {
                 capsule(width: w, height: h)
-                    .scaleEffect(colours ? 0.5 : 1)
+                    .scaleEffect(colours && !reduceMotion ? 0.5 : 1)
                     .opacity(colours ? 0 : 1)
-                    .blur(radius: colours ? 6 : 0)
+                    .blur(radius: colours && !reduceMotion ? 6 : 0)
                     .allowsHitTesting(!colours)
-                Text(level > 0 ? "\(Int((level * 100).rounded()))%" : "Off")
-                    .font(.system(size: 40, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(level > 0.55 ? Color.black.opacity(0.7) : Color.white)
-                    .contentTransition(.numericText(value: level))
+                valueLabel(fillHeight: 3 + h * level)
                     .opacity(showValue && !colours ? 1 : 0)
                     .allowsHitTesting(false)
                 if colours {
-                    Honeycomb(state: lamp.state, size: geo.size, pick: choose, cancel: closeColours)
-                        .transition(.asymmetric(insertion: .scale(scale: 0.45).combined(with: .opacity),
-                                                removal: .scale(scale: 1.2).combined(with: .opacity)))
+                    Honeycomb(state: lamp.state, size: geo.size, reduceMotion: reduceMotion, pick: choose, cancel: closeColours)
+                        .transition(reduceMotion ? .opacity
+                                    : .asymmetric(insertion: .scale(scale: 0.45).combined(with: .opacity),
+                                                  removal: .scale(scale: 1.2).combined(with: .opacity)))
                 }
+                failureNote
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
@@ -235,12 +247,52 @@ struct LampPanel: View {
             reveal(holding: false)
         }
         .onChange(of: modelLevel) { _, _ in syncCrown() }
+        .onChange(of: lamp.failedAt) { _, t in
+            guard t != nil else { return }
+            WKInterfaceDevice.current().play(.failure)
+            withAnimation(.easeOut(duration: 0.2)) { showFailure = true }
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2.5))
+                withAnimation(.easeIn(duration: 0.3)) { showFailure = false }
+            }
+        }
         .onAppear {
             syncCrown()
             lamp.refresh(force: true)
             // the fill rises into place as the panel opens
             withAnimation(.spring(response: 0.6, dampingFraction: 0.82).delay(0.12)) { appeared = true }
         }
+    }
+
+    /// The percentage, split where the fill edge crosses it: dark over the fill, white over the track (as Control
+    /// Center does), so it never flips colour as the fill passes through it.
+    private func valueLabel(fillHeight: CGFloat) -> some View {
+        let text = Text(level > 0 ? "\(Int((level * 100).rounded()))%" : "Off")
+            .font(.system(size: 40, weight: .semibold, design: .rounded).monospacedDigit())
+            .contentTransition(.numericText(value: level))
+        return ZStack {
+            text.foregroundStyle(Color.white)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            text.foregroundStyle(Color.black.opacity(0.7))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .mask(alignment: .bottom) { Rectangle().frame(height: max(0, fillHeight)) }
+        }
+    }
+
+    /// a short note when a change did not reach the lamps; the slider has already gone back to their real state
+    private var failureNote: some View {
+        VStack {
+            Label("Lamps didn't respond", systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10).padding(.vertical, 6)
+                .background(Capsule().fill(Color(white: 0.12).opacity(0.94)))
+                .padding(.top, 34)
+            Spacer()
+        }
+        .opacity(showFailure ? 1 : 0)
+        .allowsHitTesting(false)
+        .accessibilityHidden(!showFailure)
     }
 
     private func capsule(width w: CGFloat, height h: CGFloat) -> some View {
@@ -296,7 +348,7 @@ struct LampPanel: View {
         }
         let raw = dragStart - Double(g.translation.height / h)
         let clamped = min(1, max(0, raw))
-        overshoot = Self.rubber(CGFloat(raw - clamped) * h, limit: h * 0.07)
+        overshoot = reduceMotion ? 0 : Self.rubber(CGFloat(raw - clamped) * h, limit: h * 0.07)
         let edge = clamped <= 0 ? 0 : clamped >= 1 ? 1 : -1
         if edge != -1 && edge != lastEdge { WKInterfaceDevice.current().play(.click) }
         lastEdge = edge
@@ -387,6 +439,7 @@ enum Swatch: Hashable {
 struct Honeycomb: View {
     let state: LampLink.State
     let size: CGSize
+    var reduceMotion = false
     let pick: (Swatch) -> Void
     let cancel: () -> Void
 
@@ -403,7 +456,13 @@ struct Honeycomb: View {
         let pos: CGPoint
         let ring: Int
         let swatch: Swatch
+        let name: String          // what VoiceOver says
     }
+
+    static let hueNames = ["Red", "Orange", "Yellow", "Lime", "Green", "Mint", "Cyan", "Azure", "Blue", "Violet", "Magenta", "Pink"]
+    static let ringNames = [2: "Pastel", 3: "Soft", 4: "Vivid"]
+    static let whiteNames = [2200: "Candle", 2700: "Warm white", 3000: "Soft white", 3500: "White", 4200: "Neutral white",
+                             5200: "Cool white", 6500: "Daylight"]
 
     /// rings around the centre; saturation per colour ring, pastel inside, vivid at the edge
     static let rings = 4
@@ -422,15 +481,17 @@ struct Honeycomb: View {
         let whites = [2200, 3000, 3500, 4200, 5200, 6500]
         var out: [Cell] = [], i = 0
         for c in raw.sorted(by: { ($0.ring, $0.angle) < ($1.ring, $1.angle) }) {
-            let s: Swatch
+            let s: Swatch, name: String
             switch c.ring {
-            case 0: s = .white(2700)
-            case 1: s = .white(whites[i]); i += 1
+            case 0: s = .white(2700); name = "Warm white"
+            case 1: s = .white(whites[i]); name = whiteNames[whites[i]] ?? "White"; i += 1
             default:
-                let rgb = hue(c.angle / (2 * .pi), saturation: saturation[c.ring] ?? 1)
+                let h = c.angle / (2 * .pi)
+                let rgb = hue(h, saturation: saturation[c.ring] ?? 1)
                 s = .colour(rgb.0, rgb.1, rgb.2)
+                name = "\(ringNames[c.ring] ?? "") \(hueNames[Int((h * 12).rounded()) % 12].lowercased())"
             }
-            out.append(Cell(id: out.count, pos: c.p, ring: c.ring, swatch: s))
+            out.append(Cell(id: out.count, pos: c.p, ring: c.ring, swatch: s, name: name))
         }
         return out
     }()
@@ -507,12 +568,13 @@ struct Honeycomb: View {
             .overlay(Circle().strokeBorder(Color.white, lineWidth: selected ? 3 : 0))
             .overlay(Circle().strokeBorder(Color.black.opacity(0.25), lineWidth: selected ? 1 : 0).padding(3))
         .frame(width: Self.diameter, height: Self.diameter)
-        .scaleEffect(bloomed ? f.scale : 0.15)
+        .scaleEffect(bloomed || reduceMotion ? f.scale : 0.15)
         .opacity(bloomed ? 1 : 0)
-        .position(x: size.width / 2 + (bloomed ? f.point.x : 0), y: size.height / 2 + (bloomed ? f.point.y : 0))
-        .animation(.spring(response: 0.5, dampingFraction: 0.74).delay(Double(cell.ring) * 0.04), value: bloomed)
+        .position(x: size.width / 2 + (bloomed || reduceMotion ? f.point.x : 0), y: size.height / 2 + (bloomed || reduceMotion ? f.point.y : 0))
+        .animation(reduceMotion ? .easeInOut(duration: 0.2)
+                   : .spring(response: 0.5, dampingFraction: 0.74).delay(Double(cell.ring) * 0.04), value: bloomed)
         .accessibilityElement()
-        .accessibilityLabel(Text(cell.swatch.name))
+        .accessibilityLabel(Text(cell.name))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { pick(cell.swatch) }
     }
