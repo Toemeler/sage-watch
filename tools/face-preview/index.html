@@ -282,3 +282,195 @@ Promise.all([asset("glyphs.json").then(r => r.json()), loadFont("PlayfairDisplay
 });
 requestAnimationFrame(frame);
 </script>
+
+<!-- ---------- lamp panel prototype (Watch/LampPanel.swift), in watch points (184 x 224) at 2x ---------- -->
+<style>
+  .lamp-root { position: absolute; left: 0; top: 0; width: 184px; height: 224px; transform: scale(2); transform-origin: 0 0;
+               font-family: -apple-system, "SF Pro Rounded", system-ui, sans-serif; color: #fff; touch-action: none; user-select: none; }
+  .lamp-close { position: absolute; left: 10px; top: 9px; width: 26px; height: 26px; border-radius: 50%; background: #2c2c2e;
+                display: grid; place-items: center; font-size: 13px; color: #fff; }
+  .lamp-title { position: absolute; right: 14px; top: 13px; font-size: 15px; font-weight: 600; }
+  .lamp-area { position: absolute; left: 0; top: 34px; width: 184px; height: 190px; }
+  .cap { position: absolute; overflow: hidden; background: rgba(255,255,255,0.18); will-change: transform; }
+  .cap-fill { position: absolute; left: 0; right: 0; bottom: 0; transition: background-color .35s ease-in-out; }
+  .cap-icon { position: absolute; left: 50%; transform: translateX(-50%); }
+  .val { position: absolute; left: 0; right: 0; text-align: center; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .bub { position: absolute; width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 50%; box-sizing: border-box; }
+  .bub.sel { box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 4px rgba(0,0,0,.25); }
+  .lamp-help { color: #8a877d; font-size: 12px; line-height: 1.5; max-width: 300px; }
+</style>
+<div class="watch"><div class="screen" id="lampScreen">
+  <div class="lamp-root" id="lampRoot">
+    <div class="lamp-close">✕</div><div class="lamp-title">Lamps</div>
+    <div class="lamp-area" id="lampArea">
+      <div class="val" id="lampVal"></div>
+      <div class="cap" id="cap"><div class="cap-fill" id="capFill"></div>
+        <svg class="cap-icon" id="capIcon" viewBox="0 0 24 24"><path id="capIconPath" d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z" stroke-width="2" stroke-linecap="round"/></svg>
+      </div>
+      <div id="honey"></div>
+    </div>
+  </div>
+</div></div>
+<div class="controls">
+  <h2>Lamp panel</h2>
+  <p class="lamp-help" style="grid-column: 1 / -1; margin: 0">Tap the capsule: on / off. Press and slide: brightness (bottom is off, it stretches past the ends).
+  Hold ~0.4 s: colours. In colours: drag to pan, tap a bubble to pick, tap empty space to go back.
+  Scroll wheel or two-finger scroll = Digital Crown.</p>
+</div>
+<script>
+(() => {
+  // springs with SwiftUI's response / dampingFraction
+  class Spring {
+    constructor(x, response = 0.4, damping = 0.85) { this.x = x; this.v = 0; this.t = x; this.set(response, damping); }
+    set(response, damping) { this.k = Math.pow(2 * Math.PI / response, 2); this.c = 4 * Math.PI * damping / response; return this; }
+    to(t, response, damping) { if (response) this.set(response, damping); this.t = t; }
+    jump(x) { this.x = this.t = x; this.v = 0; }
+    step(dt) { const a = -this.k * (this.x - this.t) - this.c * this.v; this.v += a * dt; this.x += this.v * dt; }
+  }
+  const rubber = (x, d) => x === 0 ? 0 : Math.sign(x) * (1 - 1 / (Math.abs(x) * 0.55 / d + 1)) * d;
+  const kelvin = k => { const t = Math.min(1, Math.max(0, (k - 2200) / 4300)); return `rgb(255,${Math.round(255 * (0.66 + 0.30 * t))},${Math.round(255 * (0.36 + 0.62 * t))})`; };
+  const hue = h => { const f = n => { const k = (n + h * 6) % 6; return Math.round(255 * (1 - Math.max(0, Math.min(k, 4 - k, 1)))); }; return [f(5), f(3), f(1)]; };
+
+  // model (LampModel): on, dimming 10...100, temp or rgb
+  const lamp = { on: true, dimming: 62, temp: 2700, rgb: null };
+  const modelLevel = () => lamp.on ? lamp.dimming / 100 : 0;
+  function setLevel(l) {
+    if (l < 0.02) { lamp.on = false; return; }
+    lamp.on = true; lamp.dimming = Math.min(100, Math.max(10, Math.round(l * 100)));
+  }
+  const tint = () => lamp.rgb ? `rgb(${lamp.rgb.join(",")})` : kelvin(lamp.temp);
+  const buzz = () => navigator.vibrate && navigator.vibrate(8);
+
+  const area = document.getElementById("lampArea"), cap = document.getElementById("cap"), fill = document.getElementById("capFill");
+  const icon = document.getElementById("capIcon"), iconPath = document.getElementById("capIconPath"), val = document.getElementById("lampVal");
+  const honey = document.getElementById("honey");
+  const AW = 184, AH = 190, H = Math.min(AH - 34, 150), W = Math.round(H * 0.5);
+
+  const level = new Spring(0, 0.6, 0.82), over = new Spring(0, 0.5, 0.55), lift = new Spring(0, 0.3, 0.72);
+  const mode = new Spring(0, 0.45, 0.8), valOp = new Spring(0, 0.15, 1);
+  let dragLevel = null, touching = false, moved = false, longFired = false, dragStart = 0, startY = 0, startX = 0, lastEdge = -1;
+  let pressTimer = null, hideTimer = null, colours = false;
+  setTimeout(() => level.to(modelLevel(), 0.6, 0.82), 120);   // the fill rises as the panel opens
+
+  function reveal(holding) {
+    clearTimeout(hideTimer); valOp.to(1, 0.15, 1);
+    if (!holding) hideTimer = setTimeout(() => valOp.to(0, 0.3, 1), 900);
+  }
+
+  // honeycomb cells, as in Honeycomb.cells
+  const PITCH = 47, D = 42;
+  const raw = [];
+  for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) if (Math.abs(q + r) <= 2) {
+    const x = PITCH * (q + r / 2), y = PITCH * r * Math.sqrt(3) / 2;
+    let a = Math.atan2(x, -y); if (a < 0) a += 2 * Math.PI;
+    raw.push({ x, y, ring: Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)), a });
+  }
+  raw.sort((p, q) => p.ring - q.ring || p.a - q.a);
+  const whites = [2200, 3000, 3500, 4200, 5200, 6500]; let wi = 0;
+  const cells = raw.map(c => {
+    const sw = c.ring === 0 ? { temp: 2700 } : c.ring === 1 ? { temp: whites[wi++] } : { rgb: hue(c.a / (2 * Math.PI)) };
+    const el = document.createElement("div"); el.className = "bub";
+    el.style.background = sw.temp ? kelvin(sw.temp) : `rgb(${sw.rgb.join(",")})`;
+    honey.appendChild(el);
+    return { ...c, sw, el, bloom: new Spring(0, 0.5, 0.74) };
+  });
+  let pan = { x: 0, y: 0 }, panBase = { x: 0, y: 0 }; const panS = { x: new Spring(0, 0.45, 0.75), y: new Spring(0, 0.45, 0.75) };
+  let panning = false;
+  const LIM = 46, bound = v => Math.abs(v) <= LIM ? v : Math.sign(v) * (LIM + rubber(Math.abs(v) - LIM, 28));
+  function fisheye(x, y) {
+    const hx = AW / 2 - D * 0.55, hy = AH / 2 - D * 0.55;
+    const ex = Math.max(0, Math.abs(x) - hx), ey = Math.max(0, Math.abs(y) - hy), e = Math.hypot(ex, ey) / D;
+    if (e <= 0) return { x, y, s: 1 };
+    const len = Math.max(Math.hypot(x, y), 1), pull = Math.min(e, 1.5) * D * 0.45;
+    return { x: x - x / len * pull, y: y - y / len * pull, s: Math.max(0.3, 1 - 0.6 * e) };
+  }
+  const matches = sw => sw.temp ? (!lamp.rgb && lamp.temp === sw.temp) : (lamp.rgb && Math.abs(lamp.rgb[0] - sw.rgb[0]) + Math.abs(lamp.rgb[1] - sw.rgb[1]) + Math.abs(lamp.rgb[2] - sw.rgb[2]) < 12);
+
+  function openColours() {
+    colours = true; mode.to(1, 0.45, 0.8);
+    cells.forEach(c => { c.bloom.jump(0); setTimeout(() => c.bloom.to(1, 0.5, 0.74), c.ring * 50); });
+    pan = { x: 0, y: 0 }; panBase = { x: 0, y: 0 }; panS.x.jump(0); panS.y.jump(0);
+  }
+  function closeColours() { colours = false; mode.to(0, 0.45, 0.85); cells.forEach(c => c.bloom.to(0, 0.3, 1)); }
+
+  // capsule gestures
+  const pt = e => { const r = area.getBoundingClientRect(); return { x: (e.clientX - r.left) / (r.width / AW), y: (e.clientY - r.top) / (r.height / AH) }; };
+  area.addEventListener("pointerdown", e => {
+    area.setPointerCapture(e.pointerId);
+    const p = pt(e); startX = p.x; startY = p.y; touching = true; moved = false; longFired = false; panning = false;
+    if (colours) return;
+    const cx = AW / 2, cy = AH / 2;
+    if (Math.abs(p.x - cx) > W / 2 + 6 || Math.abs(p.y - cy) > H / 2 + 6) { touching = false; return; }
+    dragStart = modelLevel(); lastEdge = dragStart <= 0 ? 0 : dragStart >= 1 ? 1 : -1;
+    pressTimer = setTimeout(() => { if (touching && !moved) { longFired = true; buzz(); openColours(); } }, 420);
+  });
+  area.addEventListener("pointermove", e => {
+    if (!touching) return;
+    const p = pt(e), dx = p.x - startX, dy = p.y - startY;
+    if (colours) {
+      if (!panning && Math.hypot(dx, dy) > 6) panning = true;
+      if (panning) { pan = { x: bound(panBase.x + dx), y: bound(panBase.y + dy) }; panS.x.jump(pan.x); panS.y.jump(pan.y); }
+      return;
+    }
+    if (longFired) return;
+    if (!moved) { if (Math.abs(dy) <= 5 && Math.abs(dx) <= 5) return; moved = true; clearTimeout(pressTimer); lift.to(1, 0.3, 0.72); reveal(true); }
+    const rawL = dragStart - dy / H, l = Math.min(1, Math.max(0, rawL));
+    over.jump(rubber((rawL - l) * H, H * 0.22));
+    const edge = l <= 0 ? 0 : l >= 1 ? 1 : -1; if (edge !== -1 && edge !== lastEdge) buzz(); lastEdge = edge;
+    dragLevel = l; level.jump(l); setLevel(l);
+  });
+  area.addEventListener("pointerup", e => {
+    clearTimeout(pressTimer);
+    if (!touching) return; touching = false;
+    if (colours) {
+      if (panning) {
+        panBase = { x: Math.max(-LIM, Math.min(LIM, pan.x)), y: Math.max(-LIM, Math.min(LIM, pan.y)) };
+        panS.x.to(panBase.x); panS.y.to(panBase.y); pan = { ...panBase }; return;
+      }
+      if (longFired) return;   // the release of the long press that opened them
+      const p = pt(e);
+      const hit = cells.find(c => { const f = fisheye(c.x + pan.x, c.y + pan.y); return Math.hypot(p.x - AW / 2 - f.x, p.y - AH / 2 - f.y) < D / 2 * f.s; });
+      if (hit) { buzz(); if (hit.sw.temp) { lamp.temp = hit.sw.temp; lamp.rgb = null; } else lamp.rgb = hit.sw.rgb; lamp.on = true; level.to(modelLevel(), 0.45, 0.86); }
+      closeColours(); return;
+    }
+    if (longFired) return;
+    if (!moved) { buzz(); lamp.on = !lamp.on; level.to(modelLevel(), 0.45, 0.86); return; }
+    over.to(0, 0.5, 0.55); lift.to(0, 0.35, 0.8); dragLevel = null; level.to(modelLevel(), 0.35, 0.8); reveal(false);
+  });
+  // the Digital Crown
+  document.getElementById("lampScreen").addEventListener("wheel", e => {
+    e.preventDefault(); if (colours || touching) return;
+    const l = Math.min(1, Math.max(0, modelLevel() - e.deltaY / 1000));
+    setLevel(l); level.to(modelLevel(), 0.22, 0.9); reveal(false);
+  }, { passive: false });
+
+  let last = performance.now();
+  function tick(now) {
+    const dt = Math.min(0.032, (now - last) / 1000); last = now;
+    [level, over, lift, mode, valOp, panS.x, panS.y, ...cells.map(c => c.bloom)].forEach(s => { for (let i = 0; i < 4; i++) s.step(dt / 4); });
+    const L = Math.min(1.02, Math.max(0, level.x)), st = Math.abs(over.x);
+    const fh = H + st, fw = W * (1 - Math.min(st / H, 0.15) * 0.5);
+    const scale = (1 + 0.06 * lift.x) * (1 - 0.5 * mode.x);
+    cap.style.width = fw + "px"; cap.style.height = fh + "px"; cap.style.borderRadius = W * 0.4 + "px";
+    cap.style.left = (AW - fw) / 2 + "px"; cap.style.top = (AH - fh) / 2 + (over.x > 0 ? -st / 2 : st / 2) + "px";
+    cap.style.transform = `scale(${scale})`; cap.style.opacity = 1 - mode.x; cap.style.filter = `blur(${6 * mode.x}px)`;
+    fill.style.height = fh * L + "px"; fill.style.backgroundColor = tint();
+    const isz = W * 0.36; icon.style.width = icon.style.height = isz + "px"; icon.style.bottom = W * 0.3 + "px";
+    const dark = L > 0.12; iconPath.setAttribute("stroke", dark ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.8)");
+    iconPath.setAttribute("fill", L > 0 ? (dark ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.8)") : "none");
+    const shown = dragLevel ?? modelLevel();
+    val.textContent = shown > 0 ? Math.round(shown * 100) + "%" : "Off";
+    val.style.top = (AH - H) / 2 - 24 + "px"; val.style.opacity = valOp.x * (1 - mode.x);
+    if (!panning) { pan.x = panS.x.x; pan.y = panS.y.x; }
+    cells.forEach(c => {
+      const b = Math.max(0, c.bloom.x), f = fisheye(c.x + pan.x, c.y + pan.y);
+      c.el.style.left = AW / 2 + f.x * b + "px"; c.el.style.top = AH / 2 + f.y * b + "px";
+      c.el.style.transform = `scale(${Math.max(0.001, (0.15 + 0.85 * b) * f.s)})`; c.el.style.opacity = Math.min(1, b);
+      c.el.style.display = b < 0.01 && !colours ? "none" : "block";
+      c.el.classList.toggle("sel", !!matches(c.sw));
+    });
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
