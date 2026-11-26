@@ -30,7 +30,6 @@ enum FaceRenderer {
         if !state.dimmed { drawNumerals(&ctx) }
         if !state.dimmed { drawDate(&ctx, state.date) }
         drawTime(&ctx, state.date, dimmed: state.dimmed)
-        drawLabel(&ctx, state.label, dimmed: state.dimmed)
         if !state.dimmed && state.mode != .sleeping {
             drawPlaque(&ctx, battery: state.battery, charging: state.charging)
         }
@@ -157,11 +156,6 @@ enum FaceRenderer {
         }
     }
 
-    private static func drawLabel(_ ctx: inout GraphicsContext, _ s: String, dimmed: Bool) {
-        guard !s.isEmpty else { return }
-        ctx.draw(Text(s).font(.custom("PlayfairDisplay-Regular", size: 27)).kerning(3).foregroundColor(P.text.opacity(dimmed ? 0.6 : 1)),
-                 at: CGPoint(x: 484, y: 535), anchor: .center)
-    }
 
     /// battery level as a whole percentage; nil while watchOS reports no level (monitoring off, simulator)
     static func batteryPercent(_ level: Float) -> Int? {
