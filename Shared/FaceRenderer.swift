@@ -149,10 +149,13 @@ enum FaceRenderer {
         let c = Calendar.current.dateComponents([.second, .nanosecond], from: d)
         let sec = Double(c.second ?? 0) + Double(c.nanosecond ?? 0) / 1e9
         let head = Int(sec * 5) % 300, ticks = FaceGeometry.ticks
-        for k in 0..<14 {
-            let i = (head - k + 300) % 300, (p, n) = ticks[i], len = i % 5 == 0 ? 28.0 : 9.0
+        // a long, bright wake so the seconds read at a glance: the head is ivory and wide, the trail fades over 6 s
+        let trail = 30
+        for k in 0..<trail {
+            let i = (head - k + 300) % 300, (p, n) = ticks[i], len = i % 5 == 0 ? 32.0 : 18.0
             var line = Path(); line.move(to: p); line.addLine(to: CGPoint(x: p.x - n.dx * len, y: p.y - n.dy * len))
-            ctx.stroke(line, with: .color(Color(hex: 0xDDEBD2).opacity(0.9 * pow(1 - Double(k) / 14, 1.6))), lineWidth: i % 5 == 0 ? 2.2 : 1.6)
+            let fade = pow(1 - Double(k) / Double(trail), 1.3)
+            ctx.stroke(line, with: .color(Color(hex: k == 0 ? 0xFFFFFF : 0xDDEBD2).opacity(fade)), lineWidth: k == 0 ? 5 : (i % 5 == 0 ? 3.6 : 3))
         }
     }
 
