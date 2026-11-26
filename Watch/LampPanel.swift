@@ -164,7 +164,8 @@ struct LampPanel: View {
 
     private var content: some View {
         GeometryReader { geo in
-            let h = min(geo.size.height - 34, 150.0), w = (h * 0.5).rounded()
+            // the whole display is the slider: inset a hair, corners following the display's own
+            let w = geo.size.width - 6, h = geo.size.height - 6
             ZStack {
                 capsule(width: w, height: h)
                     .scaleEffect(colours ? 0.5 : 1)
@@ -172,11 +173,11 @@ struct LampPanel: View {
                     .blur(radius: colours ? 6 : 0)
                     .allowsHitTesting(!colours)
                 Text(level > 0 ? "\(Int((level * 100).rounded()))%" : "Off")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(.white)
+                    .font(.system(size: 40, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(level > 0.55 ? Color.black.opacity(0.7) : Color.white)
                     .contentTransition(.numericText(value: level))
-                    .offset(y: -h / 2 - 16)
                     .opacity(showValue && !colours ? 1 : 0)
+                    .allowsHitTesting(false)
                 if colours {
                     Honeycomb(state: lamp.state, size: geo.size, pick: choose, cancel: closeColours)
                         .transition(.asymmetric(insertion: .scale(scale: 0.45).combined(with: .opacity),
@@ -185,6 +186,7 @@ struct LampPanel: View {
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
+        .ignoresSafeArea()
         .focusable()
         .focusEffectDisabled()
         .digitalCrownRotation($crown, from: 0, through: 100, by: 1, sensitivity: .low, isContinuous: false, isHapticFeedbackEnabled: true)
@@ -205,21 +207,21 @@ struct LampPanel: View {
 
     private func capsule(width w: CGFloat, height h: CGFloat) -> some View {
         let stretch = abs(overshoot)
-        let fullH = h + stretch, fullW = w * (1 - min(stretch / h, 0.15) * 0.5)
-        let shape = RoundedRectangle(cornerRadius: w * 0.4, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: min(w, h) * 0.2, style: .continuous)
         return ZStack(alignment: .bottom) {
-            Rectangle().fill(Color.white.opacity(0.18))
-            Rectangle().fill(Self.tint(lamp.state)).frame(height: fullH * level)
+            // the track brightens a touch while held (the full-screen stand-in for Control Center's lift)
+            Rectangle().fill(Color.white.opacity(lifted ? 0.22 : 0.16))
+            Rectangle().fill(Self.tint(lamp.state)).frame(height: h * level)
             Image(systemName: level > 0 ? "lightbulb.fill" : "lightbulb")
-                .font(.system(size: w * 0.3, weight: .medium))
+                .font(.system(size: 26, weight: .medium))
                 .foregroundStyle(level > 0.12 ? Color.black.opacity(0.55) : Color.white.opacity(0.8))
                 .contentTransition(.symbolEffect(.replace))
-                .padding(.bottom, w * 0.3)
+                .padding(.bottom, 20)
         }
-        .frame(width: fullW, height: fullH)
+        .frame(width: w, height: h)
         .clipShape(shape)
-        .offset(y: overshoot > 0 ? -stretch / 2 : stretch / 2)      // stretch away from the fixed end
-        .scaleEffect(lifted ? 1.06 : 1)
+        // past either end the whole slider stretches a little away from the fixed edge, then springs back
+        .scaleEffect(x: 1 - stretch / h * 0.3, y: 1 + stretch / h, anchor: overshoot > 0 ? .bottom : .top)
         .contentShape(shape)
         .gesture(DragGesture(minimumDistance: 0)
             .onChanged { touch($0, height: h) }
@@ -256,7 +258,7 @@ struct LampPanel: View {
         }
         let raw = dragStart - Double(g.translation.height / h)
         let clamped = min(1, max(0, raw))
-        overshoot = Self.rubber(CGFloat(raw - clamped) * h, limit: h * 0.22)
+        overshoot = Self.rubber(CGFloat(raw - clamped) * h, limit: h * 0.07)
         let edge = clamped <= 0 ? 0 : clamped >= 1 ? 1 : -1
         if edge != -1 && edge != lastEdge { WKInterfaceDevice.current().play(.click) }
         lastEdge = edge

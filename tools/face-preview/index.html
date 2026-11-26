@@ -287,21 +287,21 @@ requestAnimationFrame(frame);
 <style>
   .lamp-root { position: absolute; left: 0; top: 0; width: 184px; height: 224px; transform: scale(2); transform-origin: 0 0;
                font-family: -apple-system, "SF Pro Rounded", system-ui, sans-serif; color: #fff; touch-action: none; user-select: none; }
-  .lamp-close { position: absolute; left: 10px; top: 9px; width: 26px; height: 26px; border-radius: 50%; background: #2c2c2e;
+  .lamp-close { position: absolute; z-index: 5; left: 10px; top: 9px; width: 26px; height: 26px; border-radius: 50%; background: #2c2c2e;
                 display: grid; place-items: center; font-size: 13px; color: #fff; }
   .lamp-title { position: absolute; right: 14px; top: 13px; font-size: 15px; font-weight: 600; }
-  .lamp-area { position: absolute; left: 0; top: 34px; width: 184px; height: 190px; }
+  .lamp-area { position: absolute; left: 0; top: 0; width: 184px; height: 224px; }
   .cap { position: absolute; overflow: hidden; background: rgba(255,255,255,0.18); will-change: transform; }
   .cap-fill { position: absolute; left: 0; right: 0; bottom: 0; transition: background-color .35s ease-in-out; }
   .cap-icon { position: absolute; left: 50%; transform: translateX(-50%); }
-  .val { position: absolute; left: 0; right: 0; text-align: center; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .val { position: absolute; left: 0; right: 0; text-align: center; font-size: 40px; font-weight: 600; font-variant-numeric: tabular-nums; z-index: 2; pointer-events: none; }
   .bub { position: absolute; width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 50%; box-sizing: border-box; }
   .bub.sel { box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 4px rgba(0,0,0,.25); }
   .lamp-help { color: #8a877d; font-size: 12px; line-height: 1.5; max-width: 300px; }
 </style>
 <div class="watch"><div class="screen" id="lampScreen">
   <div class="lamp-root" id="lampRoot">
-    <div class="lamp-close">✕</div><div class="lamp-title">Lamps</div>
+    <div class="lamp-close">✕</div>
     <div class="lamp-area" id="lampArea">
       <div class="val" id="lampVal"></div>
       <div class="cap" id="cap"><div class="cap-fill" id="capFill"></div>
@@ -344,7 +344,8 @@ requestAnimationFrame(frame);
   const area = document.getElementById("lampArea"), cap = document.getElementById("cap"), fill = document.getElementById("capFill");
   const icon = document.getElementById("capIcon"), iconPath = document.getElementById("capIconPath"), val = document.getElementById("lampVal");
   const honey = document.getElementById("honey");
-  const AW = 184, AH = 190, H = Math.min(AH - 34, 150), W = Math.round(H * 0.5);
+  // the whole display is the slider, inset a hair
+  const AW = 184, AH = 224, H = AH - 6, W = AW - 6;
 
   const level = new Spring(0, 0.6, 0.82), over = new Spring(0, 0.5, 0.55), lift = new Spring(0, 0.3, 0.72);
   const mode = new Spring(0, 0.45, 0.8), valOp = new Spring(0, 0.15, 1);
@@ -420,7 +421,7 @@ requestAnimationFrame(frame);
     if (longFired) return;
     if (!moved) { if (Math.abs(dy) <= 5 && Math.abs(dx) <= 5) return; moved = true; clearTimeout(pressTimer); lift.to(1, 0.3, 0.72); reveal(true); }
     const rawL = dragStart - dy / H, l = Math.min(1, Math.max(0, rawL));
-    over.jump(rubber((rawL - l) * H, H * 0.22));
+    over.jump(rubber((rawL - l) * H, H * 0.07));
     const edge = l <= 0 ? 0 : l >= 1 ? 1 : -1; if (edge !== -1 && edge !== lastEdge) buzz(); lastEdge = edge;
     dragLevel = l; level.jump(l); setLevel(l);
   });
@@ -454,18 +455,19 @@ requestAnimationFrame(frame);
     const dt = Math.min(0.032, (now - last) / 1000); last = now;
     [level, over, lift, mode, valOp, panS.x, panS.y, ...cells.map(c => c.bloom)].forEach(s => { for (let i = 0; i < 4; i++) s.step(dt / 4); });
     const L = Math.min(1.02, Math.max(0, level.x)), st = Math.abs(over.x);
-    const fh = H + st, fw = W * (1 - Math.min(st / H, 0.15) * 0.5);
-    const scale = (1 + 0.06 * lift.x) * (1 - 0.5 * mode.x);
-    cap.style.width = fw + "px"; cap.style.height = fh + "px"; cap.style.borderRadius = W * 0.4 + "px";
-    cap.style.left = (AW - fw) / 2 + "px"; cap.style.top = (AH - fh) / 2 + (over.x > 0 ? -st / 2 : st / 2) + "px";
-    cap.style.transform = `scale(${scale})`; cap.style.opacity = 1 - mode.x; cap.style.filter = `blur(${6 * mode.x}px)`;
-    fill.style.height = fh * L + "px"; fill.style.backgroundColor = tint();
-    const isz = W * 0.36; icon.style.width = icon.style.height = isz + "px"; icon.style.bottom = W * 0.3 + "px";
+    cap.style.width = W + "px"; cap.style.height = H + "px"; cap.style.borderRadius = Math.min(W, H) * 0.2 + "px";
+    cap.style.left = (AW - W) / 2 + "px"; cap.style.top = (AH - H) / 2 + "px";
+    cap.style.background = `rgba(255,255,255,${0.16 + 0.06 * lift.x})`;
+    cap.style.transformOrigin = over.x > 0 ? "50% 100%" : "50% 0%";
+    const ms = 1 - 0.5 * mode.x;
+    cap.style.transform = `scale(${ms * (1 - st / H * 0.3)}, ${ms * (1 + st / H)})`; cap.style.opacity = 1 - mode.x; cap.style.filter = `blur(${6 * mode.x}px)`;
+    fill.style.height = H * L + "px"; fill.style.backgroundColor = tint();
+    icon.style.width = icon.style.height = "30px"; icon.style.bottom = "20px";
     const dark = L > 0.12; iconPath.setAttribute("stroke", dark ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.8)");
     iconPath.setAttribute("fill", L > 0 ? (dark ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.8)") : "none");
     const shown = dragLevel ?? modelLevel();
     val.textContent = shown > 0 ? Math.round(shown * 100) + "%" : "Off";
-    val.style.top = (AH - H) / 2 - 24 + "px"; val.style.opacity = valOp.x * (1 - mode.x);
+    val.style.top = AH / 2 - 26 + "px"; val.style.color = L > 0.55 ? "rgba(0,0,0,.7)" : "#fff"; val.style.opacity = valOp.x * (1 - mode.x);
     if (!panning) { pan.x = panS.x.x; pan.y = panS.y.x; }
     cells.forEach(c => {
       const b = Math.max(0, c.bloom.x), f = fisheye(c.x + pan.x, c.y + pan.y);

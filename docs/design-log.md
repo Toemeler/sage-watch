@@ -30,3 +30,11 @@ and the Swift app (`Watch/LampPanel.swift`, `Shared/FaceRenderer.swift`).
   38 % size, inward pull up to half a bubble).
 - **Next ideas:** colour bubbles could carry a soft glow of their own colour on black; a hue ring that tracks the
   crown inside the honeycomb; check the capsule's proportions against the real Control Center module (iOS 26).
+
+### 2 · 2026-11-26 — the whole display is the slider (user feedback)
+- **Feedback:** the lamp screen should use the whole screen.
+- **Changed:** the capsule became the display itself (3 pt inset, corners at 20 % of the short side, like the
+  display's), drawn under the toolbar with only the close button on top. Tap, slide and hold work anywhere.
+  The percentage shows large (40 pt) in the middle while it changes, dark on the fill and white on the track.
+  The bulb icon sits at the bottom. With no room to grow, the press feedback is a slightly brighter track,
+  and the rubber band is a gentle stretch of the whole slider (at most 7 % of the height) away from the fixed edge.
