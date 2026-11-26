@@ -20,6 +20,16 @@ and the Swift app (`Watch/LampPanel.swift`, `Shared/FaceRenderer.swift`).
   [Deconstructing the Apple Watch Bubble UI](https://blakesanie.substack.com/p/deconstructing-the-iconic-apple-watch),
   [tempertemper](https://www.tempertemper.net/blog/apple-watchs-default-app-view-is-bad)
 
+## Quality gate (every round, every change)
+
+1. Review the diff line by line before committing: concurrency (actors, cancelled tasks), every state the code can
+   be in (iPhone unreachable, app in background, lamp off, user mid-gesture), and who wins when the user and an
+   automation act at once — **the user always wins; automation never undoes a manual change.**
+2. Logic that decides anything (times, levels, averages) gets a unit test; CI must be green (tests + build) before
+   an IPA is sent. A red build is fixed in the same round, never left.
+3. The HTML prototype and Swift stay in step; the design log says what changed, why, and what is unverified.
+4. Nothing is called done that was not run: say what was verified (CI, tests) and what needs the real watch.
+
 ## Proposed features
 
 Proposals wait one round for Tom's answer; unanswered ones are built in the next round, each on its own commit.
@@ -173,3 +183,14 @@ stays the recommended fallback.
   face to the averages; reverted after Tom clarified it was meant for the lamp. The alarm's wake window must never
   follow averaged wakes: you are always woken inside it, so the average would pull it earlier night after night.
 - **Tests:** `TypicalSleepTests` (midnight crossing, two-recording minimum, sync round trip).
+
+### 11 · 2026-11-26 — "manual lower must never get brighter" (Tom) — three bugs found
+- **Bug 1:** for 10 min after the alarm, raising the wrist re-sent full light even after Tom had dimmed it.
+- **Bug 2:** an automatic step that failed in the background was queued and could be sent *after* a manual change,
+  restoring an older, brighter level.
+- **Bug 3:** any manual change, even at noon, paused that evening's wind-down (a *scheduled* wind-down was treated
+  as running).
+- **Fixed:** a manual change drops the post-alarm re-send and any queued automatic step; it pauses only a wind-down
+  that is running now (and skips just that one); wind-down steps may only lower brightness and warm the white,
+  never raise either, and leave a colour alone. A cancelled wind-down no longer clears or duplicates its successor.
+- **Process:** added the quality gate above, applied from now on.

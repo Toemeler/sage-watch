@@ -33,6 +33,7 @@ final class LampAutomation: ObservableObject {
     private var sunriseTask: Task<Void, Never>?
     private var windDownTask: Task<Void, Never>?
     private var windDownPausedFor: Date?          // the bedtime whose wind-down was paused by a manual change
+    private var windingDown = false               // the wind-down is running now (not just scheduled for later)
 
     static let windDownMinutes = 60.0
 
@@ -95,9 +96,18 @@ final class LampAutomation: ObservableObject {
     }
 
     /// a manual change stops a running sunrise (you took over)
+    /// You changed the lamp yourself. Your setting wins: nothing automatic may undo it.
+    /// - a running sunrise stops, and the "full light after the alarm" re-send is dropped
+    /// - a running wind-down pauses until that sleep (one only scheduled for later is left alone)
     func userChanged() {
+        rangAt = nil
         if sunriseTask != nil { sunriseTask?.cancel(); sunriseTask = nil; activity = "" }
-        if windDownTask != nil { windDownPausedFor = nextBedtime().at; windDownTask?.cancel(); windDownTask = nil; activity = "Wind-down paused tonight" }
+        if windingDown, let task = windDownTask {
+            windDownPausedFor = nextBedtime().at
+            task.cancel(); windDownTask = nil; windingDown = false
+            activity = "Wind-down paused: you set the lamp"
+            scheduleWindDown()                      // arms the one after (the paused one is skipped)
+        }
     }
 
     // MARK: wind-down
@@ -127,13 +137,16 @@ final class LampAutomation: ObservableObject {
 
     /// call when the app starts and whenever it becomes active; arms the next wind-down (night or nap)
     func scheduleWindDown(now: Date = .now) {
-        guard windDownOn else { windDownTask?.cancel(); windDownTask = nil; return }
-        let bed = nextBedtime(after: now)
-        guard windDownPausedFor != bed.at, windDownTask == nil else { return }
+        guard windDownOn else { windDownTask?.cancel(); windDownTask = nil; windingDown = false; return }
+        var bed = nextBedtime(after: now)
+        if windDownPausedFor == bed.at { bed = nextBedtime(after: bed.at.addingTimeInterval(60)) }   // skip the paused one
+        guard windDownTask == nil else { return }
         let begin = bed.at.addingTimeInterval(-bed.lead)
         windDownTask = Task { @MainActor in
             if begin > Date() { try? await Task.sleep(for: .seconds(begin.timeIntervalSinceNow)) }
             guard !Task.isCancelled else { return }
+            windingDown = true
+            defer { windingDown = false }
             let when = bed.at.formatted(date: .omitted, time: .shortened)
             activity = "Winding down to your \(bed.learned ? "usual " : "")\(bed.nap ? "nap" : "bedtime") \(when)"
             let lamp = LampModel.shared
@@ -143,10 +156,17 @@ final class LampAutomation: ObservableObject {
                 let t = min(1, max(0, 1 - bed.at.timeIntervalSinceNow / bed.lead))
                 if lamp.state.on {          // never switch it on; only soften a lamp that is on
                     let dim = Int(fromDim + (10 - fromDim) * t), k = Int(fromK + (2200 - fromK) * t)
-                    lamp.set(["state": true, "dimming": max(10, dim), "temp": max(2200, k)], byUser: false)
+                    // only ever down: never brighter or cooler than the lamp is now (a colour is left as it is)
+                    let target = max(10, min(dim, lamp.state.dimming))
+                    var p: [String: Any] = ["state": true, "dimming": target]
+                    if let cur = lamp.state.temp { p["temp"] = max(2200, min(k, cur)) }
+                    if target < lamp.state.dimming || (p["temp"] as? Int).map({ $0 < (lamp.state.temp ?? 0) }) == true {
+                        lamp.set(p, byUser: false)
+                    }
                 }
                 try? await Task.sleep(for: .seconds(step))
             }
+            guard !Task.isCancelled else { return }      // cancelled: whoever cancelled it owns what comes next
             windDownTask = nil
             activity = ""
             scheduleWindDown()

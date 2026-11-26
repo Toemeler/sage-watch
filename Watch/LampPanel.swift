@@ -69,7 +69,10 @@ final class LampModel: ObservableObject {
 
     /// change the lamps; rapid changes (crown, slider) are coalesced so only the latest goes out
     func set(_ params: [String: Any], byUser: Bool = true) {
-        if byUser { LampAutomation.shared.userChanged() }      // you took over: sunrise / wind-down step aside
+        if byUser {
+            LampAutomation.shared.userChanged()      // you took over: sunrise / wind-down step aside
+            deferred = nil                           // and an older automatic step must never be sent after yours
+        }
         lastLocalChange = Date()
         apply(params)
         pending = params
