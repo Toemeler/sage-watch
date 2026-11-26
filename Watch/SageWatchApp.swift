@@ -40,6 +40,10 @@ struct FaceScreen: View {
     @ObservedObject private var activity = ActivityMonitor.shared
     @Environment(\.isLuminanceReduced) private var dimmed
     @State private var showControls = false
+    @ObservedObject private var lamp = LampModel.shared
+    @State private var showLamp = false
+    @State private var openLampWhenHome = false
+    @Environment(\.scenePhase) private var phase
 
     var body: some View {
         ZStack {
@@ -55,6 +59,17 @@ struct FaceScreen: View {
                 }
                 .allowsHitTesting(false)
             }
+            if lamp.home && !dimmed && !alarm.ringing && !alarm.testing {
+                VStack {
+                    Spacer()
+                    HStack {
+                        LampButton(lamp: lamp) { showLamp = true }
+                        Spacer()
+                    }
+                }
+                .padding(.leading, 12).padding(.bottom, 10)
+                .transition(.opacity)
+            }
             if alarm.ringing {
                 WakeOverlay(subtitle: alarm.ringingBlock == .nap ? "one cycle done · woke gently" : "light sleep · woke gently") { alarm.stop() }
             } else if alarm.testing {
@@ -67,6 +82,18 @@ struct FaceScreen: View {
         ._statusBarHidden(true)
         .contentShape(Rectangle())
         .onLongPressGesture(minimumDuration: 0.8) { showControls = true }
+        // swipe up: the lamp panel, when at home (asks the iPhone first if it does not know yet)
+        .simultaneousGesture(DragGesture(minimumDistance: 25).onEnded { g in
+            guard g.translation.height < -40, abs(g.translation.width) < abs(g.translation.height) else { return }
+            if lamp.home { showLamp = true } else { openLampWhenHome = true; lamp.refresh(force: true) }
+        })
+        .onAppear { lamp.refresh(force: true) }
+        .onChange(of: phase) { _, p in if p == .active { lamp.refresh() } }
+        .onChange(of: lamp.home) { _, home in
+            if home && openLampWhenHome { showLamp = true }
+            openLampWhenHome = false
+        }
+        .sheet(isPresented: $showLamp) { NavigationStack { LampPanel(lamp: lamp) } }
         .sheet(isPresented: $showControls) {
             RecorderControls().environmentObject(recorder).environmentObject(health)
         }

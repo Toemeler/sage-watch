@@ -126,6 +126,12 @@ final class Receiver: NSObject, ObservableObject, WCSessionDelegate {
         DispatchQueue.main.async { LiveBreathing.shared.receive(data) }
     }
 
+    // lamp control from the watch: the iPhone (woken in the background if needed) talks UDP to the WiZ bulbs
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
+        guard message[LampLink.commandKey] != nil else { replyHandler([:]); return }
+        Task { replyHandler(await WizClient.handle(message)) }
+    }
+
     func sessionDidBecomeInactive(_ session: WCSession) {}
 
     func sessionDidDeactivate(_ session: WCSession) {
