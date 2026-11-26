@@ -17,8 +17,8 @@ final class TypicalSleepTests: XCTestCase {
         // 23:50 and 00:30 average to 00:10 (night clock 1450), not to noon
         let nights = [(t(20, 23, 50), t(21, 6, 10)), (t(22, 0, 30), t(22, 6, 30))]
         let s = TypicalSleep.from(naps: [], nights: nights, calendar: cal)
-        XCTAssertEqual(s.nightOnset ?? 0, 24 * 60 + 10, accuracy: 0.5)
-        XCTAssertEqual(s.nightWake ?? 0, 24 * 60 + 6 * 60 + 20, accuracy: 0.5)
+        XCTAssertEqual(s.nightOnset ?? 0, 1450.0, accuracy: 0.5)       // 00:10
+        XCTAssertEqual(s.nightWake ?? 0, 1820.0, accuracy: 0.5)        // 06:20
         XCTAssertNil(s.napOnset)
     }
 
@@ -27,8 +27,8 @@ final class TypicalSleepTests: XCTestCase {
         XCTAssertNil(one.napOnset)
         XCTAssertEqual(one.napCount, 1)
         let two = TypicalSleep.from(naps: [(t(20, 17, 10), t(20, 18, 40)), (t(21, 16, 50), t(21, 18, 20))], nights: [], calendar: cal)
-        XCTAssertEqual(two.napOnset ?? 0, 17 * 60, accuracy: 0.5)
-        XCTAssertEqual(two.napWake ?? 0, 18 * 60 + 30, accuracy: 0.5)
+        XCTAssertEqual(two.napOnset ?? 0, 1020.0, accuracy: 0.5)
+        XCTAssertEqual(two.napWake ?? 0, 1110.0, accuracy: 0.5)
     }
 
     func testDictionaryRoundTrip() {
