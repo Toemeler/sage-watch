@@ -48,8 +48,8 @@ final class LampAutomation: ObservableObject {
         sunriseTask = Task { @MainActor in
             while !Task.isCancelled {
                 let t = min(1, Date().timeIntervalSince(start) / span)
-                let e = t * t                                       // slow at first, like dawn
-                LampModel.shared.set(["state": true, "dimming": Int(10 + 70 * e), "temp": Int(2200 + 2000 * e)], byUser: false)
+                // eased like dawn; never dims a lamp that is already brighter (LampRules, tested)
+                if let p = LampRules.sunrise(t: t, current: LampModel.shared.state) { LampModel.shared.set(p, byUser: false) }
                 if t >= 1 { break }
                 try? await Task.sleep(for: .seconds(20))
             }
@@ -150,20 +150,12 @@ final class LampAutomation: ObservableObject {
             let when = bed.at.formatted(date: .omitted, time: .shortened)
             activity = "Winding down to your \(bed.learned ? "usual " : "")\(bed.nap ? "nap" : "bedtime") \(when)"
             let lamp = LampModel.shared
-            let fromDim = Double(max(lamp.state.dimming, 10)), fromK = Double(lamp.state.temp ?? 2700)
+            let startState = lamp.state
             let step: TimeInterval = bed.nap ? 60 : 180
             while !Task.isCancelled && Date() < bed.at {
                 let t = min(1, max(0, 1 - bed.at.timeIntervalSinceNow / bed.lead))
-                if lamp.state.on {          // never switch it on; only soften a lamp that is on
-                    let dim = Int(fromDim + (10 - fromDim) * t), k = Int(fromK + (2200 - fromK) * t)
-                    // only ever down: never brighter or cooler than the lamp is now (a colour is left as it is)
-                    let target = max(10, min(dim, lamp.state.dimming))
-                    var p: [String: Any] = ["state": true, "dimming": target]
-                    if let cur = lamp.state.temp { p["temp"] = max(2200, min(k, cur)) }
-                    if target < lamp.state.dimming || (p["temp"] as? Int).map({ $0 < (lamp.state.temp ?? 0) }) == true {
-                        lamp.set(p, byUser: false)
-                    }
-                }
+                // only ever lower and warmer, never on, colour left alone (LampRules, tested)
+                if let p = LampRules.windDown(t: t, start: startState, current: lamp.state) { lamp.set(p, byUser: false) }
                 try? await Task.sleep(for: .seconds(step))
             }
             guard !Task.isCancelled else { return }      // cancelled: whoever cancelled it owns what comes next

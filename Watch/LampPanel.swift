@@ -214,6 +214,8 @@ struct LampPanel: View {
     @State private var hideTask: Task<Void, Never>?
     @State private var showFailure = false
     @State private var zoom: CGFloat = 1             // colour wheel: the crown zooms out to see all of it
+    @State private var lastUse = Date()              // closes itself after a while unused, as Control Center does
+    static let idleClose: TimeInterval = 30
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func tint(_ s: LampLink.State) -> Color {
@@ -309,6 +311,14 @@ struct LampPanel: View {
                 withAnimation(.easeIn(duration: 0.3)) { showFailure = false }
             }
         }
+        .onChange(of: crown) { _, _ in lastUse = Date() }
+        .onChange(of: colours) { _, _ in lastUse = Date() }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                if !touching && !colours && Date().timeIntervalSince(lastUse) > Self.idleClose { dismiss(); return }
+            }
+        }
         .onAppear {
             lamp.refresh(force: true)
             // the fill rises into place as the panel opens
@@ -377,6 +387,7 @@ struct LampPanel: View {
     }
 
     private func touch(_ g: DragGesture.Value, height h: CGFloat) {
+        lastUse = Date()
         if !touching {
             touching = true; moved = false; longFired = false
             dragStart = modelLevel
@@ -449,6 +460,7 @@ struct LampPanel: View {
     }
 
     private func choose(_ s: Swatch) {
+        lastUse = Date()
         WKInterfaceDevice.current().play(.click)
         withAnimation(.easeInOut(duration: 0.35)) {
             switch s {

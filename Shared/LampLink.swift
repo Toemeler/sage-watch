@@ -55,3 +55,35 @@ enum LampLink {
     static let temps = [2200, 2700, 3500, 4500, 6500]
     static let colours: [(Int, Int, Int)] = [(255, 60, 0), (255, 140, 0), (255, 0, 60), (190, 0, 255), (0, 80, 255), (0, 200, 120)]
 }
+
+/// The rules for automatic lamp steps, in one place so they can be tested. The principle: automation may only ever
+/// move the lamp in its own direction (sunrise brighter, wind-down dimmer and warmer), and never undo what you set.
+enum LampRules {
+    /// one sunrise step at progress `t` (0...1 through the wake window): eased like dawn, 10 → 80 % and
+    /// 2200 → 4200 K. Nil when the lamp is already on and at least that bright (you or an earlier step set it):
+    /// a sunrise never dims a lamp.
+    static func sunrise(t: Double, current: LampLink.State) -> [String: Any]? {
+        let p = min(1, max(0, t)), e = p * p
+        let dim = Int((10 + 70 * e).rounded()), temp = Int((2200 + 2000 * e).rounded())
+        if current.on && current.dimming >= dim { return nil }
+        return ["state": true, "dimming": dim, "temp": temp]
+    }
+
+    /// one wind-down step at progress `t` from `start` (the lamp when the wind-down began) toward 10 % at 2200 K.
+    /// Never switches the lamp on, never brighter or cooler than it is now, leaves a colour as it is.
+    /// Nil when there is nothing to lower.
+    static func windDown(t: Double, start: LampLink.State, current: LampLink.State) -> [String: Any]? {
+        guard current.on else { return nil }
+        let p = min(1, max(0, t))
+        let fromDim = Double(max(start.dimming, 10)), fromK = Double(start.temp ?? current.temp ?? 2700)
+        let dim = max(10, min(Int((fromDim + (10 - fromDim) * p).rounded()), current.dimming))
+        var out: [String: Any] = ["state": true, "dimming": dim]
+        var lowersTemp = false
+        if let cur = current.temp {
+            let k = max(2200, min(Int((fromK + (2200 - fromK) * p).rounded()), cur))
+            out["temp"] = k
+            lowersTemp = k < cur
+        }
+        return dim < current.dimming || lowersTemp ? out : nil
+    }
+}

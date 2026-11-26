@@ -101,14 +101,15 @@ struct FaceScreen: View {
             guard g.translation.height < -40, abs(g.translation.width) < abs(g.translation.height) else { return }
             showLamp = true   // the panel says why when the lamps cannot be reached
         })
-        // turning the crown on the face opens the lamp (a deliberate turn, not a brush)
+        // turning the crown on the face opens the lamp: a deliberate turn, not a brush, and never during a sleep
+        // block (a sleeve or the pillow can turn the crown; the panel would then change the light in the dark)
         .focusable()
         .focusEffectDisabled()
         .digitalCrownRotation($faceCrown, from: -1_000_000, through: 1_000_000, sensitivity: .low,
                               isContinuous: true, isHapticFeedbackEnabled: false)
         .onChange(of: faceCrown) { _, v in
-            guard !showLamp, !showControls, !showMusic, !dimmed else { crownBase = v; return }
-            if abs(v - crownBase) > 2.5 {
+            guard !showLamp, !showControls, !showMusic, !dimmed, FaceMode.auto(Date()) != .sleeping else { crownBase = v; return }
+            if abs(v - crownBase) > 4 {
                 crownBase = v
                 WKInterfaceDevice.current().play(.click)
                 showLamp = true
