@@ -60,22 +60,7 @@ struct FaceScreen: View {
                 }
                 .allowsHitTesting(false)
             }
-            if lamp.home && !dimmed && !alarm.ringing && !alarm.testing {
-                VStack {
-                    Spacer()
-                    HStack {
-                        LampButton(lamp: lamp) { showLamp = true }
-                        Spacer()
-                    }
-                }
-                .padding(.leading, 12).padding(.bottom, 10)
-                .transition(.opacity)
-            }
             if !dimmed && !alarm.ringing && !alarm.testing {
-                VStack {
-                    if audio.bluetooth { BluetoothBadge().padding(.top, 14) }
-                    Spacer()
-                }
                 // tap the music indicator for pause, skip and back
                 if audio.playing {
                     GeometryReader { geo in

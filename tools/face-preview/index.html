@@ -28,8 +28,6 @@
 <div class="watch"><div class="screen">
   <canvas id="face" width="736" height="896"></canvas>
   <div class="overlay">
-    <div class="bt" id="bt" hidden><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3a9 9 0 0 0-9 9v6a3 3 0 0 0 3 3h1a1 1 0 0 0 1-1v-6a1 1 0 0 0-1-1H5v-1a7 7 0 0 1 14 0v1h-2a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h1a3 3 0 0 0 3-3v-6a9 9 0 0 0-9-9z"/></svg></div>
-    <div class="lamp" id="lamp" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg></div>
   </div>
 </div></div>
 
@@ -41,8 +39,6 @@
   <label>Battery <span id="batv"></span></label><input id="bat" type="range" min="0" max="100" value="78">
   <label>Charging</label><input id="charging" type="checkbox">
   <label>Music playing</label><input id="music" type="checkbox" checked>
-  <label>Headphones</label><input id="bluetooth" type="checkbox" checked>
-  <label>At home (lamp)</label><input id="home" type="checkbox" checked>
   <label>Sleep face</label><input id="sleeping" type="checkbox">
   <label>Always-on (dimmed)</label><input id="dimmed" type="checkbox">
   <p class="hint">Coordinates are the renderer's reference space (screen x 131–827, y 63–893). Change the code here, reload, and port the settled values back to Shared/FaceRenderer.swift.</p>
@@ -231,8 +227,8 @@ function drawTime(ctx, date, dimmed) {
   }
 }
 
-// four rounded bars bouncing gently, centred under the time (musicRect: x 434...524, y 590...654)
-const MUSIC = { x: 479 - 45, y: 590, w: 90, h: 64 };
+// four rounded bars bouncing gently, just above the battery bar (musicRect: x 434...524, y 730...780)
+const MUSIC = { x: 479 - 45, y: 730, w: 90, h: 50 };
 function drawMusic(ctx, date) {
   const t = date.getTime() / 1000, w = 8, gap = 7, maxH = 34, minH = 8;
   const x0 = MUSIC.x + MUSIC.w / 2 - (4 * w + 3 * gap) / 2, base = MUSIC.y + MUSIC.h / 2 + maxH / 2;
@@ -254,9 +250,9 @@ function drawBattery(ctx, pct, charging) {
   if (pct == null) return;
   const target = pct / 100;
   let level = shownLevel ?? target; level += (target - level) * 0.08; if (Math.abs(level - target) < 0.002) level = target; shownLevel = level;
-  const tr = { x: 479 - 70, y: 800, w: 140, h: 8 };
-  ctx.fillStyle = P.track; rrect(ctx, tr.x, tr.y, tr.w, tr.h, 4); ctx.fill();
-  ctx.fillStyle = batteryColour(pct, charging); rrect(ctx, tr.x, tr.y, Math.max(8, tr.w * level), tr.h, 4); ctx.fill();
+  const tr = { x: 479 - 70, y: 796, w: 140, h: 13 };
+  ctx.fillStyle = P.track; rrect(ctx, tr.x, tr.y, tr.w, tr.h, 6.5); ctx.fill();
+  ctx.fillStyle = batteryColour(pct, charging); rrect(ctx, tr.x, tr.y, Math.max(13, tr.w * level), tr.h, 6.5); ctx.fill();
 }
 
 // ---------- page ----------
@@ -273,8 +269,6 @@ function frame() {
   const st = { date, bpm: +$("bpm").value, battery: +$("bat").value, charging: $("charging").checked, music: $("music").checked,
                sleeping: $("sleeping").checked, dimmed: $("dimmed").checked };
   $("bpmv").textContent = st.bpm || "–"; $("batv").textContent = st.battery + "%";
-  $("lamp").hidden = !($("home").checked && !st.dimmed);
-  $("bt").hidden = !($("bluetooth").checked && !st.dimmed);
   draw(ctx, st);
   requestAnimationFrame(frame);
 }

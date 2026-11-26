@@ -32,15 +32,3 @@ final class AudioModel: ObservableObject {
         })
     }
 }
-
-/// Small badge at the top of the face while Bluetooth headphones are connected to the iPhone.
-struct BluetoothBadge: View {
-    var body: some View {
-        Image(systemName: "headphones")
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color(hex: 0x5AA0E6))
-            .padding(4)
-            .background(Circle().fill(Color(hex: 0x0D0E0C)))
-            .accessibilityLabel(Text("Headphones connected"))
-    }
-}

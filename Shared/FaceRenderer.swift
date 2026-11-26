@@ -170,7 +170,7 @@ enum FaceRenderer {
     /// the plaque at the bottom: the watch battery, with a bolt while charging (gold at 20 % and below);
     /// just the bolt where no level is known
     /// the music indicator's place in the reference space (also the tap area on the watch)
-    static let musicRect = CGRect(x: 479 - 45, y: 590, width: 90, height: 64)
+    static let musicRect = CGRect(x: 479 - 45, y: 730, width: 90, height: 50)
 
     /// maps a rectangle of the reference space to view coordinates for a face drawn into `size`
     static func viewRect(_ r: CGRect, in size: CGSize) -> CGRect {
@@ -180,7 +180,7 @@ enum FaceRenderer {
         return CGRect(x: ox + r.minX * scale, y: oy + r.minY * scale, width: r.width * scale, height: r.height * scale)
     }
 
-    /// four rounded bars bouncing gently, centred under the time
+    /// four rounded bars bouncing gently, centred just above the battery bar
     private static func drawMusic(_ ctx: inout GraphicsContext, _ d: Date) {
         let t = d.timeIntervalSinceReferenceDate
         let r = musicRect, w = 8.0, gap = 7.0, maxH = 34.0, minH = 8.0
@@ -213,9 +213,9 @@ enum FaceRenderer {
         level += (target - level) * 0.08
         if abs(level - target) < 0.002 { level = target }
         shownLevel = level
-        let track = CGRect(x: 479 - 70, y: 800, width: 140, height: 8)
-        ctx.fill(Path(roundedRect: track, cornerRadius: 4), with: .color(P.track))
-        ctx.fill(Path(roundedRect: CGRect(x: track.minX, y: track.minY, width: max(8, track.width * level), height: track.height), cornerRadius: 4),
+        let track = CGRect(x: 479 - 70, y: 796, width: 140, height: 13)
+        ctx.fill(Path(roundedRect: track, cornerRadius: 6.5), with: .color(P.track))
+        ctx.fill(Path(roundedRect: CGRect(x: track.minX, y: track.minY, width: max(13, track.width * level), height: track.height), cornerRadius: 6.5),
                  with: .color(batteryColour(battery, charging: charging)))
     }
 

@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchKit
 import WatchConnectivity
 
 /// The watch side of lamp control. The watch cannot reach the bulbs itself, so it asks the iPhone; "at home" means
@@ -32,6 +33,12 @@ final class LampModel: ObservableObject {
     }
 
     func toggle() { set(["state": !state.on]) }
+    /// one slider for everything, like Control Center: 0 is off, anything above sets the brightness (10...100 %)
+    func setLevel(_ level: Double) {
+        if level < 0.04 { if state.on { set(["state": false]) }; return }
+        let pct = min(100, max(10, Int((level * 100).rounded())))
+        if !state.on || pct != state.dimming { set(["state": true, "dimming": pct]) }
+    }
     func brightness(_ v: Int) { set(["state": true, "dimming": min(100, max(10, v))]) }
     func temperature(_ k: Int) { set(["state": true, "temp": k, "dimming": state.dimming]) }
     func colour(_ c: (Int, Int, Int)) { set(["state": true, "r": c.0, "g": c.1, "b": c.2, "dimming": state.dimming]) }
@@ -81,31 +88,22 @@ final class LampModel: ObservableObject {
     }
 }
 
-/// Small lamp button shown on the face while at home.
-struct LampButton: View {
-    @ObservedObject var lamp: LampModel
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: lamp.state.on ? "lightbulb.fill" : "lightbulb")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(lamp.state.on ? LampPanel.tint(lamp.state) : FaceGeometry.Palette.sage)
-                .frame(width: 34, height: 34)
-                .background(Circle().fill(Color(hex: 0x0D0E0C)))
-                .overlay(Circle().stroke(FaceGeometry.Palette.rim, lineWidth: 1.5))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text("Lamp"))
-    }
-}
-
-/// Control Center style panel: a big power button, brightness on a tall slider (and the Digital Crown),
-/// white temperatures and colours as swatches.
+/// The lamp, Control Center style: one tall slider is power and brightness together.
+/// Tap: on / off. Press and slide up or down: brightness (down to the bottom turns it off). Long press: colours.
+/// The Digital Crown moves the same slider, with detents and the fill following it.
+/// While touched the slider grows toward the finger; dragged past either end it stretches (rubber band) and
+/// springs back on release.
 struct LampPanel: View {
     @ObservedObject var lamp: LampModel
-    @State private var crown: Double = 100
-    @State private var crownReady = false
+    @State private var live: Double?                 // level while the finger or crown moves it
+    @State private var start: (level: Double, moved: Bool)?
+    @State private var longFired = false
+    @State private var pressed = false
+    @State private var stretch: CGFloat = 0          // rubber band: + past the top, - past the bottom
+    @State private var showColours = false
+    @State private var crown: Double = 0
+    @State private var crownFromLamp = false
+    @State private var pressTask: Task<Void, Never>?
 
     static func tint(_ s: LampLink.State) -> Color {
         if let c = s.rgb { return Color(red: Double(c.0) / 255, green: Double(c.1) / 255, blue: Double(c.2) / 255) }
@@ -117,8 +115,10 @@ struct LampPanel: View {
         return Color(red: 1, green: 0.62 + 0.33 * t, blue: 0.28 + 0.72 * t)
     }
 
+    private var level: Double { live ?? (lamp.state.on ? Double(lamp.state.dimming) / 100 : 0) }
+
     var body: some View {
-        if lamp.home { controls } else { unavailable }
+        if lamp.home { slider } else { unavailable }
     }
 
     /// not at home, or the iPhone could not reach the lamps: say why, offer a retry
@@ -133,80 +133,139 @@ struct LampPanel: View {
         .navigationTitle("Lamp")
     }
 
-    private var controls: some View {
-        ScrollView {
-            VStack(spacing: 10) {
-                HStack(spacing: 10) {
-                    Button(action: lamp.toggle) {
-                        VStack(spacing: 4) {
-                            Image(systemName: lamp.state.on ? "lightbulb.fill" : "lightbulb")
-                                .font(.system(size: 26, weight: .semibold))
-                            Text(lamp.state.on ? "On" : "Off").font(.system(size: 13, weight: .semibold))
-                        }
-                        .foregroundStyle(lamp.state.on ? Color.black : FaceGeometry.Palette.ivory)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(RoundedRectangle(cornerRadius: 18).fill(lamp.state.on ? Self.tint(lamp.state) : Color.white.opacity(0.12)))
-                    }
-                    .buttonStyle(.plain)
-
-                    brightnessBar
-                }
-                .frame(height: 110)
-
-                swatches(LampLink.temps.map { Self.kelvin($0) }, selected: LampLink.temps.firstIndex { $0 == lamp.state.temp }) { i in
-                    lamp.temperature(LampLink.temps[i])
-                }
-                swatches(LampLink.colours.map { Color(red: Double($0.0) / 255, green: Double($0.1) / 255, blue: Double($0.2) / 255) },
-                         selected: LampLink.colours.firstIndex { c in lamp.state.rgb.map { $0 == c } ?? false }) { i in
-                    lamp.colour(LampLink.colours[i])
-                }
-
-                if lamp.state.count > 0 {
-                    Text("\(lamp.state.count) lamp\(lamp.state.count == 1 ? "" : "s")")
-                        .font(.system(size: 11)).foregroundStyle(FaceGeometry.Palette.sage)
-                }
+    private var slider: some View {
+        GeometryReader { geo in
+            let h = min(geo.size.height - 24, 160.0), w = min(92.0, h * 0.58)
+            VStack(spacing: 6) {
+                pill(width: w, height: h)
+                Text(level > 0 ? "\(Int((level * 100).rounded())) %" : "Off")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(FaceGeometry.Palette.ivory.opacity(0.8))
+                    .contentTransition(.numericText())
             }
-            .padding(.horizontal, 4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .focusable()
-        .digitalCrownRotation($crown, from: 10, through: 100, by: 5, sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
-        .onChange(of: crown) { _, v in if crownReady { lamp.brightness(Int(v)) } }
-        .onAppear {
-            crown = Double(lamp.state.dimming)
-            lamp.refresh(force: true)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { crownReady = true }
+        .digitalCrownRotation($crown, from: 0, through: 100, by: 5, sensitivity: .medium, isContinuous: false, isHapticFeedbackEnabled: true)
+        .onChange(of: crown) { _, v in
+            if crownFromLamp { crownFromLamp = false; return }
+            withAnimation(.easeOut(duration: 0.12)) { live = v / 100 }
+            lamp.setLevel(v / 100)
         }
+        .onChange(of: lamp.state.on) { _, _ in syncCrown() }
+        .onChange(of: lamp.state.dimming) { _, _ in syncCrown() }
+        .onAppear { syncCrown(); lamp.refresh(force: true) }
+        .sheet(isPresented: $showColours) { ColourSheet(lamp: lamp) }
         .navigationTitle("Lamp")
     }
 
-    /// tall slider: drag up and down, the fill shows the brightness
-    private var brightnessBar: some View {
-        GeometryReader { geo in
-            let level = Double(lamp.state.dimming) / 100
-            ZStack(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: 18).fill(Color.white.opacity(0.12))
-                RoundedRectangle(cornerRadius: 18).fill(lamp.state.on ? Self.tint(lamp.state) : Color.white.opacity(0.25))
-                    .frame(height: geo.size.height * level)
-                Image(systemName: "sun.max.fill").font(.system(size: 16)).foregroundStyle(Color.black.opacity(0.6)).padding(.bottom, 8)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0).onChanged { g in
-                let v = 1 - g.location.y / geo.size.height
-                let pct = Int((min(max(v, 0.1), 1) * 100 / 5).rounded()) * 5
-                if pct != lamp.state.dimming || !lamp.state.on { lamp.brightness(pct); crownReady = false; crown = Double(pct); crownReady = true }
-            })
-        }
-        .frame(width: 58)
+    private func syncCrown() {
+        guard start == nil else { return }
+        live = nil
+        let target = lamp.state.on ? Double(lamp.state.dimming) : 0
+        if abs(target - crown) > 0.5 { crownFromLamp = true; crown = target }
     }
 
-    private func swatches(_ colours: [Color], selected: Int?, tap: @escaping (Int) -> Void) -> some View {
-        HStack(spacing: 6) {
+    private func pill(width w: CGFloat, height h: CGFloat) -> some View {
+        let tint = Self.tint(lamp.state)
+        let radius = w * 0.42
+        // stretch: the pill gets longer toward the overshoot and a little narrower, anchored on the opposite end
+        let sy = 1 + abs(stretch) / h, sx = 1 - min(abs(stretch) / h, 0.12) * 0.6
+        return ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: radius, style: .continuous).fill(Color.white.opacity(0.16))
+            Rectangle().fill(tint).frame(height: h * level)
+            Image(systemName: level > 0 ? "lightbulb.fill" : "lightbulb")
+                .font(.system(size: w * 0.26, weight: .semibold))
+                .foregroundStyle(level > 0.14 ? Color.black.opacity(0.7) : FaceGeometry.Palette.ivory)
+                .padding(.bottom, h * 0.07)
+                .symbolEffect(.bounce, value: lamp.state.on)
+        }
+        .frame(width: w, height: h)
+        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .scaleEffect(x: sx, y: sy, anchor: stretch > 0 ? .bottom : .top)
+        .scaleEffect(pressed ? 1.06 : 1)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: pressed)
+        .contentShape(Rectangle())
+        .gesture(DragGesture(minimumDistance: 0).onChanged { g in touch(g, height: h) }.onEnded { _ in release() })
+        .accessibilityElement()
+        .accessibilityLabel(Text("Lamp"))
+        .accessibilityValue(Text(level > 0 ? "\(Int(level * 100)) percent" : "off"))
+        .accessibilityAdjustableAction { dir in lamp.setLevel(min(1, max(0, level + (dir == .increment ? 0.1 : -0.1)))) }
+        .accessibilityAction { lamp.toggle() }
+    }
+
+    private func touch(_ g: DragGesture.Value, height h: CGFloat) {
+        if start == nil {
+            start = (level, false); longFired = false; pressed = true
+            pressTask?.cancel()
+            pressTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(450))
+                guard !Task.isCancelled, let s = start, !s.moved else { return }
+                longFired = true; pressed = false
+                WKInterfaceDevice.current().play(.click)
+                showColours = true
+            }
+        }
+        guard var s = start, !longFired else { return }
+        let dy = g.translation.height
+        if !s.moved && abs(dy) > 6 { s.moved = true; start = s; pressTask?.cancel() }
+        guard s.moved else { return }
+        let raw = s.level - Double(dy / h)
+        let clamped = min(1, max(0, raw))
+        // past the ends the pill resists like a rubber band
+        let over = (raw - clamped) * Double(h)
+        stretch = over == 0 ? 0 : CGFloat((over > 0 ? 1 : -1) * sqrt(abs(over)) * 2.2)
+        if (clamped == 0 || clamped == 1) && clamped != live { WKInterfaceDevice.current().play(.click) }
+        live = clamped
+        lamp.setLevel(clamped)
+    }
+
+    private func release() {
+        pressTask?.cancel()
+        defer { start = nil; pressed = false }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.5)) { stretch = 0 }
+        guard let s = start, !longFired else { return }
+        if !s.moved {
+            WKInterfaceDevice.current().play(.click)
+            lamp.toggle()
+        }
+        live = nil
+    }
+}
+
+/// Long press: whites and colours. Tap one to set it; the sheet closes.
+struct ColourSheet: View {
+    @ObservedObject var lamp: LampModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("White").font(.system(size: 12, weight: .semibold)).foregroundStyle(FaceGeometry.Palette.sage)
+                grid(LampLink.temps.map { LampPanel.kelvin($0) }, selected: LampLink.temps.firstIndex { $0 == lamp.state.temp }) {
+                    lamp.temperature(LampLink.temps[$0])
+                }
+                Text("Colour").font(.system(size: 12, weight: .semibold)).foregroundStyle(FaceGeometry.Palette.sage)
+                grid(LampLink.colours.map { Color(red: Double($0.0) / 255, green: Double($0.1) / 255, blue: Double($0.2) / 255) },
+                     selected: LampLink.colours.firstIndex { c in lamp.state.rgb.map { $0 == c } ?? false }) {
+                    lamp.colour(LampLink.colours[$0])
+                }
+            }
+            .padding(.horizontal, 6)
+        }
+    }
+
+    private func grid(_ colours: [Color], selected: Int?, tap: @escaping (Int) -> Void) -> some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3), spacing: 8) {
             ForEach(colours.indices, id: \.self) { i in
-                Button { tap(i) } label: {
+                Button {
+                    WKInterfaceDevice.current().play(.click)
+                    tap(i)
+                    dismiss()
+                } label: {
                     Circle().fill(colours[i])
-                        .frame(width: 24, height: 24)
-                        .overlay(Circle().stroke(Color.white, lineWidth: selected == i ? 2.5 : 0))
+                        .frame(height: 40)
+                        .overlay(Circle().stroke(Color.white, lineWidth: selected == i ? 3 : 0))
                 }
                 .buttonStyle(.plain)
             }
