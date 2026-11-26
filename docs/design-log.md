@@ -64,3 +64,9 @@ and the Swift app (`Watch/LampPanel.swift`, `Shared/FaceRenderer.swift`).
     3 s for the iPhone, then retries twice (0.3 s, 0.9 s); only a failed status check marks "not home".
     The iPhone answers a change straight from the setPilot replies (no second getPilot round) and uses 0.5 s UDP
     timeouts with two retries per bulb.
+
+### 5 · 2026-11-26 — more colours outward (user feedback)
+- **Feedback:** more colours further out.
+- **Changed:** the honeycomb grew from 2 to 4 rings and became a colour wheel: whites in the centre and first ring,
+  then 12 pastels (40 % saturation), 18 richer hues (72 %) and 24 vivid ones (100 %), 61 bubbles in all. The pan
+  reaches the outermost ring; the bloom staggers 40 ms per ring.

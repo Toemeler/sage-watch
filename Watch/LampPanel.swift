@@ -381,7 +381,8 @@ enum Swatch: Hashable {
 }
 
 /// Colours laid out like the Apple Watch app grid: a honeycomb of bubbles you can pan, shrinking toward the screen
-/// edges. Whites in the middle (warm to cool around the centre), twelve hues in the outer ring, in colour-wheel order.
+/// edges. A colour wheel: whites in the middle (warm to cool around the centre), then rings of 12, 18 and 24 hues in
+/// colour-wheel order, from soft pastels to fully saturated as they go outward (61 colours).
 /// It blooms out ring by ring; tapping empty space goes back to the slider.
 struct Honeycomb: View {
     let state: LampLink.State
@@ -404,10 +405,14 @@ struct Honeycomb: View {
         let swatch: Swatch
     }
 
+    /// rings around the centre; saturation per colour ring, pastel inside, vivid at the edge
+    static let rings = 4
+    static let saturation: [Int: CGFloat] = [2: 0.4, 3: 0.72, 4: 1]
+
     static let cells: [Cell] = {
         var raw: [(p: CGPoint, ring: Int, angle: Double)] = []
-        for q in -2...2 {
-            for r in -2...2 where abs(q + r) <= 2 {
+        for q in -rings...rings {
+            for r in -rings...rings where abs(q + r) <= rings {
                 let x = pitch * (CGFloat(q) + CGFloat(r) / 2), y = pitch * CGFloat(r) * sqrt(3) / 2
                 var a = atan2(Double(x), Double(-y))            // 0 at the top, clockwise
                 if a < 0 { a += 2 * .pi }
@@ -422,7 +427,7 @@ struct Honeycomb: View {
             case 0: s = .white(2700)
             case 1: s = .white(whites[i]); i += 1
             default:
-                let rgb = hue(c.angle / (2 * .pi))
+                let rgb = hue(c.angle / (2 * .pi), saturation: saturation[c.ring] ?? 1)
                 s = .colour(rgb.0, rgb.1, rgb.2)
             }
             out.append(Cell(id: out.count, pos: c.p, ring: c.ring, swatch: s))
@@ -430,9 +435,9 @@ struct Honeycomb: View {
         return out
     }()
 
-    static func hue(_ h: Double) -> (Int, Int, Int) {
+    static func hue(_ h: Double, saturation: CGFloat = 1) -> (Int, Int, Int) {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
-        UIColor(hue: h, saturation: 1, brightness: 1, alpha: 1).getRed(&r, green: &g, blue: &b, alpha: &a)
+        UIColor(hue: h, saturation: saturation, brightness: 1, alpha: 1).getRed(&r, green: &g, blue: &b, alpha: &a)
         return (Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
     }
 
@@ -474,7 +479,7 @@ struct Honeycomb: View {
     }
 
     /// far enough that any bubble, the outer ring included, can be brought to the full-size middle
-    static let panLimit = CGSize(width: 2 * pitch, height: 2 * pitch * sqrt(3) / 2)
+    static let panLimit = CGSize(width: CGFloat(rings) * pitch, height: CGFloat(rings) * pitch * sqrt(3) / 2)
 
     /// free inside the limit, rubber band beyond it
     private func bound(_ v: CGFloat, _ lim: CGFloat) -> CGFloat {
@@ -505,7 +510,7 @@ struct Honeycomb: View {
         .scaleEffect(bloomed ? f.scale : 0.15)
         .opacity(bloomed ? 1 : 0)
         .position(x: size.width / 2 + (bloomed ? f.point.x : 0), y: size.height / 2 + (bloomed ? f.point.y : 0))
-        .animation(.spring(response: 0.5, dampingFraction: 0.74).delay(Double(cell.ring) * 0.05), value: bloomed)
+        .animation(.spring(response: 0.5, dampingFraction: 0.74).delay(Double(cell.ring) * 0.04), value: bloomed)
         .accessibilityElement()
         .accessibilityLabel(Text(cell.swatch.name))
         .accessibilityAddTraits(.isButton)

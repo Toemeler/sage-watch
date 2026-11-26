@@ -329,7 +329,7 @@ requestAnimationFrame(frame);
   }
   const rubber = (x, d) => x === 0 ? 0 : Math.sign(x) * (1 - 1 / (Math.abs(x) * 0.55 / d + 1)) * d;
   const kelvin = k => { const t = Math.min(1, Math.max(0, (k - 2200) / 4300)); return `rgb(255,${Math.round(255 * (0.66 + 0.30 * t))},${Math.round(255 * (0.36 + 0.62 * t))})`; };
-  const hue = h => { const f = n => { const k = (n + h * 6) % 6; return Math.round(255 * (1 - Math.max(0, Math.min(k, 4 - k, 1)))); }; return [f(5), f(3), f(1)]; };
+  const hue = (h, sat = 1) => { const f = n => { const k = (n + h * 6) % 6; return Math.round(255 * (1 - sat * Math.max(0, Math.min(k, 4 - k, 1)))); }; return [f(5), f(3), f(1)]; };
 
   // model (LampModel): on, dimming 10...100, temp or rgb
   const lamp = { on: true, dimming: 62, temp: 2700, rgb: null };
@@ -361,7 +361,9 @@ requestAnimationFrame(frame);
   // honeycomb cells, as in Honeycomb.cells
   const PITCH = 47, D = 42;
   const raw = [];
-  for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) if (Math.abs(q + r) <= 2) {
+  // a colour wheel: whites in the middle, then rings of 12, 18 and 24 hues from pastel to vivid
+  const RINGS = 4, SAT = { 2: 0.4, 3: 0.72, 4: 1 };
+  for (let q = -RINGS; q <= RINGS; q++) for (let r = -RINGS; r <= RINGS; r++) if (Math.abs(q + r) <= RINGS) {
     const x = PITCH * (q + r / 2), y = PITCH * r * Math.sqrt(3) / 2;
     let a = Math.atan2(x, -y); if (a < 0) a += 2 * Math.PI;
     raw.push({ x, y, ring: Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)), a });
@@ -369,7 +371,7 @@ requestAnimationFrame(frame);
   raw.sort((p, q) => p.ring - q.ring || p.a - q.a);
   const whites = [2200, 3000, 3500, 4200, 5200, 6500]; let wi = 0;
   const cells = raw.map(c => {
-    const sw = c.ring === 0 ? { temp: 2700 } : c.ring === 1 ? { temp: whites[wi++] } : { rgb: hue(c.a / (2 * Math.PI)) };
+    const sw = c.ring === 0 ? { temp: 2700 } : c.ring === 1 ? { temp: whites[wi++] } : { rgb: hue(c.a / (2 * Math.PI), SAT[c.ring]) };
     const el = document.createElement("div"); el.className = "bub";
     el.style.background = sw.temp ? kelvin(sw.temp) : `rgb(${sw.rgb.join(",")})`;
     honey.appendChild(el);
@@ -378,7 +380,7 @@ requestAnimationFrame(frame);
   let pan = { x: 0, y: 0 }, panBase = { x: 0, y: 0 }; const panS = { x: new Spring(0, 0.45, 0.75), y: new Spring(0, 0.45, 0.75) };
   let panning = false;
   // far enough that any bubble, the outer ring included, can reach the full-size middle
-  const LIMX = 2 * PITCH, LIMY = 2 * PITCH * Math.sqrt(3) / 2;
+  const LIMX = RINGS * PITCH, LIMY = RINGS * PITCH * Math.sqrt(3) / 2;
   const bound = (v, L) => Math.abs(v) <= L ? v : Math.sign(v) * (L + rubber(Math.abs(v) - L, 28));
   // Bubble UI model: full-size centre zone, then a fringe where bubbles ease down and slide inward
   function fisheye(x, y) {
@@ -392,7 +394,7 @@ requestAnimationFrame(frame);
 
   function openColours() {
     colours = true; mode.to(1, 0.45, 0.8);
-    cells.forEach(c => { c.bloom.jump(0); setTimeout(() => c.bloom.to(1, 0.5, 0.74), c.ring * 50); });
+    cells.forEach(c => { c.bloom.jump(0); setTimeout(() => c.bloom.to(1, 0.5, 0.74), c.ring * 40); });
     // open centred on the colour that is set, as the app grid opens on the last app
     const cur = cells.find(c => matches(c.sw)); const p0 = cur ? { x: -cur.x, y: -cur.y } : { x: 0, y: 0 };
     pan = { ...p0 }; panBase = { ...p0 }; panS.x.jump(p0.x); panS.y.jump(p0.y);
