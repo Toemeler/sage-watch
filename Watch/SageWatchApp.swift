@@ -119,13 +119,8 @@ struct FaceScreen: View {
         .onChange(of: phase) { _, p in
             if p == .active { lamp.refresh(); audio.refresh(force: true); LampAutomation.shared.appBecameActive() }
         }
-        // while the face is up, check headphones and playback every 10 s
-        .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(10))
-                if phase == .active { audio.refresh() }
-            }
-        }
+        // headphones and playback: AudioModel polls by itself while the app is in front
+        .task { audio.startPolling() }
         .sheet(isPresented: $showMusic) { NowPlayingView() }
         // full screen: it slides up like the swipe that opens it, and vertical drags inside can't pull it away
         .fullScreenCover(isPresented: $showLamp) { NavigationStack { LampPanel(lamp: lamp) } }

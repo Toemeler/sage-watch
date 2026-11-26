@@ -44,6 +44,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F5 | ~~Wake light from the iPhone alarm~~ | rejected: only the watch's smart wake wakes Tom |
 | F6 | **Off when asleep:** when the watch finds you asleep (night or nap), a lamp that is on fades off in two steps | built (round 3, no answer) |
 | F7 | ~~Lamp in the Smart Stack~~ | rejected: not needed, focus on the watch app itself |
+| F8 | **Today ring from your real sleep:** the iPhone Today ring draws your usual nap and night (averages of the recorded ones) as the main arcs, with the plan's presets as a faint outline behind them | proposed (round 4) |
 
 ## Iterations
 
@@ -194,3 +195,11 @@ stays the recommended fallback.
   that is running now (and skips just that one); wind-down steps may only lower brightness and warm the white,
   never raise either, and leave a colour alone. A cancelled wind-down no longer clears or duplicates its successor.
 - **Process:** added the quality gate above, applied from now on.
+
+### 12 · 2026-11-26 — music bars only after "Check again" (Tom)
+- **Found:** the watch's 10 s re-check read the app's scene phase captured when the loop was created; if Sage
+  launched in the background that value stayed "not active" forever and the loop never checked again. Right after
+  launch the watch link is also often still starting, and nothing retried soon.
+- **Changed:** `AudioModel` polls by itself and reads `WKApplication.applicationState` live each time: every 3 s
+  until the iPhone has answered, then every 10 s while Sage is in front.
+- **Question from Tom:** the Today ring is drawn from the plan's presets, not from recorded averages → proposed as F8.
