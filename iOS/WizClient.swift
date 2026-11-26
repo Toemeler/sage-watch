@@ -80,3 +80,37 @@ enum WizClient {
         }
     }
 }
+
+import SwiftUI
+
+/// Lamps in the Faces tab: whether the iPhone reaches the bulbs (and so the watch can), with a test toggle.
+struct LampsCard: View {
+    @State private var state = LampLink.State()
+    @State private var checking = false
+
+    var body: some View {
+        Card {
+            Eyebrow(text: "WiZ lamps")
+            Text(checking ? "Checking…" : state.home ? "\(state.count) of \(WizClient.bulbs.count) lamps reachable" : "No lamp reachable")
+                .font(Theme.serif(20)).foregroundStyle(Theme.ivory)
+            if !state.home && !checking {
+                Text("Be on your home Wi-Fi and allow Local Network for Sage (Settings › Privacy & Security › Local Network).")
+                    .font(.caption).foregroundStyle(Theme.muted)
+            }
+            HStack {
+                Button("Check") { Task { await check() } }
+                if state.home {
+                    Button(state.on ? "Turn off" : "Turn on") { Task { checking = true; state = await WizClient.set(["state": !state.on]); checking = false } }
+                }
+            }
+            .buttonStyle(.bordered).tint(Theme.sage)
+        }
+        .task { await check() }
+    }
+
+    private func check() async {
+        checking = true
+        state = await WizClient.status()
+        checking = false
+    }
+}

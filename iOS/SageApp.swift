@@ -11,6 +11,8 @@ struct SageApp: App {
                 .environmentObject(health)
                 .preferredColorScheme(.dark)
                 .task { await health.start() }
+                // touch the bulbs once in the foreground, so iOS asks for Local Network now (it cannot ask in the background)
+                .task { _ = await WizClient.status() }
         }
     }
 }
@@ -249,6 +251,7 @@ struct FacesView: View {
                 Card {
                     ForEach(FaceMode.allCases, id: \.self) { m in modeRow(m) }
                 }
+                LampsCard()
                 SpotifyCard()
             }
             .padding(16)

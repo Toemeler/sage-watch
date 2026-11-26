@@ -9,6 +9,8 @@ final class LampModel: ObservableObject {
 
     @Published private(set) var state = LampLink.State()
     @Published private(set) var busy = false
+    /// why the lamps are not available, in plain words (nil while at home)
+    @Published private(set) var problem: String? = "Checking…"
     var home: Bool { state.home }
 
     private var lastCheck = Date.distantPast
@@ -55,7 +57,9 @@ final class LampModel: ObservableObject {
     private func send(_ message: [String: Any], done: (() -> Void)? = nil) {
         let session = WCSession.default
         guard WCSession.isSupported(), session.activationState == .activated, session.isReachable else {
-            state.home = false; done?(); return
+            state.home = false
+            problem = "iPhone not reachable. Keep it nearby with Bluetooth on."
+            done?(); return
         }
         busy = true
         session.sendMessage(message, replyHandler: { reply in
@@ -63,11 +67,16 @@ final class LampModel: ObservableObject {
                 let s = LampLink.State(reply)
                 // keep the optimistic values while more changes are queued
                 if self.pending == nil { self.state = s } else { self.state.home = s.home }
+                self.problem = s.home ? nil : "No lamp answered. Open Sage on the iPhone once and allow Local Network, then retry."
                 self.busy = false
                 done?()
             }
         }, errorHandler: { _ in
-            Task { @MainActor in self.state.home = false; self.busy = false; done?() }
+            Task { @MainActor in
+                self.state.home = false; self.busy = false
+                self.problem = "The iPhone did not answer. Open Sage on the iPhone and retry."
+                done?()
+            }
         })
     }
 }
@@ -109,6 +118,22 @@ struct LampPanel: View {
     }
 
     var body: some View {
+        if lamp.home { controls } else { unavailable }
+    }
+
+    /// not at home, or the iPhone could not reach the lamps: say why, offer a retry
+    private var unavailable: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "lightbulb.slash").font(.system(size: 26)).foregroundStyle(FaceGeometry.Palette.sage)
+            Text(lamp.busy ? "Checking…" : (lamp.problem ?? "Checking…"))
+                .font(.system(size: 13)).multilineTextAlignment(.center).foregroundStyle(FaceGeometry.Palette.ivory)
+            Button("Retry") { lamp.refresh(force: true) }.disabled(lamp.busy)
+        }
+        .onAppear { lamp.refresh(force: true) }
+        .navigationTitle("Lamp")
+    }
+
+    private var controls: some View {
         ScrollView {
             VStack(spacing: 10) {
                 HStack(spacing: 10) {

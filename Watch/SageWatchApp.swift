@@ -42,7 +42,6 @@ struct FaceScreen: View {
     @State private var showControls = false
     @ObservedObject private var lamp = LampModel.shared
     @State private var showLamp = false
-    @State private var openLampWhenHome = false
     @ObservedObject private var audio = AudioModel.shared
     @State private var showMusic = false
     @Environment(\.scenePhase) private var phase
@@ -109,7 +108,7 @@ struct FaceScreen: View {
         // swipe up: the lamp panel, when at home (asks the iPhone first if it does not know yet)
         .simultaneousGesture(DragGesture(minimumDistance: 25).onEnded { g in
             guard g.translation.height < -40, abs(g.translation.width) < abs(g.translation.height) else { return }
-            if lamp.home { showLamp = true } else { openLampWhenHome = true; lamp.refresh(force: true) }
+            showLamp = true   // the panel says why when the lamps cannot be reached
         })
         .onAppear { lamp.refresh(force: true); audio.refresh(force: true) }
         .onChange(of: phase) { _, p in if p == .active { lamp.refresh(); audio.refresh(force: true) } }
@@ -121,10 +120,6 @@ struct FaceScreen: View {
             }
         }
         .sheet(isPresented: $showMusic) { NowPlayingView() }
-        .onChange(of: lamp.home) { _, home in
-            if home && openLampWhenHome { showLamp = true }
-            openLampWhenHome = false
-        }
         .sheet(isPresented: $showLamp) { NavigationStack { LampPanel(lamp: lamp) } }
         .sheet(isPresented: $showControls) {
             RecorderControls().environmentObject(recorder).environmentObject(health)

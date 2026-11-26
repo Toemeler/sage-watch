@@ -5,7 +5,7 @@ import SwiftUI
 enum FaceGeometry {
     static let screen = CGRect(x: 131, y: 63, width: 696, height: 830)
     static let dialCentre = CGPoint(x: 480.5, y: 478)
-    static let disc = (centre: CGPoint(x: 482, y: 418), r: 182.0)
+    static let disc = (centre: CGPoint(x: 479, y: 478), r: 182.0)
 
     enum Palette {
         static let ivory = Color(hex: 0xE2D9C9), sage = Color(hex: 0x8C9A7E), sageLight = Color(hex: 0xB9C4AA)
@@ -53,7 +53,7 @@ enum FaceGeometry {
     /// 300 tick positions around the outer rail (every 5th is a minute)
     static let ticks: [(CGPoint, CGVector)] = (0..<300).map { outerRail.hit(Double($0) / 300 * 2 * .pi, from: dialCentre) }
 
-    /// digit slots fitted to the reference ink boxes: hours 294...471, minutes 501...722, baseline 495.5
+    /// digit slots: the time centred on the screen (hours 265...442, minutes 472...693, ink 402...553)
     struct Slot { let x: Double; let scaleX: Double; let scaleY: Double; let base: Double }
     static func slots(_ set: GlyphSet, template: (Int, Int), x0: Double, x1: Double, h: Double, base: Double) -> [Slot] {
         guard let zero = set.digits[0], let a = set.digits[template.0], let b = set.digits[template.1] else { return [] }
@@ -63,8 +63,8 @@ enum FaceGeometry {
         let ox = x0 - Double(ba.minX) * s * sx, baseY = base + Double(z.minY) * s
         return [Slot(x: ox, scaleX: s * sx, scaleY: s, base: baseY), Slot(x: ox + a.advance * s * sx, scaleX: s * sx, scaleY: s, base: baseY)]
     }
-    static let hourSlots = slots(Glyphs.regular, template: (1, 0), x0: 294, x1: 471, h: 151, base: 495.5)
-    static let minuteSlots = slots(Glyphs.italic, template: (0, 9), x0: 501, x1: 722, h: 153, base: 495.5)
+    static let hourSlots = slots(Glyphs.regular, template: (1, 0), x0: 265, x1: 442, h: 151, base: 553.5)
+    static let minuteSlots = slots(Glyphs.italic, template: (0, 9), x0: 472, x1: 693, h: 153, base: 553.5)
 }
 
 extension Color {
