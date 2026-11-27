@@ -892,30 +892,45 @@ struct Honeycomb: View {
 
     private func bubble(_ cell: Cell) -> some View {
         let f = fisheye(CGPoint(x: cell.pos.x * zoom + pan.width, y: cell.pos.y * zoom + pan.height))
-        let selected = cell.swatch.matches(state)
+        let selected: Bool = cell.swatch.matches(state)
         // F21: a recent colour (not the one set, which has its ring) carries a small dot, light on every colour
-        let recent = !selected && recentIDs.contains(cell.id)
-        return Circle().fill(cell.swatch.color)
-            .overlay(Circle().strokeBorder(Color.white, lineWidth: selected ? 3 : 0))
-            .overlay(Circle().strokeBorder(Color.black.opacity(0.25), lineWidth: selected ? 1 : 0).padding(3))
-            .overlay(alignment: .bottom) {
-                if recent {
-                    Circle().fill(Color.white).overlay(Circle().strokeBorder(Color.black.opacity(0.35), lineWidth: 1))
-                        .frame(width: 7, height: 7).padding(.bottom, 6)
-                }
+        let recent: Bool = !selected && recentIDs.contains(cell.id)
+        let shown: Bool = bloomed || reduceMotion
+        let scale: CGFloat = (shown ? f.scale : 0.15) * zoom
+        let x: CGFloat = size.width / 2 + (shown ? f.point.x : 0)
+        let y: CGFloat = size.height / 2 + (shown ? f.point.y : 0)
+        let bloom: Animation = reduceMotion ? .easeInOut(duration: 0.2)
+            : .spring(response: 0.5, dampingFraction: 0.74).delay(Double(cell.ring) * 0.04)
+        let label: String = recent ? "\(cell.name), recent" : cell.name
+        let priority: Double = selected ? 3 : recent ? 2 : cell.ring <= 1 ? 1 : 0
+        // in steps: Xcode 26's type checker times out on the one long chain
+        return bubbleFace(cell.swatch.color, selected: selected, recent: recent)
+            .scaleEffect(scale)
+            .opacity(bloomed ? 1 : 0)
+            .position(x: x, y: y)
+            .animation(bloom, value: bloomed)
+            .accessibilityElement()
+            .accessibilityLabel(Text(label))
+            // VoiceOver reaches the colour that is set first, then the recent ones, then the whites, then the 54 hues
+            .accessibilitySortPriority(priority)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { pick(cell.swatch) }
+    }
+
+    /// one bubble's look: the colour, the ring of the colour that is set, the dot of a recent one
+    private func bubbleFace(_ color: Color, selected: Bool, recent: Bool) -> some View {
+        ZStack(alignment: .bottom) {
+            Circle().fill(color)
+            Circle().strokeBorder(Color.white, lineWidth: selected ? 3 : 0)
+            Circle().strokeBorder(Color.black.opacity(0.25), lineWidth: selected ? 1 : 0).padding(3)
+            if recent {
+                Circle().fill(Color.white)
+                    .overlay(Circle().strokeBorder(Color.black.opacity(0.35), lineWidth: 1))
+                    .frame(width: 7, height: 7)
+                    .padding(.bottom, 6)
             }
+        }
         .frame(width: Self.diameter, height: Self.diameter)
-        .scaleEffect((bloomed || reduceMotion ? f.scale : 0.15) * zoom)
-        .opacity(bloomed ? 1 : 0)
-        .position(x: size.width / 2 + (bloomed || reduceMotion ? f.point.x : 0), y: size.height / 2 + (bloomed || reduceMotion ? f.point.y : 0))
-        .animation(reduceMotion ? .easeInOut(duration: 0.2)
-                   : .spring(response: 0.5, dampingFraction: 0.74).delay(Double(cell.ring) * 0.04), value: bloomed)
-        .accessibilityElement()
-        .accessibilityLabel(Text(recent ? "\(cell.name), recent" : cell.name))
-        // VoiceOver reaches the colour that is set first, then the recent ones, then the whites, then the 54 hues
-        .accessibilitySortPriority(selected ? 3 : recent ? 2 : cell.ring <= 1 ? 1 : 0)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { pick(cell.swatch) }
     }
 
     /// Bubble UI model of the app grid: a centre zone where bubbles are full size, and a fringe around it in which
