@@ -58,7 +58,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F19 | **Recording stopped:** Record is on but no motion was written for 10 min (a crash, a revoked permission, a session that ended): one tap and the note "Recording stopped" with Restart (8 s). Not in the first 2 min of a run; during a sleep block it waits until the block ends, so it never taps you awake | built (round 25, no answer) |
 | F20 | **Earlier wind-down after a short night:** when the last recorded night was over an hour shorter than your usual (and it was last night, ended < 20 h ago), the night's wind-down starts 30 min earlier (90 min lead); naps unchanged; lamp only, the plan and alarm are unchanged | built (round 26, no answer) |
 | F21 | **Recent colours in the wheel:** the three colours you chose last carry a small white dot (VoiceOver: "recent"); the wheel opens on the middle of the current and recent colours when they all fit in the full-size centre, else on the current one | built (round 27, no answer) |
-| F22 | **Time-aware switch-on:** switching the lamp on from off (tap, double tap) after dark brings back your last evening brightness and warmth, in daylight your last daytime one, instead of whatever it was last; your own changes set those memories | proposed (round 27) |
+| F22 | **Time-aware switch-on:** switching the lamp on from off (tap, double tap, VoiceOver) after dark brings back your own last evening light, in daylight your last daytime one; remembered only from your changes that reached the lamp, never the bedside night light or an automation; toggle "Light by time of day" | built (round 28, no answer) |
+| F23 | **Arrival in your evening light:** the arrival light (F16) comes on at your remembered evening light (F22) instead of a fixed 60 %, and still dim and warm inside the wind-down | proposed (round 28) |
 
 ## Iterations
 
@@ -575,3 +576,18 @@ multipath indoors).
 - **Verified:** rules by unit tests (CI), prototype JS parses. **Needs the real watch:** whether the dot reads at
   the fringe's smallest bubble size (it scales with the bubble).
 - **Proposed:** F22 time-aware switch-on.
+
+### 37 · 2026-11-27 — round 28: F22 built (unanswered → approved; watch app change, install after recording)
+- **F22** (own commit): two memories, evening (dark here, from the sunset of the rough position) and day.
+  `LampRules.memory(of:)` keeps dimming and white or colour of a lamp that is on, never the night light (tested);
+  `LampRules.switchOn(memory:)` is "on" plus that light, or just "on" with nothing remembered (tested). The memory is
+  written when a change you made has been confirmed by the lamp and nothing newer is waiting, so a failed change or
+  a half-way slider value is not remembered; automatic changes (sunrise, wind-down, arrival) never are.
+- **Review points:** off stays a plain off (Undo after a double-tap on works as before); switching on during the
+  wind-down hour is your own change, so it pauses the wind-down as any change of yours does; the arrival light now
+  uses the same `Sun.darkHere` as F22, so both agree on when evening starts.
+- **Prototype:** "After dark" switch; tap on brings back the remembered light for it; drags, the crown and colour
+  picks are remembered (not the night light).
+- **Verified:** rules by unit tests (CI), prototype JS parses. **Needs the real watch:** whether bringing back the
+  evening light feels right or surprising the first evenings.
+- **Proposed:** F23 arrival in your evening light.
