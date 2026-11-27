@@ -16,7 +16,11 @@ struct DataView: View {
     var body: some View {
         NavigationStack {
             List {
-                PhoneTrackerCard()
+                PhoneTrackerCard(exportToday: {
+                    range = .today
+                    includeRaw = false
+                    build()
+                })
                 Section {
                     NavigationLink {
                         BreathingView()
@@ -41,6 +45,8 @@ struct DataView: View {
                     Picker("Range", selection: $range) {
                         ForEach(ExportRange.allCases) { r in Text(r.title).tag(r) }
                     }
+                    // the position ranges do not need raw motion (it is ~95 % of the size; a day of it is >100 MB)
+                    .onChange(of: range) { _, r in if r == .today || r == .lastHour { includeRaw = false } }
                     if range == .custom {
                         DatePicker("From", selection: $from)
                         DatePicker("To", selection: $to)
@@ -151,11 +157,13 @@ struct DataView: View {
 
 /// Ranges built from the sleep plan, with room before and after each block.
 enum ExportRange: String, CaseIterable, Identifiable {
-    case lastNap, lastNight, last24h, all, custom
+    case lastHour, today, lastNap, lastNight, last24h, all, custom
     var id: String { rawValue }
 
     var title: String {
         switch self {
+        case .lastHour: return "Last hour"
+        case .today: return "Today"
         case .lastNap: return "Last nap"
         case .lastNight: return "Last night"
         case .last24h: return "Last 24 hours"
@@ -166,6 +174,10 @@ enum ExportRange: String, CaseIterable, Identifiable {
 
     func interval(now: Date, calendar: Calendar = .current) -> DateInterval {
         switch self {
+        case .lastHour:
+            return DateInterval(start: now.addingTimeInterval(-3600), end: now)
+        case .today:
+            return DateInterval(start: calendar.startOfDay(for: now), end: now)
         case .lastNap:
             // 16:00 – 19:30 around the 17:00 nap
             let start = Self.latest(Plan.nap.onset, now: now, calendar: calendar)

@@ -240,6 +240,8 @@ final class PhoneCSV {
 /// The iPhone's position tracking in the Data tab: on/off, the last fix and what has been counted.
 struct PhoneTrackerCard: View {
     @ObservedObject private var tracker = PhoneTracker.shared
+    /// builds today's export without raw motion (the share button appears in Export below)
+    var exportToday: () -> Void = {}
 
     var body: some View {
         Section {
@@ -256,10 +258,11 @@ struct PhoneTrackerCard: View {
                 if tracker.saver { Text("Battery below 20 %: GPS saves power (~10 m)").font(.footnote).foregroundStyle(.orange) }
             }
             if let p = tracker.problem { Text(p).font(.footnote).foregroundStyle(.red) }
+            Button("Export today's position data") { exportToday() }
         } header: {
             Text("Position")
         } footer: {
-            Text("Records GPS, compass, steps and floors on the iPhone, together with the watch's (turn on Track position there too). Keep the iPhone in a pocket. Uses a lot of battery. Export a time range below to get both.")
+            Text("Records GPS, compass, steps and floors on the iPhone, together with the watch's (turn on Track position there too). Keep the iPhone in a pocket. Uses a lot of battery. \"Export today's position data\" builds today without raw motion (small, quick); share it from Export below.")
         }
     }
 }

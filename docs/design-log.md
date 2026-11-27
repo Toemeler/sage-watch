@@ -444,3 +444,13 @@ multipath indoors).
   The classification now uses only the steep part of the height change (10 s rate, above half its peak).
 - **Test:** the long indoor day now has a lift ride; the regression test checks 0→2 stairs, 2→1 stairs, 1→0 lift.
   14/14 pass.
+
+### 30 · 2026-11-27 — round 21: the export tonight must not fail (iPhone app change; install after recording)
+- **Review:** the last step between the recorded day and the 3D path is the export. There was no "Today" range (the
+  choice would have been "Last 24 hours", including last night), and raw motion is on by default: 24 h of 50 Hz is
+  ~4 million lines, >100 MB — slow, risky on the phone, awkward to send, and not needed for the path.
+- **Changed:** ranges "Last hour" (for the health check) and "Today" at the top; choosing either switches raw
+  motion off (it can be switched back on). The Position section has "Export today's position data" (today, no raw).
+  Tested: the two new ranges (`testTodayAndLastHourRanges`).
+- **Process:** this is an iPhone app change on a recording day: install only after the day's recording ends
+  (reinstalling restarts the app and leaves a gap).

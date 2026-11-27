@@ -53,6 +53,16 @@ final class RecordingFormatTests: XCTestCase {
         XCTAssertEqual(end.day, 25); XCTAssertEqual(end.hour, 9); XCTAssertEqual(end.minute, 0)
     }
 
+    func testTodayAndLastHourRanges() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Europe/Zurich")!
+        let now = cal.date(from: DateComponents(year: 2026, month: 11, day: 27, hour: 17, minute: 30))!
+        let today = ExportRange.today.interval(now: now, calendar: cal)
+        XCTAssertEqual(cal.dateComponents([.day, .hour, .minute], from: today.start), DateComponents(day: 27, hour: 0, minute: 0))
+        XCTAssertEqual(today.end, now)
+        XCTAssertEqual(ExportRange.lastHour.interval(now: now, calendar: cal).duration, 3600, accuracy: 0.001)
+    }
+
     func testLastNapRangeBeforeTodaysNapIsYesterdays() {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "Europe/Zurich")!
