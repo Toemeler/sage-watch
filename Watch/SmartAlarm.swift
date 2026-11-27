@@ -220,6 +220,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
         onsetPurpose = nil
         watchUntil = nil
         manualNapUntil = nil
+        napLengthOverride = nil              // the hand-started nap ended without sleep: its length goes with it
         handledNap = Date()
         scheduleNext()
     }
@@ -277,7 +278,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
         case .nap:
             let s = AlarmSettings.load().clamped()
             // F17: a length chosen on the face for this nap, else the settings' window
-            let w = napLengthOverride.map { s.napWindow(latest: $0) } ?? (earliest: s.napEarliest, latest: s.napLatest)
+            let w = s.napWindow(chosen: napLengthOverride, manual: napArmed)
             napLengthOverride = nil
             var n = NapState(onset: onset, earliest: onset.addingTimeInterval(w.earliest * 60), latest: onset.addingTimeInterval(w.latest * 60))
             if n.latest <= Date() { n.latest = Date().addingTimeInterval(60) }     // found very late: still wake gently
@@ -487,6 +488,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
             savedNap = nil
             nap = nil
             manualNapUntil = nil
+            napLengthOverride = nil
         case .night?:
             handledNight = max(handledNight, Plan.nextWakeWindow(after: now.addingTimeInterval(-3600), block: .night).end)
             nightOnset = nil

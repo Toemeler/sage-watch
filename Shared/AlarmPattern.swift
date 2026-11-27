@@ -55,6 +55,15 @@ struct AlarmSettings: Equatable {
 
     /// F17: the wake window for a nap of `latest` minutes: as wide as the usual window, but never opening before
     /// half the nap (a 20-minute nap is not woken after 5). `latest` is put on the 5-minute grid and in range.
+    /// F17: the window for a nap whose sleep was just found: the length chosen on the face only for the nap that was
+    /// started by hand and is still armed; any other nap (a planned one, or after a hand-started one expired) uses
+    /// the settings' window, so a stale choice never carries over
+    func napWindow(chosen: Double?, manual: Bool) -> (earliest: Double, latest: Double) {
+        if manual, let c = chosen { return napWindow(latest: c) }
+        let s = clamped()
+        return (s.napEarliest, s.napLatest)
+    }
+
     func napWindow(latest: Double) -> (earliest: Double, latest: Double) {
         let s = clamped()
         let l = Self.clamp((latest / Self.napLengthStep).rounded() * Self.napLengthStep, Self.napLengthRange)

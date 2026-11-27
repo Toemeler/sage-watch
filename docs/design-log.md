@@ -741,3 +741,17 @@ multipath indoors).
   provoke "Recording stopped". Grouped so the sections fit the moments they need (2-min checks, one evening,
   one night).
 - No app change: no IPA this round (build 105 is current).
+
+### 49 · 2026-11-27 — round 40: saved state that outlived its moment (watch app change, install after recording)
+- **Review (every state, across expiry and relaunch):** the persisted values added in rounds 22–38 were checked for
+  what happens when their moment passes without the expected end.
+  - F17's chosen nap length was cleared on Undo, on a new nap and when sleep was found — but not when a nap started
+    by hand expired without sleep (90 min) or was stopped. It stayed saved and was applied to the **next planned
+    nap**, silently changing its wake window.
+  - F18's "already warned tonight" was in memory only; a relaunch inside the 5-min bedtime window warned twice.
+  - Checked and fine: the away markers (cleared by the next home answer), the evening/day light memories (meant to
+    last), the recent colours (unknown ids are skipped), the deferred step (now dropped by any newer change).
+- **Changed:** `AlarmSettings.napWindow(chosen:manual:)` (tested) uses the chosen length only for the nap started
+  by hand that is still armed; the length is also cleared when that nap's watch ends or the alarm is stopped.
+  The battery guard's warned bedtime is saved.
+- **Verified:** rule by unit tests (CI). No visual change; prototype not republished.

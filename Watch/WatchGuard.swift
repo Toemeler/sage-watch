@@ -18,7 +18,11 @@ final class WatchGuard: ObservableObject {
     private var loop: Task<Void, Never>?
     private var lastCount = -1
     private var lastChange = Date()
-    private var warnedBedtime: Date?            // the bedtime already warned for (once per night)
+    /// the bedtime already warned for (once per night, kept across a relaunch inside the 5-min window)
+    private var warnedBedtime: Date? {
+        get { UserDefaults.standard.object(forKey: "guardBatteryBedtime") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "guardBatteryBedtime") }
+    }
     private var stallWarned = false              // until samples move again
 
     /// start the minute checks (idempotent)

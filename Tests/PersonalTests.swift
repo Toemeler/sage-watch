@@ -35,6 +35,13 @@ final class PersonalTests: XCTestCase {
         XCTAssertEqual(s.napWindow(latest: 82).latest, 80)          // 5-minute grid
     }
 
+    func testChosenNapLengthOnlyForTheNapStartedByHand() {
+        let s = AlarmSettings()
+        XCTAssertEqual(s.napWindow(chosen: 40, manual: true).latest, 40)
+        XCTAssertEqual(s.napWindow(chosen: 40, manual: false).latest, 100)    // a planned nap: the settings
+        XCTAssertEqual(s.napWindow(chosen: nil, manual: true).latest, 100)
+    }
+
     func testNapAndRingSettings() throws {
         var s = AlarmSettings()
         XCTAssertEqual(s.napEarliest, 70)
