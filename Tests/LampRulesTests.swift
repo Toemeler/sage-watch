@@ -108,6 +108,30 @@ final class LampRulesTests: XCTestCase {
         XCTAssertEqual(LampRules.nightCapped(["state": true, "dimming": 80], night: false, currentDimming: 80)["dimming"] as? Int, 80)
     }
 
+    func testAdaptiveWhiteFollowsTheDay() {
+        let rise = 7.5 * 60, set = 16.75 * 60                         // a November day
+        XCTAssertEqual(LampRules.adaptiveKelvin(minutes: 6 * 60, sunrise: rise, sunset: set), 2200)
+        XCTAssertEqual(LampRules.adaptiveKelvin(minutes: rise, sunrise: rise, sunset: set), 2700)
+        XCTAssertEqual(LampRules.adaptiveKelvin(minutes: (rise + set) / 2, sunrise: rise, sunset: set), 4000)
+        XCTAssertEqual(LampRules.adaptiveKelvin(minutes: 20 * 60, sunrise: rise, sunset: set), 2700)
+        let mid = LampRules.adaptiveKelvin(minutes: 10 * 60, sunrise: rise, sunset: set)
+        XCTAssertTrue(mid > 2700 && mid < 4000)
+    }
+
+    func testAdaptiveStepsAreSmallAndStepAside() {
+        let warm = state(on: true, dim: 60, temp: 2700)
+        XCTAssertEqual(LampRules.adaptiveStep(current: warm, target: 4000, paused: false)?["temp"] as? Int, 3000)  // ≤ 300 K
+        XCTAssertEqual(LampRules.adaptiveStep(current: warm, target: 4000, paused: false)?["dimming"] as? Int, 60)  // brightness kept
+        XCTAssertNil(LampRules.adaptiveStep(current: warm, target: 4000, paused: true))                            // you chose a white
+        XCTAssertNil(LampRules.adaptiveStep(current: state(on: true, dim: 60, temp: nil), target: 4000, paused: false))  // a colour
+        XCTAssertNil(LampRules.adaptiveStep(current: state(on: false, dim: 60), target: 4000, paused: false))       // off
+        XCTAssertNil(LampRules.adaptiveStep(current: state(on: true, dim: 60, temp: 3950), target: 4000, paused: false))  // close enough
+        let candle = state(on: true, dim: 10, temp: 2200)                                         // after the wind-down
+        XCTAssertNil(LampRules.adaptiveStep(current: candle, target: 2700, paused: false, onlyWarmer: true))
+        XCTAssertEqual(LampRules.adaptiveStep(current: state(on: true, dim: 60, temp: 4000), target: 2700, paused: false,
+                                              onlyWarmer: true)?["temp"] as? Int, 3700)
+    }
+
     func testPanelClosesWithTheWristButNotUnderAFinger() {
         XCTAssertTrue(LampRules.closeOnWristDown(active: false, touching: false))
         XCTAssertFalse(LampRules.closeOnWristDown(active: false, touching: true))

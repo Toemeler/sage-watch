@@ -104,6 +104,7 @@ final class LampModel: ObservableObject {
             userChangedAt = Date()
             if params["state"] as? Bool == false { userOffAt = Date() }
         }
+        if params["state"] as? Bool == false { LampAutomation.shared.lampSwitchedOff() }
         // any newer change supersedes an older automatic step still waiting to be retried: after yours it must
         // never be sent, and after a newer automatic one (the alarm's full light) neither (an "off, you fell
         // asleep" from earlier would otherwise follow it when you raise the wrist)
@@ -147,8 +148,15 @@ final class LampModel: ObservableObject {
         let pct = min(100, max(10, Int((level * 100).rounded())))
         if !state.on || pct != state.dimming { set(["state": true, "dimming": pct]) }
     }
-    func temperature(_ k: Int) { set(["state": true, "temp": k, "dimming": state.dimming]) }
-    func colour(_ c: (Int, Int, Int)) { set(["state": true, "r": c.0, "g": c.1, "b": c.2, "dimming": state.dimming]) }
+    /// a white or a colour you chose in the wheel: F27's adaptive white rests until the lamp is next switched off
+    func temperature(_ k: Int) {
+        LampAutomation.shared.adaptivePaused = true
+        set(["state": true, "temp": k, "dimming": state.dimming])
+    }
+    func colour(_ c: (Int, Int, Int)) {
+        LampAutomation.shared.adaptivePaused = true
+        set(["state": true, "r": c.0, "g": c.1, "b": c.2, "dimming": state.dimming])
+    }
 
     /// optimistic update so the panel reacts at once
     private func apply(_ p: [String: Any]) {

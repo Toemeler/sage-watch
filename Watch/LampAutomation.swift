@@ -40,10 +40,22 @@ final class LampAutomation: ObservableObject {
     @Published var nightCapOn = UserDefaults.standard.object(forKey: "lampNightCap") as? Bool ?? true {
         didSet { UserDefaults.standard.set(nightCapOn, forKey: "lampNightCap") }
     }
-    static let automationCount = 7
+    /// F27: while the lamp is on in white, its white follows the day
+    @Published var adaptiveOn = UserDefaults.standard.object(forKey: "lampAdaptive") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(adaptiveOn, forKey: "lampAdaptive") }
+    }
+    /// F27: you chose a white or a colour yourself: adaptive white rests until the lamp is next switched off
+    var adaptivePaused: Bool {
+        get { UserDefaults.standard.bool(forKey: "lampAdaptivePaused") }
+        set { UserDefaults.standard.set(newValue, forKey: "lampAdaptivePaused") }
+    }
+    private var adaptiveTask: Task<Void, Never>?
+
+    static let automationCount = 8
     /// how many of the automations are on (the menu's summary)
     var enabledCount: Int {
-        [sunriseOn, windDownOn, offWhenAsleepOn, bedtimeTapOn, arrivalOn, switchOnMemoryOn, nightCapOn].filter { $0 }.count
+        [sunriseOn, windDownOn, offWhenAsleepOn, bedtimeTapOn, arrivalOn, switchOnMemoryOn, nightCapOn, adaptiveOn]
+            .filter { $0 }.count
     }
     /// when the bedtime tap last fired (the face shows a note for it)
     @Published private(set) var bedtimeTappedAt: Date?
@@ -244,6 +256,44 @@ final class LampAutomation: ObservableObject {
             if !Task.isCancelled, activity == "Welcome home: lamp on" { activity = "" }
         }
     }
+
+    // MARK: adaptive white (F27)
+
+    /// starts the adaptive white's check every 4 min (idempotent; the recorder keeps the app running)
+    func startAdaptive() {
+        guard adaptiveTask == nil else { return }
+        adaptiveTask = Task { @MainActor in
+            while !Task.isCancelled {
+                adaptiveTick(now: Date())
+                try? await Task.sleep(for: .seconds(240))
+            }
+        }
+    }
+
+    /// one step toward the day's white, unless something else is in charge of the light right now: the sunrise,
+    /// its preview, the wind-down, the minutes after the alarm, or a white / colour you chose (LampRules, tested)
+    private func adaptiveTick(now: Date) {
+        guard adaptiveOn, sunriseTask == nil, !previewing, !windingDown, rangAt == nil else { return }
+        let lamp = LampModel.shared
+        guard lamp.home else { return }
+        let cal = Calendar.current
+        let minutes = Double(cal.component(.hour, from: now) * 60 + cal.component(.minute, from: now))
+        let d = UserDefaults.standard
+        var rise = 7 * 60.0, set = 17 * 60.0
+        if let lat = d.object(forKey: "approxLat") as? Double, let lon = d.object(forKey: "approxLon") as? Double,
+           let t = Sun.times(on: now, lat: lat, lon: lon) {
+            rise = Double(cal.component(.hour, from: t.rise) * 60 + cal.component(.minute, from: t.rise))
+            set = Double(cal.component(.hour, from: t.set) * 60 + cal.component(.minute, from: t.set))
+        }
+        let target = LampRules.adaptiveKelvin(minutes: minutes, sunrise: rise, sunset: set)
+        let evening = minutes >= set || minutes < rise
+        if let p = LampRules.adaptiveStep(current: lamp.state, target: target, paused: adaptivePaused, onlyWarmer: evening) {
+            lamp.set(p, byUser: false)
+        }
+    }
+
+    /// F27: the lamp went off (by anyone): the next time it is on, the adaptive white may take it again
+    func lampSwitchedOff() { adaptivePaused = false }
 
     // MARK: try the sunrise (F14)
 

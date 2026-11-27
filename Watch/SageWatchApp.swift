@@ -17,6 +17,7 @@ struct SageWatchApp: App {
                 .environmentObject(recorder)
                 .task { await health.start() }
                 .onAppear {
+                    LampAutomation.shared.startAdaptive()
                     LampAutomation.shared.scheduleWindDown()
                     LampAutomation.shared.scheduleBedtimeTap()
                     alarm.scheduleNext()

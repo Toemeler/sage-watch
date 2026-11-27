@@ -159,6 +159,7 @@ struct LampAutomations: View {
                 .onChange(of: automation.bedtimeTapOn) { _, _ in automation.rescheduleWindDown() }
             item("Arrival light", $automation.arrivalOn, "On in your evening light when you come home after dark and it is off.")
             item("Light by time of day", $automation.switchOnMemoryOn, "Switching on brings back your last evening or daytime light.")
+            item("Adaptive white", $automation.adaptiveOn, "A white lamp follows the day: warm morning, cooler midday, warm evening. A white or colour you pick pauses it until off.")
             item("Night cap", $automation.nightCapOn, "Between bedtime and wake the slider and crown stop at 30 %; push again to go higher.")
             Text("Your own change always wins: any of these steps aside when you set the lamp. Night steps go through the iPhone while Sage runs in the background; the contact log shows whether they arrived.")
                 .font(.footnote).foregroundStyle(.secondary)

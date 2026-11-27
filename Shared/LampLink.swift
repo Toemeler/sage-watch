@@ -162,6 +162,31 @@ enum LampRules {
         return p
     }
 
+    /// F27: the white the day calls for at `minutes` after midnight, given today's sunrise and sunset (minutes):
+    /// warm before sunrise (2200 K), rising to a neutral 4000 K at solar noon, back to warm 2700 K at sunset and
+    /// after (the wind-down takes it to candle-warm before bed). Eased, on 100 K steps.
+    static func adaptiveKelvin(minutes m: Double, sunrise: Double, sunset: Double) -> Int {
+        func ease(_ t: Double) -> Double { let c = min(1, max(0, t)); return c * c * (3 - 2 * c) }
+        let noon = (sunrise + sunset) / 2
+        let k: Double
+        if m < sunrise { k = 2200 }
+        else if m < noon { k = 2700 + 1300 * ease((m - sunrise) / max(1, noon - sunrise)) }
+        else if m < sunset { k = 4000 - 1300 * ease((m - noon) / max(1, sunset - noon)) }
+        else { k = 2700 }
+        return Int((k / 100).rounded()) * 100
+    }
+
+    /// F27: one adaptive step toward `target`, or nil: only a lamp that is on and white, not paused by a white or
+    /// colour you chose, at least 100 K away; at most 300 K per step, so the change is never seen as a jump.
+    /// `onlyWarmer` (evening and night): never cooler — after the wind-down has taken the lamp to candle-warm, the
+    /// evening's 2700 K must not pull it back up.
+    static func adaptiveStep(current: LampLink.State, target: Int, paused: Bool, onlyWarmer: Bool = false) -> [String: Any]? {
+        guard current.on, !paused, current.rgb == nil, let k = current.temp, abs(target - k) >= 100 else { return nil }
+        if onlyWarmer && target > k { return nil }
+        let next = k + max(-300, min(300, target - k))
+        return ["state": true, "temp": next, "dimming": current.dimming]
+    }
+
     /// F25: lowering the wrist (the app leaves the front) closes the panel, so the next raise shows the face, as
     /// Control Center does; never while a finger is still on the slider
     static func closeOnWristDown(active: Bool, touching: Bool) -> Bool {

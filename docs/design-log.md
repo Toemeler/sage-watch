@@ -63,7 +63,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F24 | **Double tap answers the note:** while a note with a button shows (Undo, Restart), double tap presses that button instead of toggling the lamp, as watchOS's double tap presses the primary button on screen; a ringing alarm still comes first; not in always-on (the note is not seen there) | built (round 30, no answer) |
 | F25 | **Lamp panel closes with the wrist:** lowering the wrist (the app leaves the front) closes the lamp panel, so the next raise shows the face, as Control Center does; never while a finger is on it (then right after the touch ends) | built (round 31, no answer) |
 | F26 | **Night cap:** between your usual bedtime and wake (learned night), the slider and the crown stop at 30 % with a click and the stretch of the real top; a second push from the cap (a new drag starting there, or a crown turn after resting there ½ s) goes higher; switching on at night comes on at most 30 %; a light set brighter before is never pulled down; night changes are not remembered as the evening light (F22); toggle "Night cap" | built (round 42, no answer) |
-| F27 | **Adaptive white (like Apple Home's Adaptive Lighting):** while the lamp is on in white, its colour temperature follows the day by itself: warm in the morning, cooler around midday (~4000 K), warm again from sunset, candle-warm (2200 K) in the wind-down; small steps every few minutes, never touching brightness or a colour. Any white or colour you choose yourself stops it until the lamp is next switched off | proposed (round 46) |
+| F27 | **Adaptive white (like Apple Home's Adaptive Lighting):** while the lamp is on in white, its white follows the day: 2200 K before sunrise, 2700 K at sunrise rising to 4000 K at solar noon, back to 2700 K at sunset; ≤ 300 K steps every 4 min, brightness untouched, never on a colour. Evening and night only ever warmer (after the wind-down it stays candle-warm). Steps aside for the sunrise, its preview, the wind-down and the minutes after the alarm; a white or colour you pick pauses it until the lamp is next switched off; toggle "Adaptive white" | built (round 47, no answer) |
 
 ## Iterations
 
@@ -826,3 +826,16 @@ multipath indoors).
   Sage already has the evening half (wind-down) and the morning half (sunrise); the day between is a fixed white.
 - **Proposed:** F27 adaptive white (built next round if unanswered).
 - No app change: build 112 is current.
+
+### 56 · 2026-11-27 — round 47: F27 adaptive white built (unanswered → approved; watch app change, install after recording)
+- **F27** (own commit): `LampRules.adaptiveKelvin` (the day's curve from today's sunrise/sunset of the rough
+  position, 07:00/17:00 without one) and `adaptiveStep` (tested: curve points, ≤ 300 K steps, brightness kept, paused,
+  colour, off, close enough, evening only-warmer). A 4-min check in `LampAutomation`; started with the app.
+- **Review findings fixed before commit:** (1) after the wind-down had taken the lamp to 2200 K, the evening target
+  of 2700 K would have pulled it cooler again — evening and night steps are only ever warmer. (2) A first version
+  guessed "you chose a white" from the shape of the message; a switch-on carrying a remembered white (F22) would
+  have counted. Now only choosing in the colour wheel pauses it — the one place a white or colour is chosen.
+  (3) It stands aside for every other automation that owns the light at that moment (sunrise, its preview,
+  wind-down, the 10 min after the alarm).
+- **Prototype:** shows the adaptive white for the current time (07:00/17:00 day).
+- **Verified:** rules by unit tests (CI). **Needs the real watch:** that 300 K steps every 4 min are not noticed.
