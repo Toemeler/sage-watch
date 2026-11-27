@@ -393,3 +393,11 @@ an 8-minute gap in all data, and GPS from both devices at once. All run and give
    says "no data", the summary counts the minutes.
 **Verified:** the four cases. **Needs a real day:** everything about real sensor noise (compass near metal, GPS
 multipath indoors).
+
+### 25 · 2026-11-27 — round 16: find a broken recording while it can still be fixed (no app change)
+- **Review:** the biggest risk of the position day is not tonight's processing but discovering tonight that a
+  stream was never recorded (a permission, a paused stream, an uncalibrated compass), when the day is lost.
+- **Added:** `tools/check_export.py`: for a short export taken during the day, lists per device whether GPS,
+  compass, steps/floors, barometer and absolute altitude are present, at the right rate (compass ~10/s), with gaps
+  over 2 min, GPS accuracy, compass validity (heading -1 = uncalibrated) and the height range. Tested on a good, a
+  deliberately broken (gaps, dead compass) and an old export without position data; it flags each problem.
