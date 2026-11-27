@@ -952,3 +952,13 @@ multipath indoors).
 - **Changed:** the step counter is compared with the barometer's stairs only; the real day now has no warning (1 / 1
   by stairs against 0 / 0 is within the tolerance of one floor). Regression test 14/14.
 - No app change: build 124 is current.
+
+### 66 · 2026-11-27 — round 57: tracking must not drain the phone it runs on (watch + iPhone change)
+- **Review after the real day:** the iPhone died at 12:10 while tracking, and the export cannot tell why or how fast:
+  there is no battery log. The iPhone also asked for "best for navigation" accuracy all day, which Apple documents
+  as meant for a device on power. Below 20 % the saver only coarsened GPS; nothing kept the phone itself alive.
+- **Changed:** off the charger the iPhone uses plain "best" (navigation-grade only while charging). A last-reserve
+  tier below 10 %: GPS ~100 m and the compass at 2 a second (watch: GPS ~100 m), back up with gaps (minimal → saver
+  above 15 %, saver → best above 30 %; tested, the old saver test unchanged). A new `phonestatus` stream logs the
+  iPhone's battery, charging and GPS mode once a minute; the health check lists it.
+- **Verified:** rule by unit tests (CI). **Needs a real day:** the battery curve in the next export.

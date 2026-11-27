@@ -19,6 +19,7 @@ STREAMS = [
     ("steps", None, "watch steps/floors"), ("phonesteps", None, "iPhone steps/floors"),
     ("pressure", None, "watch barometer"), ("phonepressure", None, "iPhone barometer"),
     ("altitude", None, "watch absolute altitude"), ("phonealtitude", None, "iPhone absolute altitude"),
+    ("phonestatus", None, "iPhone battery log"),
 ]
 
 

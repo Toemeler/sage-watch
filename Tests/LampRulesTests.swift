@@ -277,4 +277,12 @@ final class PositionRulesTests: XCTestCase {
         XCTAssertEqual(PositionRules.gpsMode(battery: 0.10, charging: true, current: .saver), .best)    // on the charger
         XCTAssertEqual(PositionRules.gpsMode(battery: nil, charging: false, current: .saver), .saver)   // unknown: keep
     }
+
+    func testLastReserveBelowTenPercent() {
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.08, charging: false, current: .saver), .minimal)
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.12, charging: false, current: .minimal), .minimal)  // no flapping
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.16, charging: false, current: .minimal), .saver)
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.25, charging: false, current: .minimal), .saver)
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.05, charging: true, current: .minimal), .best)    // on the charger
+    }
 }

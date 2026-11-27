@@ -113,8 +113,9 @@ final class PositionTracker: NSObject, CLLocationManagerDelegate {
         let next = PositionRules.gpsMode(battery: level, charging: charging, current: gpsMode)
         guard next != gpsMode else { return }
         gpsMode = next
-        manager?.desiredAccuracy = next == .best ? kCLLocationAccuracyBest : kCLLocationAccuracyNearestTenMeters
-        saver = next == .saver
+        manager?.desiredAccuracy = next == .best ? kCLLocationAccuracyBest
+            : next == .saver ? kCLLocationAccuracyNearestTenMeters : kCLLocationAccuracyHundredMeters
+        saver = next != .best
     }
 
     // MARK: CLLocationManagerDelegate

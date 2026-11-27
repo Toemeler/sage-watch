@@ -18,7 +18,9 @@ enum PositionFormat {
     static let location = "location", heading = "heading", steps = "steps", altitude = "altitude"
     /// the iPhone records the same streams under these names (plus its own barometer)
     static let phoneLocation = "phonelocation", phoneHeading = "phoneheading", phoneSteps = "phonesteps",
-               phoneAltitude = "phonealtitude", phonePressure = "phonepressure"
+               phoneAltitude = "phonealtitude", phonePressure = "phonepressure", phoneStatus = "phonestatus"
+    /// the iPhone's battery once a minute while tracking, so an export shows how fast tracking drains it
+    static let statusHeader = "unix_time,battery,charging,gps_mode"
 
     static func location(t: Double, lat: Double, lon: Double, alt: Double, hAcc: Double, vAcc: Double,
                          speed: Double, course: Double, floor: Int?) -> String {
@@ -46,16 +48,18 @@ enum PositionFormat {
 
 /// Decisions for position tracking, kept testable.
 enum PositionRules {
-    enum GPSMode: Equatable { case best, saver }
+    enum GPSMode: String, Equatable { case best, saver, minimal }
 
     /// Best accuracy while the battery allows; below 20 % (not charging) GPS drops to ~10 m accuracy, which costs far
-    /// less, so the recording lasts the day. Barometer, steps and compass keep going either way. Back to best above
-    /// 30 % or on the charger (a gap avoids flapping around the threshold).
+    /// less; below 10 % to ~100 m and the iPhone's compass to 2 per second, a last reserve so the phone itself stays
+    /// usable (27 Nov: the iPhone ran out at 12:10 while tracking). Back up with a gap each time (no flapping):
+    /// minimal → saver above 15 %, saver → best above 30 %; on the charger always best.
     static func gpsMode(battery: Double?, charging: Bool, current: GPSMode) -> GPSMode {
         guard let b = battery, b >= 0, !charging else { return charging ? .best : current }
-        if b < 0.20 { return .saver }
+        if b < 0.10 { return .minimal }
+        if b < 0.20 { return current == .minimal && b < 0.15 ? .minimal : .saver }
         if b > 0.30 { return .best }
-        return current
+        return current == .minimal ? .saver : current
     }
 }
 

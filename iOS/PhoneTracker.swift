@@ -42,7 +42,7 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
         queue.maxConcurrentOperationCount = 1
         queue.qualityOfService = .utility
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        manager.desiredAccuracy = kCLLocationAccuracyBest          // refined by checkBattery()
         manager.distanceFilter = kCLDistanceFilterNone
         manager.activityType = .otherNavigation
         manager.pausesLocationUpdatesAutomatically = false
@@ -67,7 +67,8 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
                 PositionFormat.phoneHeading: PhoneCSV(dir, PositionFormat.phoneHeading, PositionFormat.headingHeader),
                 PositionFormat.phoneSteps: PhoneCSV(dir, PositionFormat.phoneSteps, PositionFormat.stepsHeader),
                 PositionFormat.phoneAltitude: PhoneCSV(dir, PositionFormat.phoneAltitude, PositionFormat.altitudeHeader),
-                PositionFormat.phonePressure: PhoneCSV(dir, PositionFormat.phonePressure, RecordingFormat.pressureHeader)
+                PositionFormat.phonePressure: PhoneCSV(dir, PositionFormat.phonePressure, RecordingFormat.pressureHeader),
+                PositionFormat.phoneStatus: PhoneCSV(dir, PositionFormat.phoneStatus, PositionFormat.statusHeader)
             ]
         }
 
@@ -153,10 +154,19 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
         let level = d.batteryLevel >= 0 ? Double(d.batteryLevel) : nil
         let charging = d.batteryState == .charging || d.batteryState == .full
         let next = PositionRules.gpsMode(battery: level, charging: charging, current: gpsMode)
+        // one line a minute: how fast tracking drains the phone, for the export
+        let now = Date().timeIntervalSince1970
+        let line = "\(RecordingFormat.unix(now)),\(level.map { String(format: "%.2f", $0) } ?? ""),\(charging ? 1 : 0),\(next.rawValue)"
+        queue.addOperation { self.files[PositionFormat.phoneStatus]?.append(line, now) }
+        // "best for navigation" is meant for a device on power (Apple's docs): plain "best" off the charger
+        let accuracy = next == .best ? (charging ? kCLLocationAccuracyBestForNavigation : kCLLocationAccuracyBest)
+            : next == .saver ? kCLLocationAccuracyNearestTenMeters : kCLLocationAccuracyHundredMeters
+        if manager.desiredAccuracy != accuracy { manager.desiredAccuracy = accuracy }
+        // last reserve: the compass slows to 2 a second
+        motion.deviceMotionUpdateInterval = next == .minimal ? 0.5 : 0.1
         guard next != gpsMode else { return }
         gpsMode = next
-        manager.desiredAccuracy = next == .best ? kCLLocationAccuracyBestForNavigation : kCLLocationAccuracyNearestTenMeters
-        saver = next == .saver
+        saver = next != .best
     }
 
     private func writeMeta(end: Date?) {
@@ -266,7 +276,7 @@ struct PhoneTrackerCard: View {
                 }
                 LabeledContent("Steps", value: "\(tracker.steps)")
                 LabeledContent("Floors", value: "↑\(tracker.floorsUp)  ↓\(tracker.floorsDown)")
-                if tracker.saver { Text("Battery below 20 %: GPS saves power (~10 m)").font(.footnote).foregroundStyle(.orange) }
+                if tracker.saver { Text("Battery low: GPS saves power (~10 m below 20 %, ~100 m and a slower compass below 10 %)").font(.footnote).foregroundStyle(.orange) }
             }
             if let p = tracker.problem { Text(p).font(.footnote).foregroundStyle(.red) }
             if tracker.needsAlways {
