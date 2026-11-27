@@ -16,6 +16,7 @@ struct DataView: View {
     var body: some View {
         NavigationStack {
             List {
+                PhoneTrackerCard()
                 Section {
                     NavigationLink {
                         BreathingView()

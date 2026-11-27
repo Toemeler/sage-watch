@@ -36,6 +36,9 @@ targets:
         NSHealthShareUsageDescription: Sage shows your steps, heart rate and sleep on the watch face and in the app. Nothing leaves your devices.
         NSHealthUpdateUsageDescription: The watch recorder runs as a Mind & Body session. It is only saved to Health if you turn that on.
         UIFileSharingEnabled: true
+        NSLocationWhenInUseUsageDescription: With Track position on, Sage records where you go (GPS outdoors, compass and steps indoors) together with the watch. Nothing leaves your devices.
+        NSMotionUsageDescription: With Track position on, Sage records steps, floors, compass heading and the barometer to follow your path indoors.
+        UIBackgroundModes: [location]
         NSLocalNetworkUsageDescription: Sage controls your WiZ lamps on your home network from the watch.
         LSSupportsOpeningDocumentsInPlace: true
     settings:

@@ -11,6 +11,7 @@ struct SageApp: App {
                 .environmentObject(health)
                 .preferredColorScheme(.dark)
                 .task { await health.start() }
+                .task { _ = PhoneTracker.shared }           // resumes position tracking after a relaunch
                 // touch the bulbs once in the foreground, so iOS asks for Local Network now (it cannot ask in the background)
                 .task { _ = await WizClient.status() }
         }
