@@ -326,7 +326,7 @@ requestAnimationFrame(frame);
 </div></div>
 <div class="controls">
   <h2>Lamp panel</h2>
-  <label>Connection</label><select id="lampConn"><option value="ok">at home</option><option value="reconnecting">short drop (reconnecting)</option><option value="away">unreachable</option></select>
+  <label>Connection</label><select id="lampConn"><option value="ok">at home</option><option value="reconnecting">short drop (reconnecting)</option><option value="away">unreachable</option></select><span id="reconInfo" class="lamp-help"></span>
   <p class="lamp-help" style="grid-column: 1 / -1; margin: 0">Tap the capsule: on / off. Press and slide: brightness (bottom is off, it stretches past the ends).
   Hold ~0.4 s: colours. In colours: drag to pan, scroll (crown) to zoom out and see all 61, tap a bubble to pick, tap empty space to go back.
   Scroll wheel or two-finger scroll = Digital Crown.
@@ -383,7 +383,10 @@ requestAnimationFrame(frame);
     step();
   };
   const stopPreview = () => { if (preview) { clearTimeout(preview.timer); preview = null; } };
-  window.simulateFailure = () => { lamp.on = !lamp.on; level.to(modelLevel(), 0.35, 0.8); failEl.style.opacity = 1; setTimeout(() => failEl.style.opacity = 0, 2500); };
+  // a second failure restarts the 2.5 s (the first timer must not hide the new note early), as on the watch
+  let failTimer = 0;
+  window.simulateFailure = () => { lamp.on = !lamp.on; level.to(modelLevel(), 0.35, 0.8); failEl.style.opacity = 1;
+    clearTimeout(failTimer); failTimer = setTimeout(() => failEl.style.opacity = 0, 2500); };
   // the whole display is the slider, inset a hair
   const AW = 184, AH = 224, H = AH - 6, W = AW - 6;
 
@@ -503,6 +506,11 @@ requestAnimationFrame(frame);
   }, { passive: false });
 
   const connSel = document.getElementById("lampConn"), away = document.getElementById("lampAway"), recon = document.getElementById("lampReconnect");
+  // "Reconnecting…" keeps trying while it shows: one check every 8 s, never two at once (LampRules.retryReconnect)
+  let reconTries = 0;
+  const reconInfo = document.getElementById("reconInfo");
+  setInterval(() => { reconTries = connSel.value === "reconnecting" ? reconTries + 1 : 0;
+    reconInfo.textContent = reconTries ? `checks sent while reconnecting: ${reconTries}` : ""; }, 8000);
   let last = performance.now();
   function tick(now) {
     // connection states as on the watch: a short drop keeps the controls with "Reconnecting…", only a lasting one

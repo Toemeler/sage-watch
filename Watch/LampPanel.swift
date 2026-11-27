@@ -13,7 +13,10 @@ final class LampModel: ObservableObject {
     static let shared = LampModel()
 
     @Published private(set) var state = LampLink.State()
+    /// a message to the iPhone is out (a counter underneath: a status check and a change can overlap, and the
+    /// first to finish must not clear it for the other)
     @Published private(set) var busy = false
+    private var inFlight = 0 { didSet { busy = inFlight > 0 } }
     /// why the lamps are not available, in plain words (nil while at home)
     @Published private(set) var problem: String? = "Checking…"
     /// when a change last failed to reach the lamps (the panel flashes a note and plays the failure haptic)
@@ -125,8 +128,8 @@ final class LampModel: ObservableObject {
     /// one message to the iPhone: waits for reachability, retries, then takes the reply in
     @discardableResult
     private func send(_ message: [String: Any], byUser: Bool = true) async -> Bool {
-        busy = true
-        defer { busy = false }
+        inFlight += 1
+        defer { inFlight -= 1 }
         let background = WKApplication.shared().applicationState != .active
         let what = (message[LampLink.commandKey] as? String == LampLink.status ? "check" : "change") + (byUser ? "" : " (auto)")
         var lastError = "The iPhone did not answer. Open Sage on the iPhone and retry."
@@ -216,9 +219,9 @@ struct LampPanel: View {
     @State private var pressTask: Task<Void, Never>?
     @State private var hideTask: Task<Void, Never>?
     @State private var showFailure = false
+    @State private var failureTask: Task<Void, Never>?
     @State private var zoom: CGFloat = 1             // colour wheel: the crown zooms out to see all of it
     @State private var lastUse = Date()              // closes itself after a while unused, as Control Center does
-    static let idleClose: TimeInterval = 30
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static func tint(_ s: LampLink.State) -> Color {
@@ -255,6 +258,15 @@ struct LampPanel: View {
                 Button { dismiss() } label: { Image(systemName: "xmark") }
             }
         }
+        // on both views: the "not reachable" screen must not keep the app in front forever either
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                if LampRules.idleClose(idle: Date().timeIntervalSince(lastUse), touching: touching, colours: colours) {
+                    dismiss(); return
+                }
+            }
+        }
     }
 
     /// not at home, or the iPhone could not reach the lamps: say why, offer a retry
@@ -268,7 +280,17 @@ struct LampPanel: View {
         .background(Capsule().fill(Color(white: 0.12).opacity(0.94)))
         .padding(.top, 34)
         .allowsHitTesting(false)
-        .onAppear { lamp.refresh(force: true) }
+        .task {
+            // it says reconnecting, so it keeps trying while it shows (cancelled as soon as the lamp answers)
+            var lastTry = Date.distantPast
+            while !Task.isCancelled {
+                if LampRules.retryReconnect(sinceLastTry: Date().timeIntervalSince(lastTry), busy: lamp.busy) {
+                    lastTry = Date()
+                    lamp.refresh(force: true)
+                }
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
     }
 
     private var unavailable: some View {
@@ -280,7 +302,7 @@ struct LampPanel: View {
                 Image(systemName: "lightbulb.slash").font(.system(size: 26)).foregroundStyle(FaceGeometry.Palette.sage)
                 Text(lamp.problem ?? "")
                     .font(.system(size: 13)).multilineTextAlignment(.center).foregroundStyle(FaceGeometry.Palette.ivory)
-                Button("Retry") { lamp.refresh(force: true) }
+                Button("Retry") { lastUse = Date(); lamp.refresh(force: true) }
             }
         }
         .onAppear { lamp.refresh(force: true) }
@@ -331,19 +353,16 @@ struct LampPanel: View {
             guard t != nil else { return }
             WKInterfaceDevice.current().play(.failure)
             withAnimation(.easeOut(duration: 0.2)) { showFailure = true }
-            Task { @MainActor in
+            // a second failure restarts the 2.5 s; the first one's timer must not hide the new note early
+            failureTask?.cancel()
+            failureTask = Task { @MainActor in
                 try? await Task.sleep(for: .seconds(2.5))
+                guard !Task.isCancelled else { return }
                 withAnimation(.easeIn(duration: 0.3)) { showFailure = false }
             }
         }
         .onChange(of: crown) { _, _ in lastUse = Date() }
         .onChange(of: colours) { _, _ in lastUse = Date() }
-        .task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
-                if !touching && !colours && Date().timeIntervalSince(lastUse) > Self.idleClose { dismiss(); return }
-            }
-        }
         .onAppear {
             lamp.refresh(force: true)
             // the fill rises into place as the panel opens
@@ -406,9 +425,12 @@ struct LampPanel: View {
         .accessibilityElement()
         .accessibilityLabel(Text("Lamp"))
         .accessibilityValue(Text(level > 0 ? "\(Int((level * 100).rounded())) percent" : "Off"))
-        .accessibilityAdjustableAction { dir in lamp.setLevel(min(1, max(0, modelLevel + (dir == .increment ? 0.1 : -0.1)))) }
-        .accessibilityAction { lamp.toggle() }
-        .accessibilityAction(named: Text("Colours")) { withAnimation { colours = true } }
+        .accessibilityAdjustableAction { dir in
+            lastUse = Date()                             // VoiceOver use is use: the panel must not close under it
+            lamp.setLevel(min(1, max(0, modelLevel + (dir == .increment ? 0.1 : -0.1))))
+        }
+        .accessibilityAction { lastUse = Date(); lamp.toggle() }
+        .accessibilityAction(named: Text("Colours")) { lastUse = Date(); withAnimation { colours = true } }
     }
 
     private func touch(_ g: DragGesture.Value, height h: CGFloat) {

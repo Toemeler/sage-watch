@@ -71,6 +71,19 @@ final class LampRulesTests: XCTestCase {
         XCTAssertFalse(LampRules.showControls(home: false, sinceConfirmed: nil))    // never reached
     }
 
+    func testPanelClosesWhenIdleButNeverUnderAFinger() {
+        XCTAssertTrue(LampRules.idleClose(idle: 31, touching: false, colours: false))
+        XCTAssertFalse(LampRules.idleClose(idle: 10, touching: false, colours: false))
+        XCTAssertFalse(LampRules.idleClose(idle: 300, touching: true, colours: false))    // finger on it
+        XCTAssertFalse(LampRules.idleClose(idle: 300, touching: false, colours: true))    // choosing a colour
+    }
+
+    func testReconnectRetriesWithoutPilingUp() {
+        XCTAssertTrue(LampRules.retryReconnect(sinceLastTry: 8, busy: false))
+        XCTAssertFalse(LampRules.retryReconnect(sinceLastTry: 3, busy: false))
+        XCTAssertFalse(LampRules.retryReconnect(sinceLastTry: 60, busy: true))           // one still out
+    }
+
     func testWindDownNeverSwitchesOnAndLeavesColour() {
         XCTAssertNil(LampRules.windDown(t: 0.5, start: state(on: true, dim: 80), current: state(on: false, dim: 80)))
         let colour = LampRules.windDown(t: 0.5, start: state(on: true, dim: 80, temp: nil), current: state(on: true, dim: 80, temp: nil))

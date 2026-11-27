@@ -95,6 +95,22 @@ enum LampRules {
         return s >= 0 && s < reconnectGrace
     }
 
+    /// the panel closes after this long unused, as Control Center does
+    static let idleCloseAfter: TimeInterval = 30
+    /// while "Reconnecting…" shows, the watch tries again this often
+    static let reconnectEvery: TimeInterval = 8
+
+    /// close the panel when unused for `idleCloseAfter`; never under a finger or while the colours are open
+    static func idleClose(idle: TimeInterval, touching: Bool, colours: Bool) -> Bool {
+        !touching && !colours && idle > idleCloseAfter
+    }
+
+    /// try to reach the lamp again while reconnecting, but never start a check while one is still out (a slow
+    /// WatchConnectivity reply would otherwise pile up checks and keep the radio busy)
+    static func retryReconnect(sinceLastTry: TimeInterval, busy: Bool) -> Bool {
+        !busy && sinceLastTry >= reconnectEvery
+    }
+
     /// one sunrise step at progress `t` (0...1 through the wake window): eased like dawn, 10 → 80 % and
     /// 2200 → 4200 K. Nil when the lamp is already on and at least that bright (you or an earlier step set it):
     /// a sunrise never dims a lamp.

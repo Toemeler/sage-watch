@@ -52,6 +52,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F13 | **Bedtime tap:** at your usual bedtime, if the lamp is still bright and wind-down is off, one quiet tap on the wrist with "Bedtime" (no sound); nothing if the lamp is already dim or off | built (round 10, no answer) |
 | F14 | **Try the sunrise:** a "Try sunrise" button in the long-press menu plays the whole wake-up light in 60 s (10 % candle → 80 % daylight → full), so you can see and judge it without waiting for a morning; any touch of the lamp stops it | built (round 12, no answer) |
 | F15 | **Walk direction in recordings:** record the compass heading once a second (device motion, magnetic north) alongside the barometer, so walks get a direction and length; with floor changes from the barometer, a change of room shows up in the data (for counting work like beds). Small battery cost; compass is disturbed near metal (bed frames), so direction changes, not absolute bearings, are used | built (Tom asked for full position tracking) |
+| F16 | **Arrival light:** when you come home after dark (the lamp becomes reachable again after ≥ 30 min away, after sunset) and the lamp is off, it comes on warm at the level wind-down would have now; never during a sleep block, never if you switched it off in the last 10 min | proposed (round 22) |
+| F17 | **Nap length on the crown:** after the long turn down starts a nap (F9), the note shows its length and further turns change it in 5-min steps while the 3 s note is up | proposed (round 22) |
 
 ## Iterations
 
@@ -454,3 +456,23 @@ multipath indoors).
   Tested: the two new ranges (`testTodayAndLastHourRanges`).
 - **Process:** this is an iPhone app change on a recording day: install only after the day's recording ends
   (reinstalling restarts the app and leaves a gap).
+
+### 31 · 2026-11-27 — round 22: the lamp panel under failure (watch app change; install after recording)
+- **Review (failure states, concurrency):**
+  - `busy` was one flag set and cleared by every message. A status check and a change can be out together; the
+    first to finish cleared it, so "Checking…" stopped spinning while the other was still waiting (and the panel
+    looked frozen or showed a stale error).
+  - "Reconnecting…" checked once when it appeared. If that one check failed, the pill kept saying it was
+    reconnecting for up to 2 min without trying — the text promised something the code did not do.
+  - The 30 s idle close lived on the controls only. The "not reachable" screen never closed itself and kept the
+    app in front (battery, and the face hidden) until dismissed by hand.
+  - VoiceOver adjustments and actions did not count as use, so the panel could close in the middle of them.
+  - Two failures within 2.5 s: the first note's timer hid the second note after a fraction of its time.
+- **Changed (Swift and prototype):** `busy` counts messages in flight; "Reconnecting…" retries every 8 s and never
+  starts a check while one is out (`LampRules.retryReconnect`); the idle close covers both views and is a tested
+  rule (`LampRules.idleClose`); VoiceOver use and Retry reset the idle timer; a second failure restarts the note's
+  2.5 s. Prototype: the failure timer restarts, and the controls show the checks sent while reconnecting.
+- **Tests:** `testPanelClosesWhenIdleButNeverUnderAFinger`, `testReconnectRetriesWithoutPilingUp`.
+- **Verified:** rules by unit tests (CI), prototype JS parses. **Needs the real watch:** how often a real drop
+  recovers within the 2 min grace with 8 s retries, and that the idle close is not felt as too early.
+- **Proposed:** F16 arrival light, F17 nap length on the crown (built next round if unanswered).
