@@ -630,3 +630,18 @@ multipath indoors).
   reviewing what is there, and a proposal comes when there is a real gap.
 - **Verified:** rule by unit tests (CI). **Needs the real watch:** the order of onEnded and the gesture-state reset
   (the 150 ms wait makes either order safe), and that a lowered wrist closes the panel without a flash.
+
+### 41 · 2026-11-27 — round 32: the face's note, measured (watch app change, install after recording)
+- **Review:** the note pill now carries nine different messages from six features, and nobody had measured it.
+  At 13 pt semibold, "Welcome home · lamp on" plus the 44 pt Undo button and the padding is ~200 pt; the 44 mm
+  screen is 184 pt (40 mm: 162 pt). SwiftUI wraps the text to two lines inside a capsule — it looks broken.
+  In always-on the pill and its button stayed up, bright over the dimmed face, with a button that cannot be
+  pressed there. VoiceOver read the button as a bare "Undo" or "Restart". And the prototype drew the note at half
+  size: the face preview is 2 px per watch point (368 px for 184 pt), the note was written in points.
+- **Changed:** the note text is one line and shrinks to 75 % before it would wrap; the button never shrinks
+  (`fixedSize`); texts shortened ("Welcome home", "Bedtime · lamp is bright"); no note in always-on (F24's double
+  tap already ignored it there); the button reads "Undo, Welcome home"; a merged comment from round 25 cleaned up.
+  Prototype: note at the right scale (26 px text, 88 x 64 px button), the same shrink-to-fit, buttons for the
+  arrival and bedtime notes.
+- **Verified:** CI build; prototype JS parses. **Needs the real watch:** the shrink on the 40 mm screen for the
+  longest note ("Nap · up to 100 min" + Undo).

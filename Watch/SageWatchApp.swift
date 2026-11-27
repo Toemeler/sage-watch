@@ -58,8 +58,8 @@ struct FaceScreen: View {
     @State private var napNoteTask: Task<Void, Never>?
     @State private var napLength: Double?            // F17: while the nap note shows, the crown sets the nap's length
     @State private var napEditFrom = Date.distantFuture
-    @State private var noteUndo: (() -> Void)?
-    @State private var noteActionLabel = "Undo"      // the note's button: Undo, or Restart (F19)        // what Undo on the current note does (nil: no Undo)
+    @State private var noteUndo: (() -> Void)?        // what the note's button does (nil: no button)
+    @State private var noteActionLabel = "Undo"      // the note's button: Undo, or Restart (F19)
     @Environment(\.scenePhase) private var phase
 
     var body: some View {
@@ -83,13 +83,14 @@ struct FaceScreen: View {
                 }
             }
             doubleTapTarget
-            if let note = napNote {
+            if let note = napNote, !dimmed {
                 VStack {
                     Spacer()
                     HStack(spacing: 8) {
                         // on the bedside clock the note is red too, so it never lights the room
                         let night = Self.bedside(Date())
                         Text(note).font(.system(size: 13, weight: .semibold))
+                            .lineLimit(1).minimumScaleFactor(0.75)      // one line in the pill, on 40 and 44 mm
                             .foregroundStyle(night ? FaceRenderer.bedsideRed : FaceGeometry.Palette.ivory)
                         if let undo = noteUndo {
                             // a target a sleepy finger can hit: ~44 x 32 pt, not just the word
@@ -100,6 +101,9 @@ struct FaceScreen: View {
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(night ? FaceRenderer.bedsideRed : FaceGeometry.Palette.sageLight)
+                            .fixedSize()                                 // the button never shrinks; the text does
+                            // VoiceOver: "Undo, Welcome home", not a bare "Undo"
+                            .accessibilityLabel(Text("\(noteActionLabel), \(note)"))
                         }
                     }
                     .padding(.horizontal, 12).padding(.vertical, 8)
@@ -185,12 +189,12 @@ struct FaceScreen: View {
         }
         .onChange(of: showLamp) { _, _ in crownBase = faceCrown }
         .onChange(of: automation.bedtimeTappedAt) { _, t in
-            if t != nil { showNapNote("Bedtime · lamp still bright", undo: nil) }
+            if t != nil { showNapNote("Bedtime · lamp is bright", undo: nil) }
         }
         // F16: an automation that switches the lamp on says so, and Undo switches it off again (as your own change:
         // nothing automatic switches it back on for the next 10 min)
         .onChange(of: automation.arrivedAt) { _, t in
-            if t != nil { showNapNote("Welcome home · lamp on", undo: { lamp.set(["state": false]) }) }
+            if t != nil { showNapNote("Welcome home", undo: { lamp.set(["state": false]) }) }
         }
         // F18: a watch that may not last the night says so at bedtime
         .onChange(of: guardian.batteryWarnedAt) { _, t in

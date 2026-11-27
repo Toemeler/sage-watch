@@ -29,10 +29,11 @@
   <canvas id="face" width="736" height="896"></canvas>
   <div class="overlay">
     <!-- the face's note (SageWatchApp napNote): F17 shows the nap's length, the crown changes it -->
-    <div id="napNote" style="position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;
-         background:rgba(31,31,31,.94);border-radius:99px;padding:6px 6px 6px 14px;white-space:nowrap;opacity:0;transition:opacity .2s">
-      <span id="napText" style="font:600 13px -apple-system,system-ui;color:#E2D9C9"></span>
-      <span id="napAction" style="font:600 14px -apple-system,system-ui;color:#B9C4AA;min-width:44px;text-align:center;line-height:32px">Undo</span>
+    <!-- in watch points x 2 (this screen is 368 px for 184 pt): 13 pt text, 12 / 8 pt padding, 44 x 32 pt button -->
+    <div id="napNote" style="position:absolute;left:50%;bottom:36px;transform:translateX(-50%);display:flex;gap:16px;align-items:center;
+         background:rgba(31,31,31,.95);border-radius:99px;padding:16px 24px;white-space:nowrap;opacity:0;transition:opacity .2s;max-width:344px;box-sizing:border-box">
+      <span id="napText" style="font:600 26px -apple-system,system-ui;color:#E2D9C9;overflow:hidden"></span>
+      <span id="napAction" style="font:600 28px -apple-system,system-ui;color:#B9C4AA;min-width:88px;text-align:center;line-height:64px;flex:none">Undo</span>
     </div>
   </div>
 </div></div>
@@ -49,6 +50,8 @@
   <label>Bedside (charging at night)</label><input id="bedside" type="checkbox">
   <label>Nap from the face (F17)</label><button type="button" id="napBtn">Start nap</button>
   <label>Bedtime, battery low (F18)</label><button type="button" onclick="faceNote('Charge for the alarm', null, 3)">Show note</button>
+  <label>Coming home (F16)</label><button type="button" onclick="faceNote('Welcome home', 'Undo', 3)">Show note</button>
+  <label>Bedtime tap (F13)</label><button type="button" onclick="faceNote('Bedtime · lamp is bright', null, 3)">Show note</button>
   <label>Recording stopped (F19)</label><button type="button" onclick="faceNote('Recording stopped', 'Restart', 8)">Show note</button>
   <p class="hint">Coordinates are the renderer's reference space (screen x 131–827, y 63–893). Change the code here, reload, and port the settled values back to Shared/FaceRenderer.swift.</p>
 </div>
@@ -261,19 +264,26 @@ function drawBattery(ctx, pct, charging) {
 
 // ---------- F17: nap length on the crown (SageWatchApp.adjustNapLength, FaceRules.napLength) ----------
 const nap = { len: null, timer: 0, editFrom: 0, acc: 0 };
+// the note stays on one line: the text shrinks to 75 % before it would wrap (lineLimit 1, minimumScaleFactor 0.75)
+function fitNote() {
+  const t = document.getElementById("napText"), n = document.getElementById("napNote");
+  t.style.fontSize = "26px";
+  for (let px = 26; px > 19.5 && n.scrollWidth > 344; px -= 0.5) t.style.fontSize = px + "px";
+}
 // any face note: text, its button (Undo, Restart or none) and how long it stays (3 s, 8 s for a warning)
 let noteTimer = 0;
 window.faceNote = (text, action, seconds) => {
   nap.len = null;
   document.getElementById("napText").textContent = text;
   const a = document.getElementById("napAction"); a.textContent = action || ""; a.style.display = action ? "" : "none";
+  fitNote();
   document.getElementById("napNote").style.opacity = 1;
   clearTimeout(nap.timer); clearTimeout(noteTimer);
   noteTimer = setTimeout(() => document.getElementById("napNote").style.opacity = 0, seconds * 1000);
 };
 function napShow() {
   const a = document.getElementById("napAction"); a.textContent = "Undo"; a.style.display = ""; clearTimeout(noteTimer);
-  document.getElementById("napText").textContent = `Nap · up to ${nap.len} min`;
+  document.getElementById("napText").textContent = `Nap · up to ${nap.len} min`; fitNote();
   document.getElementById("napNote").style.opacity = 1;
   clearTimeout(nap.timer);
   nap.timer = setTimeout(() => { document.getElementById("napNote").style.opacity = 0; nap.len = null; }, 3000);
