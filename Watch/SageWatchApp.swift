@@ -55,6 +55,8 @@ struct FaceScreen: View {
     @State private var crownMovedAt = Date.distantPast
     @State private var napNote: String?              // "Nap: watching for sleep" with Undo, for 3 s (F9)
     @State private var napNoteTask: Task<Void, Never>?
+    @State private var napLength: Double?            // F17: while the nap note shows, the crown sets the nap's length
+    @State private var napEditFrom = Date.distantFuture
     @State private var noteUndo: (() -> Void)?        // what Undo on the current note does (nil: no Undo)
     @Environment(\.scenePhase) private var phase
 
@@ -154,6 +156,7 @@ struct FaceScreen: View {
                               isContinuous: true, isHapticFeedbackEnabled: false)
         .onChange(of: faceCrown) { _, v in
             guard !showLamp, !showControls, !showMusic, !dimmed, !alarmActive else { crownBase = v; return }
+            if napLength != nil { adjustNapLength(crown: v); return }
             // a pause starts a new gesture; up opens the lamp, a long turn down starts a nap (FaceRules, tested)
             if Date().timeIntervalSince(crownMovedAt) > FaceRules.gesturePause { crownBase = v - (v - crownBase).clamped(to: -1...1) }
             crownMovedAt = Date()
@@ -268,12 +271,39 @@ struct FaceScreen: View {
         }
         alarm.napNow()
         WKInterfaceDevice.current().play(.start)
-        showNapNote("Nap: watching for sleep", undo: { alarm.cancelNap() })
+        showNapNote(Self.napText(alarm.napLength), undo: { alarm.cancelNap() })
+        // F17: while the note shows, turning the crown sets the length. The turn that started the nap carries on
+        // for a moment; it must not shorten the nap, so editing starts after a short pause in the turn.
+        napLength = alarm.napLength
+        napEditFrom = Date().addingTimeInterval(0.6)
+    }
+
+    static func napText(_ minutes: Double) -> String { "Nap · up to \(Int(minutes)) min" }
+
+    /// F17: 4 detents per 5-minute step, up longer, down shorter (as crowns raise values); a click per step and
+    /// none past the ends. Each step keeps the note (and its Undo) up for another 3 s.
+    private func adjustNapLength(crown v: Double) {
+        guard let m = napLength, Date() >= napEditFrom, alarm.napArmed else { crownBase = v; return }
+        let steps = ((v - crownBase) / FaceRules.napStepDetents).rounded(.towardZero)
+        guard steps != 0 else { return }
+        crownBase += steps * FaceRules.napStepDetents
+        let next = FaceRules.napLength(m, steps: Int(steps))
+        guard next != m else { return }
+        napLength = next
+        alarm.setNapLength(next)
+        WKInterfaceDevice.current().play(.click)
+        keepNote(Self.napText(next))
     }
 
     private func showNapNote(_ text: String, undo: (() -> Void)? = nil) {
-        napNoteTask?.cancel()
+        napLength = nil                          // any other note ends the nap-length editing
         noteUndo = undo
+        keepNote(text)
+    }
+
+    /// show `text` and (re)start the note's 3 s
+    private func keepNote(_ text: String) {
+        napNoteTask?.cancel()
         withAnimation(.easeOut(duration: 0.2)) { napNote = text }
         napNoteTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(3))
@@ -284,6 +314,7 @@ struct FaceScreen: View {
 
     private func hideNapNote() {
         noteUndo = nil
+        napLength = nil
         withAnimation(.easeIn(duration: 0.25)) { napNote = nil }
     }
 

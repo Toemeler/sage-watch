@@ -10,6 +10,13 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertEqual(FaceRules.crownAction(delta: -12, sleeping: false), .startNap)
     }
 
+    func testNapLengthStepsAndStopsAtTheEnds() {
+        XCTAssertEqual(FaceRules.napLength(100, steps: 1), 105)
+        XCTAssertEqual(FaceRules.napLength(100, steps: -2), 90)
+        XCTAssertEqual(FaceRules.napLength(25, steps: -3), 20)
+        XCTAssertEqual(FaceRules.napLength(125, steps: 4), 130)
+    }
+
     func testCrownDoesNothingWhileAsleep() {
         XCTAssertEqual(FaceRules.crownAction(delta: 20, sleeping: true), .none)
         XCTAssertEqual(FaceRules.crownAction(delta: -20, sleeping: true), .none)

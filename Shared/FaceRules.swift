@@ -7,6 +7,14 @@ enum FaceRules {
     /// detents up that open the lamp, detents down that start a nap
     static let lampDetents = 4.0
     static let napDetents = 12.0
+    /// F17: crown detents per 5-minute step of the nap's length
+    static let napStepDetents = 4.0
+
+    /// F17: the nap's length after `steps` crown steps from `minutes` (5 min each, 20...130)
+    static func napLength(_ minutes: Double, steps: Int) -> Double {
+        min(AlarmSettings.napLengthRange.upperBound, max(AlarmSettings.napLengthRange.lowerBound, minutes + Double(steps) * AlarmSettings.napLengthStep))
+    }
+
     /// a pause longer than this starts a new crown gesture
     static let gesturePause: TimeInterval = 1.5
 

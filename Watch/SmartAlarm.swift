@@ -64,6 +64,21 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
 
     private enum Keys {
         static let handledNight = "alarm.handledNight", handledNap = "alarm.handledNap", nap = "alarm.nap", manualNap = "alarm.manualNap"
+        static let napLength = "alarm.napLength"
+    }
+
+    /// F17: the length chosen on the face for the nap started by hand (nil: the settings' window)
+    private var napLengthOverride: Double? {
+        get { UserDefaults.standard.object(forKey: Keys.napLength) as? Double }
+        set { UserDefaults.standard.set(newValue, forKey: Keys.napLength) }
+    }
+    /// the latest wake of the coming nap, in minutes after falling asleep
+    var napLength: Double { napLengthOverride ?? AlarmSettings.load().clamped().napLatest }
+
+    /// F17: set the length of the nap started by hand (only while it is still waiting for sleep)
+    func setNapLength(_ minutes: Double) {
+        guard napArmed else { return }
+        napLengthOverride = AlarmSettings.load().napWindow(latest: minutes).latest
     }
 
     /// a block is not armed again until this time (after it rang, was stopped, or its watch ended)
@@ -177,6 +192,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
     func napNow() {
         guard !ringing else { return }
         manualNapUntil = Date().addingTimeInterval(90 * 60)
+        napLengthOverride = nil
         handledNap = .distantPast
         savedNap = nil
         nap = nil
@@ -188,6 +204,7 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
 
     func cancelNap() {
         manualNapUntil = nil
+        napLengthOverride = nil
         handledNap = Date().addingTimeInterval(4 * 3600)
         savedNap = nil
         nap = nil
@@ -259,7 +276,10 @@ final class SmartAlarm: NSObject, ObservableObject, WKExtendedRuntimeSessionDele
         switch purpose {
         case .nap:
             let s = AlarmSettings.load().clamped()
-            var n = NapState(onset: onset, earliest: onset.addingTimeInterval(s.napEarliest * 60), latest: onset.addingTimeInterval(s.napLatest * 60))
+            // F17: a length chosen on the face for this nap, else the settings' window
+            let w = napLengthOverride.map { s.napWindow(latest: $0) } ?? (earliest: s.napEarliest, latest: s.napLatest)
+            napLengthOverride = nil
+            var n = NapState(onset: onset, earliest: onset.addingTimeInterval(w.earliest * 60), latest: onset.addingTimeInterval(w.latest * 60))
             if n.latest <= Date() { n.latest = Date().addingTimeInterval(60) }     // found very late: still wake gently
             savedNap = n
             nap = n

@@ -25,6 +25,16 @@ final class PersonalTests: XCTestCase {
         XCTAssertEqual(LastSleepSummary(dictionary: s.dictionary), s)
     }
 
+    func testNapLengthFromTheFaceKeepsASensibleWindow() {
+        let s = AlarmSettings()                                     // 70...100: a 30-minute window
+        XCTAssertEqual(s.napWindow(latest: 100).earliest, 70)
+        XCTAssertEqual(s.napWindow(latest: 60).earliest, 30)
+        XCTAssertEqual(s.napWindow(latest: 20).earliest, 10)        // never before half the nap
+        XCTAssertEqual(s.napWindow(latest: 5).latest, 20)           // shortest
+        XCTAssertEqual(s.napWindow(latest: 500).latest, 130)        // longest
+        XCTAssertEqual(s.napWindow(latest: 82).latest, 80)          // 5-minute grid
+    }
+
     func testNapAndRingSettings() throws {
         var s = AlarmSettings()
         XCTAssertEqual(s.napEarliest, 70)

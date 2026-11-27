@@ -49,6 +49,18 @@ struct AlarmSettings: Equatable {
     static let napLatestRange = 60.0...130.0
     /// the nap's wake window is at least this wide
     static let napMinimumWindow = 10.0
+    /// F17: the lengths a nap started from the face can be given (its latest wake, minutes after falling asleep)
+    static let napLengthRange = 20.0...130.0
+    static let napLengthStep = 5.0
+
+    /// F17: the wake window for a nap of `latest` minutes: as wide as the usual window, but never opening before
+    /// half the nap (a 20-minute nap is not woken after 5). `latest` is put on the 5-minute grid and in range.
+    func napWindow(latest: Double) -> (earliest: Double, latest: Double) {
+        let s = clamped()
+        let l = Self.clamp((latest / Self.napLengthStep).rounded() * Self.napLengthStep, Self.napLengthRange)
+        let width = max(s.napLatest - s.napEarliest, Self.napMinimumWindow)
+        return (max(l - width, l / 2), l)
+    }
 
     /// seconds between the taps of one pulse (closer taps tend to merge into one)
     static let tapSpacing = 0.6
