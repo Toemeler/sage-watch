@@ -2,7 +2,7 @@
 
 Everything below passed the cloud build and unit tests but has **not** been seen on a real watch. Each line is one
 quick check; note ✓ / ✗ and anything odd. Long-press the face → **Lamp → Contact log** shows every lamp message.
-Up to date with build 116 (design log rounds 1–49).
+Up to date with build 126 (design log rounds 1–57).
 
 ## Face (3 min)
 - [ ] Time centred, no date, thin battery bar; bar yellow ≤ 20 %, red ≤ 10 %, green while charging.
@@ -95,3 +95,12 @@ Up to date with build 116 (design log rounds 1–49).
 ## Recording
 - [ ] Settings → Privacy → Motion: switch Sage off for 11 min with Record on (daytime) → one tap, "Recording
       stopped · Restart" (8 s). Switch it back on, Restart → recording again. At night it waits until morning.
+
+## Position day (one day, both devices)
+- [ ] Switch Track position on at the watch → within a minute the iPhone's Position card shows it running (and the
+      other way round). Switching off on one switches off the other.
+- [ ] The iPhone asks once to allow location "Always"; allow it. If it stays "While Using", the card says what that
+      means.
+- [ ] Battery: the iPhone lasts the day (it died at 12:10 on 27 Nov). Below 20 % / 10 % the card says GPS saves power.
+- [ ] Evening export → `tools/check_export.py`: watch and iPhone streams present, no "timestamps in the future"
+      (the watch barometer is fixed from build 120), `phonestatus` (the iPhone's battery log) present.

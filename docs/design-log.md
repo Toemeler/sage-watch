@@ -962,3 +962,8 @@ multipath indoors).
   above 15 %, saver → best above 30 %; tested, the old saver test unchanged). A new `phonestatus` stream logs the
   iPhone's battery, charging and GPS mode once a minute; the health check lists it.
 - **Verified:** rule by unit tests (CI). **Needs a real day:** the battery curve in the next export.
+
+### 67 · 2026-11-27 — round 58: the checklist for the next recording day (docs only, no new build)
+- The on-watch checklist gains a "Position day" section for builds 120–126: the one switch on both devices (F28),
+  the "Always" prompt, the battery tiers and battery log, and an export check that the watch barometer's times
+  are right. No app change: build 126 is current.
