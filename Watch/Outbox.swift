@@ -145,7 +145,22 @@ final class Outbox: NSObject, ObservableObject, WCSessionDelegate {
 
     static let lastSleepKey = "lastSleep"
 
+    /// F28: a Track position change made on the iPhone (newer than this watch's own last change)
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        Self.followPosition(userInfo)
+    }
+
+    static func followPosition(_ message: [String: Any]) {
+        guard let c = PositionSync.change(in: message),
+              PositionSync.shouldFollow(remoteAt: c.at, localAt: PositionSync.localChangedAt) else { return }
+        DispatchQueue.main.async {
+            PositionSync.localChangedAt = c.at
+            if Recorder.shared.trackPosition != c.on { Recorder.shared.trackPosition = c.on }
+        }
+    }
+
     static func apply(_ context: [String: Any]) {
+        followPosition(context)
         if let d = context[AlarmLink.settingsKey] as? [String: Any] {
             AlarmSettings(dictionary: d).save()
             DispatchQueue.main.async { SmartAlarm.shared.scheduleNext() }

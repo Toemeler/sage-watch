@@ -245,7 +245,11 @@ struct PhoneTrackerCard: View {
 
     var body: some View {
         Section {
-            Toggle("Track position on this iPhone", isOn: Binding(get: { tracker.running }, set: { $0 ? tracker.start() : tracker.stop() }))
+            // F28: one switch for both devices: changing it here changes the watch's too
+            Toggle("Track position (iPhone and watch)", isOn: Binding(get: { tracker.running }, set: { on in
+                on ? tracker.start() : tracker.stop()
+                WatchSync.shared.sendTrackPosition(on)
+            }))
             if tracker.running {
                 if let f = tracker.lastFix {
                     LabeledContent("GPS", value: "±\(Int(f.horizontalAccuracy.rounded())) m · \(f.timestamp.formatted(date: .omitted, time: .shortened))")

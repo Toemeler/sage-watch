@@ -282,6 +282,17 @@ final class WatchSync {
         }
     }
 
+    /// F28: the iPhone's Track position switch, for the watch to follow (application context: it arrives even if
+    /// the watch app is not running, and only the latest counts)
+    func sendTrackPosition(_ on: Bool) {
+        let now = Date()
+        PositionSync.localChangedAt = now.timeIntervalSince1970
+        queue.async {
+            self.context[PositionSync.key] = PositionSync.message(on: on, at: now)[PositionSync.key]
+            self.push()
+        }
+    }
+
     static let typicalKey = "typicalSleep"
 
     func sendTypical(_ t: TypicalSleep) {

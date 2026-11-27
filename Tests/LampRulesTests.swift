@@ -258,6 +258,16 @@ final class LampRulesTests: XCTestCase {
 }
 
 final class PositionRulesTests: XCTestCase {
+    func testOneSwitchFollowsOnlyNewerChanges() {
+        XCTAssertTrue(PositionSync.shouldFollow(remoteAt: 200, localAt: 100))
+        XCTAssertFalse(PositionSync.shouldFollow(remoteAt: 100, localAt: 200))    // a late message never undoes a newer choice
+        XCTAssertTrue(PositionSync.shouldFollow(remoteAt: 1, localAt: nil))
+        let m = PositionSync.message(on: true, at: Date(timeIntervalSince1970: 1234))
+        XCTAssertEqual(PositionSync.change(in: m)?.on, true)
+        XCTAssertEqual(PositionSync.change(in: m)?.at, 1234)
+        XCTAssertNil(PositionSync.change(in: ["other": 1]))
+    }
+
     func testGPSSaverBelowTwentyPercentWithAGap() {
         XCTAssertEqual(PositionRules.gpsMode(battery: 0.5, charging: false, current: .best), .best)
         XCTAssertEqual(PositionRules.gpsMode(battery: 0.19, charging: false, current: .best), .saver)

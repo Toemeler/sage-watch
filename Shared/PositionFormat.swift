@@ -58,3 +58,29 @@ enum PositionRules {
         return current
     }
 }
+
+/// F28: one switch for position on both devices. Each side sends its own switch changes, made by you, with the
+/// time; the other side follows when that change is newer than its own last one (so the two never fight, and a
+/// message that arrives late never undoes a newer choice).
+enum PositionSync {
+    static let key = "trackPosition"
+    static let changedAtKey = "positionChangedAt"
+
+    static func message(on: Bool, at: Date) -> [String: Any] { [key: ["on": on, "at": at.timeIntervalSince1970]] }
+
+    /// the change in a received message, if any
+    static func change(in message: [String: Any]) -> (on: Bool, at: Double)? {
+        guard let d = message[key] as? [String: Any], let on = d["on"] as? Bool, let at = d["at"] as? Double else { return nil }
+        return (on, at)
+    }
+
+    /// follow a change from the other device only if it is newer than this device's own last change
+    static func shouldFollow(remoteAt: Double, localAt: Double?) -> Bool {
+        remoteAt > (localAt ?? 0)
+    }
+
+    static var localChangedAt: Double? {
+        get { UserDefaults.standard.object(forKey: changedAtKey) as? Double }
+        set { UserDefaults.standard.set(newValue, forKey: changedAtKey) }
+    }
+}

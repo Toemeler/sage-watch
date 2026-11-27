@@ -1,4 +1,5 @@
 import SwiftUI
+import WatchConnectivity
 
 /// Long-press the face to open: recording on/off, what is being captured, and the queue to the iPhone.
 struct RecorderControls: View {
@@ -84,7 +85,15 @@ struct RecorderControls: View {
             }
 
             Section {
-                Toggle("Track position", isOn: $recorder.trackPosition)
+                // F28: one switch for both devices: changing it here changes the iPhone's too
+                Toggle("Track position", isOn: Binding(get: { recorder.trackPosition }, set: { on in
+                    recorder.trackPosition = on
+                    let now = Date()
+                    PositionSync.localChangedAt = now.timeIntervalSince1970
+                    if WCSession.isSupported(), WCSession.default.activationState == .activated {
+                        WCSession.default.transferUserInfo(PositionSync.message(on: on, at: now))   // queued, arrives later too
+                    }
+                }))
                 if recorder.trackPosition, let fix = PositionTracker.shared.lastFix {
                     row("GPS", "±\(Int(fix.horizontalAccuracy.rounded())) m · \(fix.timestamp.formatted(date: .omitted, time: .shortened))")
                 }

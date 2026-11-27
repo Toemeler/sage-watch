@@ -64,7 +64,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F25 | **Lamp panel closes with the wrist:** lowering the wrist (the app leaves the front) closes the lamp panel, so the next raise shows the face, as Control Center does; never while a finger is on it (then right after the touch ends) | built (round 31, no answer) |
 | F26 | **Night cap:** between your usual bedtime and wake (learned night), the slider and the crown stop at 30 % with a click and the stretch of the real top; a second push from the cap (a new drag starting there, or a crown turn after resting there ½ s) goes higher; switching on at night comes on at most 30 %; a light set brighter before is never pulled down; night changes are not remembered as the evening light (F22); toggle "Night cap" | built (round 42, no answer) |
 | F27 | **Adaptive white (like Apple Home's Adaptive Lighting):** while the lamp is on in white, its white follows the day: 2200 K before sunrise, 2700 K at sunrise rising to 4000 K at solar noon, back to 2700 K at sunset; ≤ 300 K steps every 4 min, brightness untouched, never on a colour. Evening and night only ever warmer (after the wind-down it stays candle-warm). Steps aside for the sunrise, its preview, the wind-down and the minutes after the alarm; a white or colour you pick pauses it until the lamp is next switched off; toggle "Adaptive white" | built (round 47, no answer) |
-| F28 | **One switch for position:** turning Track position on (or off) on the iPhone turns it on (or off) on the watch too, and the other way round, so a recording day never misses one device again (27 Nov: the watch's switch was off and only the iPhone recorded) | proposed (round 53) |
+| F28 | **One switch for position:** turning Track position on (or off) on either device turns it on (or off) on the other; the watch sends with transferUserInfo (queued, arrives later too), the iPhone in the application context (arrives even if the watch app is not running); the newer change wins, so a late message never undoes a newer choice. The iPhone's switch now reads "Track position (iPhone and watch)" | built (round 54, no answer) |
 
 ## Iterations
 
@@ -920,3 +920,16 @@ multipath indoors).
   the 27 Nov export: both are reported.
 - **Proposed:** F28 one switch for position (built next round if unanswered).
 - No app change: build 120 is current.
+
+### 63 · 2026-11-27 — round 54: F28 built (unanswered → approved; watch + iPhone change)
+- **F28** (own commit): `PositionSync` (Shared): the message (on, time of the change), and `shouldFollow` — follow
+  the other device only if its change is newer than this device's own last one (tested: newer, older, none, the
+  message round trip). Only changes you make on a switch are sent; a change that arrives from the other device is
+  applied without being sent back (no echo, no loop).
+- **Review:** the application context keeps the iPhone's last change and is re-delivered with every other context
+  update (sleep averages, alarm settings); the "newer than mine" rule makes re-delivery harmless. A change made
+  while the other device is off arrives when it is back. Starting tracking on the iPhone from a watch message runs
+  in the background; iOS may hold it until the app is opened if location permission is "While Using" (the iPhone
+  card says so when that happens).
+- **Verified:** rule by unit tests (CI). **Needs the real devices:** switch on the watch → iPhone card shows
+  tracking within a minute; switch on the iPhone → the watch's menu shows it on.

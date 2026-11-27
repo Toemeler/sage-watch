@@ -132,6 +132,17 @@ final class Receiver: NSObject, ObservableObject, WCSessionDelegate {
         Task { replyHandler(await WizClient.handle(message)) }
     }
 
+    /// F28: a Track position change made on the watch (newer than this iPhone's own last change)
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        guard let c = PositionSync.change(in: userInfo),
+              PositionSync.shouldFollow(remoteAt: c.at, localAt: PositionSync.localChangedAt) else { return }
+        DispatchQueue.main.async {
+            PositionSync.localChangedAt = c.at
+            let tracker = PhoneTracker.shared
+            if c.on && !tracker.running { tracker.start() } else if !c.on && tracker.running { tracker.stop() }
+        }
+    }
+
     func sessionDidBecomeInactive(_ session: WCSession) {}
 
     func sessionDidDeactivate(_ session: WCSession) {
