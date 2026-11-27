@@ -1,4 +1,5 @@
 import Foundation
+import WatchKit
 
 /// The lamp working with the sleep plan, driven from the watch (it stays awake through the night with the recorder;
 /// the iPhone app could not run a long fade in the background).
@@ -25,6 +26,12 @@ final class LampAutomation: ObservableObject {
     @Published var offWhenAsleepOn = UserDefaults.standard.object(forKey: "lampOffAsleep") as? Bool ?? true {
         didSet { UserDefaults.standard.set(offWhenAsleepOn, forKey: "lampOffAsleep") }
     }
+    @Published var bedtimeTapOn = UserDefaults.standard.object(forKey: "lampBedtimeTap") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(bedtimeTapOn, forKey: "lampBedtimeTap") }
+    }
+    /// when the bedtime tap last fired (the face shows a note for it)
+    @Published private(set) var bedtimeTappedAt: Date?
+    private var bedtimeTask: Task<Void, Never>?
     /// when the alarm last rang with the sunrise on: full light is sent again when you raise your wrist
     private var rangAt: Date?
     /// what it is doing right now, for the menu
@@ -169,5 +176,36 @@ final class LampAutomation: ObservableObject {
     func rescheduleWindDown() {
         windDownTask?.cancel(); windDownTask = nil
         scheduleWindDown()
+        bedtimeTask?.cancel(); bedtimeTask = nil
+        scheduleBedtimeTap()
+    }
+
+    // MARK: bedtime tap (F13)
+
+    /// At your usual bedtime (the night's, not the nap's): two quiet clicks on the wrist when the lamp is still
+    /// bright and wind-down is off (LampRules.bedtimeTap, tested). The lamp is asked fresh first, so a stale state
+    /// never taps. Clicks, not the notification haptic, which can play a tone.
+    func scheduleBedtimeTap() {
+        guard bedtimeTapOn, bedtimeTask == nil else { return }
+        var bed = nextBedtime(after: .now)
+        while bed.nap { bed = nextBedtime(after: bed.at.addingTimeInterval(60)) }
+        let at = bed.at
+        bedtimeTask = Task { @MainActor in
+            if at > Date() { try? await Task.sleep(for: .seconds(at.timeIntervalSinceNow)) }
+            guard !Task.isCancelled else { return }
+            let lamp = LampModel.shared
+            lamp.refresh(force: true)
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            if bedtimeTapOn, lamp.home, LampRules.bedtimeTap(lampOn: lamp.state.on, dimming: lamp.state.dimming, windDownOn: windDownOn) {
+                WKInterfaceDevice.current().play(.click)
+                try? await Task.sleep(for: .milliseconds(350))
+                WKInterfaceDevice.current().play(.click)
+                bedtimeTappedAt = Date()
+                activity = "Bedtime: the lamp is still bright"
+            }
+            bedtimeTask = nil
+            scheduleBedtimeTap()                          // the next night
+        }
     }
 }

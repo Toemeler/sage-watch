@@ -18,12 +18,14 @@ struct SageWatchApp: App {
                 .task { await health.start() }
                 .onAppear {
                     LampAutomation.shared.scheduleWindDown()
+                    LampAutomation.shared.scheduleBedtimeTap()
                     alarm.scheduleNext()
                     if recorder.keepRunning { recorder.start() }
                 }
                 .onChange(of: phase) { _, p in
                     guard p == .active else { return }
                     LampAutomation.shared.scheduleWindDown()
+                    LampAutomation.shared.scheduleBedtimeTap()
                     alarm.scheduleNext()
                     if recorder.keepRunning && !recorder.isRunning { recorder.start() }
                     Outbox.shared.resendAll()
@@ -46,6 +48,7 @@ struct FaceScreen: View {
     @ObservedObject private var lamp = LampModel.shared
     @State private var showLamp = false
     @ObservedObject private var audio = AudioModel.shared
+    @ObservedObject private var automation = LampAutomation.shared
     @State private var showMusic = false
     @State private var faceCrown: Double = 0
     @State private var crownBase: Double = 0
@@ -171,6 +174,9 @@ struct FaceScreen: View {
             }
         }
         .onChange(of: showLamp) { _, _ in crownBase = faceCrown }
+        .onChange(of: automation.bedtimeTappedAt) { _, t in
+            if t != nil { showNapNote("Bedtime · lamp still bright", undo: nil) }
+        }
         .onAppear { lamp.refresh(force: true); audio.refresh(force: true) }
         .onChange(of: phase) { _, p in
             if p == .active { lamp.refresh(); audio.refresh(force: true); LampAutomation.shared.appBecameActive() }
