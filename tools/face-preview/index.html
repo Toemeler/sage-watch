@@ -363,6 +363,7 @@ requestAnimationFrame(frame);
     <div class="lamp-area" id="lampArea">
       <div class="val" id="lampVal"></div><div class="val" id="lampValDark"></div>
       <div class="lamp-fail" id="lampFail">⚠︎ Lamp didn't respond</div>
+      <div class="lamp-fail" id="lampChecking" style="top:50%;transform:translate(-50%,-50%)">Checking…</div>
       <div class="lamp-fail" id="lampReconnect"><span style="color:#B9C4AA">((·))</span> Reconnecting…</div>
       <div id="lampAway" style="position:absolute;inset:0;z-index:6;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:0 14px">
         <div style="font-size:26px;color:#8C9A7E">⌀</div>
@@ -378,7 +379,7 @@ requestAnimationFrame(frame);
 </div></div>
 <div class="controls">
   <h2>Lamp panel</h2>
-  <label>Connection</label><select id="lampConn"><option value="ok">at home</option><option value="reconnecting">short drop (reconnecting)</option><option value="away">unreachable</option></select>
+  <label>Connection</label><select id="lampConn"><option value="ok">at home</option><option value="reconnecting">short drop (reconnecting)</option><option value="checking">checking (last known)</option><option value="away">unreachable</option></select>
   <label>After dark (F22)</label><input id="lampDark" type="checkbox"><span id="reconInfo" class="lamp-help"></span>
   <p class="lamp-help" style="grid-column: 1 / -1; margin: 0">Tap the capsule: on / off. Press and slide: brightness (bottom is off, it stretches past the ends).
   Hold ~0.4 s: colours. In colours: drag to pan, scroll (crown) to zoom out and see all 61, tap a bubble to pick, tap empty space to go back.
@@ -606,6 +607,10 @@ requestAnimationFrame(frame);
     // connection states as on the watch: a short drop keeps the controls with "Reconnecting…", only a lasting one
     // shows the reason with Retry (LampRules.showControls)
     away.style.display = connSel.value === "away" ? "flex" : "none";
+    // checking: the last known light greyed, not touchable, "Checking…" on top (no spinner)
+    const checking = connSel.value === "checking";
+    document.getElementById("lampChecking").style.opacity = checking ? 1 : 0;
+    area.style.pointerEvents = checking ? "none" : "";
     recon.style.opacity = connSel.value === "reconnecting" ? 1 : 0;
     const dt = Math.min(0.032, (now - last) / 1000); last = now;
     [level, over, lift, mode, valOp, panS.x, panS.y, ...cells.map(c => c.bloom)].forEach(s => { for (let i = 0; i < 4; i++) s.step(dt / 4); });
@@ -615,7 +620,7 @@ requestAnimationFrame(frame);
     cap.style.background = `rgba(255,255,255,${0.16 + 0.06 * lift.x})`;
     cap.style.transformOrigin = over.x > 0 ? "50% 100%" : "50% 0%";
     const ms = 1 - 0.5 * mode.x;
-    cap.style.transform = `scale(${ms * (1 - st / H * 0.3)}, ${ms * (1 + st / H)})`; cap.style.opacity = 1 - mode.x; cap.style.filter = `blur(${6 * mode.x}px)`;
+    cap.style.transform = `scale(${ms * (1 - st / H * 0.3)}, ${ms * (1 + st / H)})`; cap.style.opacity = (1 - mode.x) * (connSel.value === "checking" ? 0.35 : 1); cap.style.filter = `blur(${6 * mode.x}px)`;
     fill.style.height = H * L + "px"; fill.style.backgroundColor = tint();
     icon.style.width = icon.style.height = "30px"; icon.style.bottom = "20px";
     const dark = L > 0.12; iconPath.setAttribute("stroke", dark ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.8)");

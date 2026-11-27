@@ -62,6 +62,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F23 | **Arrival in your evening light:** the arrival light (F16) comes on at your remembered evening light (F22) instead of a fixed 60 % (only with "Light by time of day" on), and still 25 % 2200 K inside the wind-down | built (round 29, no answer) |
 | F24 | **Double tap answers the note:** while a note with a button shows (Undo, Restart), double tap presses that button instead of toggling the lamp, as watchOS's double tap presses the primary button on screen; a ringing alarm still comes first; not in always-on (the note is not seen there) | built (round 30, no answer) |
 | F25 | **Lamp panel closes with the wrist:** lowering the wrist (the app leaves the front) closes the lamp panel, so the next raise shows the face, as Control Center does; never while a finger is on it (then right after the touch ends) | built (round 31, no answer) |
+| F26 | **Night cap:** between your usual bedtime and wake, the slider and the crown stop at 30 % with a click, so a sleepy fumble at 3 am never floods the room; push past the top a second time (or keep turning) to go higher, as Control Center's volume limit works | proposed (round 41) |
 
 ## Iterations
 
@@ -755,3 +756,16 @@ multipath indoors).
   by hand that is still armed; the length is also cleared when that nap's watch ends or the alarm is stopped.
   The battery guard's warned bedtime is saved.
 - **Verified:** rule by unit tests (CI). No visual change; prototype not republished.
+
+### 50 · 2026-11-27 — round 41: content instead of a spinner while checking (watch app change, install after recording)
+- **Review:** round 24 kept the "Checking…" spinner because "with no state known there is no content to show". But
+  the watch nearly always knows the lamp's last light (saved at every answer); only the first launch does not.
+  A full-screen spinner for the 0.5–3 s of a check is the indeterminate indicator the HIG asks watch apps to avoid,
+  and it makes the panel jump from spinner to slider.
+- **Changed:** while checking, the panel shows the slider as the lamp last was — greyed (35 %), not touchable —
+  with a "Checking…" pill in the middle; when the answer comes the live slider takes its place at the same spot.
+  Only with nothing ever saved does the spinner remain. VoiceOver: "Lamp, checking, last 60 percent".
+  Prototype: a "checking (last known)" connection state shows the same.
+- **Verified:** CI build; prototype JS parses. **Needs the real watch:** that the change from greyed to live reads as
+  "it's ready", not as a flicker.
+- **Proposed:** F26 night cap.

@@ -78,6 +78,12 @@ final class LampModel: ObservableObject {
         }
     }
 
+    /// the last light the lamp confirmed, however old: the checking screen shows it greyed while it asks, instead
+    /// of a bare spinner (the HIG asks watch apps to show content rather than indeterminate progress)
+    var lastKnown: LampLink.State? {
+        UserDefaults.standard.dictionary(forKey: Self.cacheKey).map { LampLink.State($0) }
+    }
+
     private func remember(_ s: LampLink.State) {
         guard s.home else { return }
         UserDefaults.standard.set(s.dictionary, forKey: Self.cacheKey)
@@ -365,8 +371,12 @@ struct LampPanel: View {
     private var unavailable: some View {
         VStack(spacing: 10) {
             if lamp.busy || lamp.problem == nil || lamp.problem == "Checking…" {
-                ProgressView()                                  // moving, so it never looks frozen
-                Text("Checking…").font(.footnote).foregroundStyle(FaceGeometry.Palette.ivory)
+                if let last = lamp.lastKnown {
+                    checking(last)
+                } else {
+                    ProgressView()                              // nothing known yet: moving, so it never looks frozen
+                    Text("Checking…").font(.footnote).foregroundStyle(FaceGeometry.Palette.ivory)
+                }
             } else {
                 Image(systemName: "lightbulb.slash").font(.system(size: 26)).foregroundStyle(FaceGeometry.Palette.sage)
                 Text(lamp.problem ?? "")
@@ -375,6 +385,32 @@ struct LampPanel: View {
             }
         }
         .onAppear { lamp.refresh(force: true) }
+    }
+
+    /// while asking the lamp: the slider as it last was, greyed and not touchable, with "Checking…" on top; it
+    /// becomes the live slider in place when the answer comes, so nothing jumps
+    private func checking(_ last: LampLink.State) -> some View {
+        GeometryReader { geo in
+            let w = geo.size.width - 6, h = geo.size.height - 6
+            let lvl = last.on ? Double(last.dimming) / 100 : 0
+            ZStack {
+                ZStack(alignment: .bottom) {
+                    Rectangle().fill(Color.white.opacity(0.10))
+                    Rectangle().fill(Self.tint(last).opacity(0.35)).frame(height: h * lvl)
+                }
+                .frame(width: w, height: h)
+                .clipShape(RoundedRectangle(cornerRadius: min(w, h) * 0.2, style: .continuous))
+                Text("Checking…").font(.caption.weight(.semibold)).foregroundStyle(.white)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(Capsule().fill(Color(white: 0.12).opacity(0.94)))
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityElement()
+        .accessibilityLabel(Text("Lamp, checking"))
+        .accessibilityValue(Text(last.on ? "last \(last.dimming) percent" : "last off"))
     }
 
     private var content: some View {
