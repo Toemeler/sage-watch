@@ -83,6 +83,7 @@ struct RecorderControls: View {
                 if recorder.trackPosition, let fix = PositionTracker.shared.lastFix {
                     row("GPS", "±\(Int(fix.horizontalAccuracy.rounded())) m · \(fix.timestamp.formatted(date: .omitted, time: .shortened))")
                 }
+                if recorder.trackPosition && PositionTracker.shared.saver { row("Battery", "below 20 %: GPS saves power") }
             } header: {
                 Text("Position")
             } footer: {

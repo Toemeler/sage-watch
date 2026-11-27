@@ -43,3 +43,18 @@ enum PositionFormat {
         "\(RecordingFormat.unix(t)),\(String(format: "%.2f", altitude)),\(String(format: "%.2f", accuracy)),\(String(format: "%.2f", precision))"
     }
 }
+
+/// Decisions for position tracking, kept testable.
+enum PositionRules {
+    enum GPSMode: Equatable { case best, saver }
+
+    /// Best accuracy while the battery allows; below 20 % (not charging) GPS drops to ~10 m accuracy, which costs far
+    /// less, so the recording lasts the day. Barometer, steps and compass keep going either way. Back to best above
+    /// 30 % or on the charger (a gap avoids flapping around the threshold).
+    static func gpsMode(battery: Double?, charging: Bool, current: GPSMode) -> GPSMode {
+        guard let b = battery, b >= 0, !charging else { return charging ? .best : current }
+        if b < 0.20 { return .saver }
+        if b > 0.30 { return .best }
+        return current
+    }
+}

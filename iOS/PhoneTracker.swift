@@ -30,6 +30,9 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
     private var files: [String: PhoneCSV] = [:]          // owned by queue
     private var segmentDir: URL?
     private var started: Date?
+    private var gpsMode = PositionRules.GPSMode.best
+    private var batteryTimer: Timer?
+    @Published private(set) var saver = false
 
     override init() {
         super.init()
@@ -68,6 +71,13 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
         if manager.authorizationStatus == .notDetermined { manager.requestWhenInUseAuthorization() }
         manager.allowsBackgroundLocationUpdates = true
         manager.startUpdatingLocation()
+        // if iOS closes Sage in the background (memory), a significant location change relaunches it, and init
+        // resumes tracking; plain location updates alone would end the day's recording silently
+        if CLLocationManager.significantLocationChangeMonitoringAvailable() { manager.startMonitoringSignificantLocationChanges() }
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        batteryTimer?.invalidate()
+        batteryTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.checkBattery() }
+        checkBattery()
 
         let bootOffset = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime
         if motion.isDeviceMotionAvailable {
@@ -120,7 +130,9 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
         running = false
         UserDefaults.standard.set(false, forKey: "phoneTracking")
         manager.stopUpdatingLocation()
+        manager.stopMonitoringSignificantLocationChanges()
         manager.allowsBackgroundLocationUpdates = false
+        batteryTimer?.invalidate(); batteryTimer = nil
         motion.stopDeviceMotionUpdates()
         pedometer.stopUpdates()
         altimeter.stopRelativeAltitudeUpdates()
@@ -130,6 +142,18 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
             self.files = [:]
         }
         writeMeta(end: Date())
+    }
+
+    /// below 20 % battery GPS drops to ~10 m accuracy so the recording lasts the day (PositionRules, tested)
+    private func checkBattery() {
+        let d = UIDevice.current
+        let level = d.batteryLevel >= 0 ? Double(d.batteryLevel) : nil
+        let charging = d.batteryState == .charging || d.batteryState == .full
+        let next = PositionRules.gpsMode(battery: level, charging: charging, current: gpsMode)
+        guard next != gpsMode else { return }
+        gpsMode = next
+        manager.desiredAccuracy = next == .best ? kCLLocationAccuracyBestForNavigation : kCLLocationAccuracyNearestTenMeters
+        saver = next == .saver
     }
 
     private func writeMeta(end: Date?) {
@@ -229,6 +253,7 @@ struct PhoneTrackerCard: View {
                 }
                 LabeledContent("Steps", value: "\(tracker.steps)")
                 LabeledContent("Floors", value: "↑\(tracker.floorsUp)  ↓\(tracker.floorsDown)")
+                if tracker.saver { Text("Battery below 20 %: GPS saves power (~10 m)").font(.footnote).foregroundStyle(.orange) }
             }
             if let p = tracker.problem { Text(p).font(.footnote).foregroundStyle(.red) }
         } header: {

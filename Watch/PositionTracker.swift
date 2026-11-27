@@ -1,6 +1,7 @@
 import CoreLocation
 import CoreMotion
 import Foundation
+import WatchKit
 
 /// Position tracking on the watch, alongside a recording run ("Track position" in the long-press menu):
 /// every GPS fix (best accuracy, no distance filter), Apple's step counter with floors up/down, and absolute
@@ -28,6 +29,10 @@ final class PositionTracker: NSObject, CLLocationManagerDelegate {
     /// the last fix, for the menu (main thread)
     private(set) var lastFix: CLLocation?
     var onFix: ((CLLocation) -> Void)?
+    private var gpsMode = PositionRules.GPSMode.best
+    private var batteryTimer: Timer?
+    /// GPS is in battery-saver mode (for the menu)
+    private(set) var saver = false
 
     /// starts all position streams into the run's segment directory (main thread)
     func start(directory dir: URL, segment: String) {
@@ -55,6 +60,10 @@ final class PositionTracker: NSObject, CLLocationManagerDelegate {
         manager = m
         if m.authorizationStatus == .notDetermined { m.requestWhenInUseAuthorization() }
         m.startUpdatingLocation()
+        WKInterfaceDevice.current().isBatteryMonitoringEnabled = true
+        batteryTimer?.invalidate()
+        batteryTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in self?.checkBattery() }
+        checkBattery()
 
         if CMPedometer.isStepCountingAvailable() {
             let since = Date()
@@ -82,6 +91,7 @@ final class PositionTracker: NSObject, CLLocationManagerDelegate {
         running = false
         manager?.stopUpdatingLocation()
         manager = nil
+        batteryTimer?.invalidate(); batteryTimer = nil
         pedometer.stopUpdates()
         if #available(watchOS 8.0, *) { altimeter.stopAbsoluteAltitudeUpdates() }
         queue.async {
@@ -93,6 +103,18 @@ final class PositionTracker: NSObject, CLLocationManagerDelegate {
     /// closes the open chunks so they reach the iPhone now ("Send now")
     func shipOpenChunks() {
         queue.async { self.locationFile?.close(); self.stepsFile?.close(); self.altitudeFile?.close() }
+    }
+
+    /// below 20 % battery GPS drops to ~10 m accuracy so the recording lasts the day (PositionRules, tested)
+    private func checkBattery() {
+        let d = WKInterfaceDevice.current()
+        let level = d.batteryLevel >= 0 ? Double(d.batteryLevel) : nil
+        let charging = d.batteryState == .charging || d.batteryState == .full
+        let next = PositionRules.gpsMode(battery: level, charging: charging, current: gpsMode)
+        guard next != gpsMode else { return }
+        gpsMode = next
+        manager?.desiredAccuracy = next == .best ? kCLLocationAccuracyBest : kCLLocationAccuracyNearestTenMeters
+        saver = next == .saver
     }
 
     // MARK: CLLocationManagerDelegate

@@ -78,3 +78,15 @@ final class LampRulesTests: XCTestCase {
         XCTAssertEqual(colour?["dimming"] as? Int, 45)
     }
 }
+
+final class PositionRulesTests: XCTestCase {
+    func testGPSSaverBelowTwentyPercentWithAGap() {
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.5, charging: false, current: .best), .best)
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.19, charging: false, current: .best), .saver)
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.25, charging: false, current: .saver), .saver)   // no flapping
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.25, charging: false, current: .best), .best)
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.31, charging: false, current: .saver), .best)
+        XCTAssertEqual(PositionRules.gpsMode(battery: 0.10, charging: true, current: .saver), .best)    // on the charger
+        XCTAssertEqual(PositionRules.gpsMode(battery: nil, charging: false, current: .saver), .saver)   // unknown: keep
+    }
+}

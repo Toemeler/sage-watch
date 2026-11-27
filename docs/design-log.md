@@ -51,7 +51,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F12 | **Night light from the bedside clock:** on the charger at night, turning the crown sets the lamp to a dim red night light (5 %), for getting up without waking fully; turning back down switches it off. Never bright | built (round 10, no answer; 10 % is the WiZ minimum) |
 | F13 | **Bedtime tap:** at your usual bedtime, if the lamp is still bright and wind-down is off, one quiet tap on the wrist with "Bedtime" (no sound); nothing if the lamp is already dim or off | built (round 10, no answer) |
 | F14 | **Try the sunrise:** a "Try sunrise" button in the long-press menu plays the whole wake-up light in 60 s (10 % candle → 80 % daylight → full), so you can see and judge it without waiting for a morning; any touch of the lamp stops it | built (round 12, no answer) |
-| F15 | **Walk direction in recordings:** record the compass heading once a second (device motion, magnetic north) alongside the barometer, so walks get a direction and length; with floor changes from the barometer, a change of room shows up in the data (for counting work like beds). Small battery cost; compass is disturbed near metal (bed frames), so direction changes, not absolute bearings, are used | proposed (Tom asked, round 13) |
+| F15 | **Walk direction in recordings:** record the compass heading once a second (device motion, magnetic north) alongside the barometer, so walks get a direction and length; with floor changes from the barometer, a change of room shows up in the data (for counting work like beds). Small battery cost; compass is disturbed near metal (bed frames), so direction changes, not absolute bearings, are used | built (Tom asked for full position tracking) |
 
 ## Iterations
 
@@ -351,3 +351,24 @@ whether background clicks are felt at bedtime.
 (as the alarm), then back. The prototype has the same button. Real sunrise and preview never run together.
 **Verified:** CI build and tests. **Needs the watch:** how the steps look on the real bulb (2 s step rate over the
 iPhone link).
+
+### 22 · 2026-11-27 — position tracking (Tom) and critical round 13 on it
+**Tom's request:** record where he goes all day, as accurately as possible, in 3D (stairs), with GPS when available
+and other methods otherwise, using the iPhone and the watch. Expectation set honestly: height ~10–25 cm (barometer),
+floors reliable, outdoors a few metres (GPS), indoors room-level by dead reckoning; 10 cm horizontal indoors would
+need the iPhone's camera (ARKit) or installed beacons/UWB anchors.
+**Built (build 78):** Track position on the watch (GPS, compass/orientation 10 Hz via magnetic-north device motion,
+steps/floors, absolute altitude, plus the existing barometer) and on the iPhone (the same streams plus its own
+barometer, background location). `tools/track3d.py` fuses both into one 3D path (barometer height pinned to
+GPS/absolute altitude, Kalman + RTS smoother over GPS and step/compass dead reckoning, pocket heading offset learned
+from GPS course). On a synthetic day with a known path: height median 0.13 m, floors 100 %, outdoors 0.6 m (clean
+GPS noise, optimistic), indoors 3.9 m after 14 min.
+**Round 13 review of it (for a whole working day):**
+1. *Silent end on the iPhone (critical).* iOS can terminate a background app; standard location updates do not
+   relaunch it, so the recording would just stop. Now also significant-location-change monitoring (relaunches
+   Sage) and the tracker is created in the app delegate, so it resumes even on a background launch.
+2. *Flat battery loses the rest of the day (high).* Below 20 % (not charging) GPS drops to ~10 m accuracy on both
+   devices; back to best above 30 % or on the charger (`PositionRules.gpsMode`, tested; the gap avoids flapping).
+   Barometer, steps and compass keep running. The menu / Data tab show when it is saving.
+3. *Process:* do not install new builds during a recording day (a reinstall restarts the app and leaves a gap).
+**Verified:** CI build and tests. **Needs a real day:** background GPS on the watch, battery, the real 3D path.
