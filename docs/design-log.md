@@ -929,7 +929,7 @@ multipath indoors).
 - **Review:** the application context keeps the iPhone's last change and is re-delivered with every other context
   update (sleep averages, alarm settings); the "newer than mine" rule makes re-delivery harmless. A change made
   while the other device is off arrives when it is back. Starting tracking on the iPhone from a watch message runs
-  in the background; iOS may hold it until the app is opened if location permission is "While Using" (the iPhone
-  card says so when that happens).
+  in the background; with location permission "While Using", iOS may not start it until the app is next opened
+  (not shown on the card yet — open Sage on the iPhone once after switching on the watch if in doubt).
 - **Verified:** rule by unit tests (CI). **Needs the real devices:** switch on the watch → iPhone card shows
   tracking within a minute; switch on the iPhone → the watch's menu shows it on.
