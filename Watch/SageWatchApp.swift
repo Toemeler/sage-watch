@@ -69,13 +69,17 @@ struct FaceScreen: View {
                     // always-on and bedside: one frame a minute
                     face(minute.date)
                 } else {
-                    // static layers drawn once; only the runner and the live layer follow the clock, at 20 fps
-                    // (the runner steps 5 times a second; 20 fps keeps its fade and the digit morph smooth)
+                    // static layers drawn once. The runner follows the clock at 20 fps (it steps 5 times a second;
+                    // 20 fps keeps its fade smooth); the time only while its digits morph, at the minute; the
+                    // music bars only while something plays
                     ZStack {
                         layer([.base])
                         TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in layer([.runner], tl.date) }
                         layer([.marks])
-                        TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in layer([.live], tl.date) }
+                        TimelineView(FaceRenderer.MorphSchedule()) { tl in layer([.live], tl.date) }
+                        if audio.playing {
+                            TimelineView(.animation(minimumInterval: 1.0 / 20)) { tl in layer([.music], tl.date) }
+                        }
                     }
                     // the spoken time follows the minute (it was fixed at the first draw before)
                     .accessibilityElement()

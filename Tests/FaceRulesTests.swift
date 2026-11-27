@@ -34,6 +34,21 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertFalse(FaceRules.recordingStalled(keepRunning: true, sinceStart: 3600, sinceLastSample: 9999, sleeping: true))  // not at night
     }
 
+    func testTimeLayerDrawsOnlyWhileTheDigitsMorph() {
+        let minute = Date(timeIntervalSince1970: 1_800_000_000)          // a whole minute (multiple of 60)
+        // inside the morph window: the next frame 1/20 s later
+        XCTAssertEqual(FaceRenderer.MorphSchedule.next(after: minute).timeIntervalSince(minute), 0.05, accuracy: 1e-6)
+        // past it: straight to the next minute
+        let late = minute.addingTimeInterval(0.8)
+        XCTAssertEqual(FaceRenderer.MorphSchedule.next(after: late).timeIntervalSince1970, 1_800_000_060, accuracy: 1e-6)
+        let mid = minute.addingTimeInterval(30)
+        XCTAssertEqual(FaceRenderer.MorphSchedule.next(after: mid).timeIntervalSince1970, 1_800_000_060, accuracy: 1e-6)
+        // frames per minute: ~16 during the morph, 1 at the minute
+        var d = mid, n = 0
+        while d.timeIntervalSince1970 < 1_800_000_119 { d = FaceRenderer.MorphSchedule.next(after: d); n += 1 }
+        XCTAssertLessThan(n, 20)
+    }
+
     func testCrownDoesNothingWhileAsleep() {
         XCTAssertEqual(FaceRules.crownAction(delta: 20, sleeping: true), .none)
         XCTAssertEqual(FaceRules.crownAction(delta: -20, sleeping: true), .none)

@@ -24,8 +24,33 @@ enum FaceRenderer {
         static let base = Layers(rawValue: 1)      // black, sunburst, guilloché disc, track rails and ticks
         static let runner = Layers(rawValue: 2)    // the seconds runner (between the track and the indices)
         static let marks = Layers(rawValue: 4)     // applied indices and minute numerals
-        static let live = Layers(rawValue: 8)      // time, music bars, battery
-        static let all: Layers = [.base, .runner, .marks, .live]
+        static let live = Layers(rawValue: 8)      // time and battery
+        static let music = Layers(rawValue: 16)    // the music bars (their own layer: they move, the time mostly not)
+        static let all: Layers = [.base, .runner, .marks, .live, .music]
+    }
+
+    /// When the time layer needs a frame: 20 a second during the first 0.8 s of each minute (the digits morph in
+    /// the first 0.75 s), otherwise not until the next minute. The time used to be redrawn 20 times a second all
+    /// minute long for a picture that changes for under a second of it.
+    struct MorphSchedule: TimelineSchedule {
+        static let window: TimeInterval = 0.8, step: TimeInterval = 1.0 / 20
+        func entries(from start: Date, mode: TimelineScheduleMode) -> AnyIterator<Date> {
+            var t = start
+            return AnyIterator {
+                let now = t
+                t = Self.next(after: now)
+                return now
+            }
+        }
+        /// the frame after `d` (time zones are whole minutes, so the minute starts at unix multiples of 60)
+        static func next(after d: Date) -> Date {
+            let u = d.timeIntervalSince1970
+            var start = (u / 60).rounded(.down) * 60
+            if u - start > 60 - 1e-3 { start += 60 }               // a hair before the minute counts as on it
+            let sec = max(0, u - start)
+            if sec + step < window { return Date(timeIntervalSince1970: u + step) }
+            return Date(timeIntervalSince1970: start + 60)          // exactly the next minute, never a tiny step
+        }
     }
 
     static func draw(_ ctx: inout GraphicsContext, size: CGSize, state: FaceState, layers: Layers = .all) {
@@ -53,11 +78,11 @@ enum FaceRenderer {
         }
         if layers.contains(.live) {
             drawTime(&ctx, state.date, dimmed: state.dimmed)
-            if !state.dimmed && state.music { drawMusic(&ctx, state.date) }
             if !state.dimmed && state.mode != .sleeping {
                 drawPlaque(&ctx, battery: state.battery, charging: state.charging, date: state.date, dimmed: false)
             }
         }
+        if layers.contains(.music) && !state.dimmed && state.music { drawMusic(&ctx, state.date) }
     }
 
     // MARK: dial

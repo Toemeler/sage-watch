@@ -689,3 +689,18 @@ multipath indoors).
 - **Prototype:** default text size only, no visual change; not republished.
 - **Verified:** CI build. **Needs the real watch:** the note at the largest allowed size on 40 mm, and VoiceOver
   reading order on the face.
+
+### 45 · 2026-11-27 — round 36: the face draws what moves, when it moves (watch app change, install after recording)
+- **Review (battery):** the face's live layer — four glyph paths with two shadow copies each, the music bars and
+  the battery bar — was redrawn 20 times a second all minute. The time only changes in the first 0.75 s of a minute
+  (the digit morph); the music bars move only while something plays; the battery bar almost never. That is ~1,200
+  full redraws a minute for under 20 that show anything new.
+- **Changed:** the time and battery layer runs on `FaceRenderer.MorphSchedule`: 20 fps for the first 0.8 s of each
+  minute, then nothing until the next minute (tested: in the window, after it, mid-minute, under 20 frames per
+  minute; a hair before the minute counts as on it, so floating point can never produce a burst of tiny steps).
+  The music bars are their own layer at 20 fps, present only while something plays. The runner (the seconds) stays
+  at 20 fps, it is the one thing that always moves. The battery bar still eases, in the morph frames.
+- **Prototype:** draws everything every frame on a computer; the layer split is performance only and changes no
+  pixel, so it is not mirrored.
+- **Verified:** schedule by unit tests (CI). **Needs the real watch:** battery over a day compared with before
+  (Battery in Settings shows Sage's share).
