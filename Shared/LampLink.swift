@@ -120,6 +120,13 @@ enum LampRules {
     /// while "Reconnecting…" shows, the watch tries again this often
     static let reconnectEvery: TimeInterval = 8
 
+    /// F6: switch the lamp off for a sleep that began at `onset`? Not when you changed the lamp yourself after that
+    /// moment: you were awake then, whatever the motion said (reading in bed, still), and your light stays.
+    static func offWhenAsleep(onset: Date, lastUserChange: Date?) -> Bool {
+        guard let u = lastUserChange else { return true }
+        return u < onset
+    }
+
     /// F25: lowering the wrist (the app leaves the front) closes the panel, so the next raise shows the face, as
     /// Control Center does; never while a finger is still on the slider
     static func closeOnWristDown(active: Bool, touching: Bool) -> Bool {

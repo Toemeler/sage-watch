@@ -61,6 +61,8 @@ final class LampModel: ObservableObject {
         get { UserDefaults.standard.object(forKey: "lampAwayLast") as? Date }
         set { UserDefaults.standard.set(newValue, forKey: "lampAwayLast") }
     }
+    /// when you last changed the lamp yourself (F6 never switches off over it)
+    private(set) var userChangedAt: Date?
     /// F16: when you last switched the lamp off yourself
     private(set) var userOffAt: Date? {
         get { UserDefaults.standard.object(forKey: "lampUserOffAt") as? Date }
@@ -93,9 +95,13 @@ final class LampModel: ObservableObject {
     func set(_ params: [String: Any], byUser: Bool = true) {
         if byUser {
             LampAutomation.shared.userChanged()      // you took over: sunrise / wind-down step aside
-            deferred = nil                           // and an older automatic step must never be sent after yours
+            userChangedAt = Date()
             if params["state"] as? Bool == false { userOffAt = Date() }
         }
+        // any newer change supersedes an older automatic step still waiting to be retried: after yours it must
+        // never be sent, and after a newer automatic one (the alarm's full light) neither (an "off, you fell
+        // asleep" from earlier would otherwise follow it when you raise the wrist)
+        deferred = nil
         lastLocalChange = Date()
         apply(params)
         pending = params
@@ -146,7 +152,8 @@ final class LampModel: ObservableObject {
         sending = true
         Task {
             let ok = await send([LampLink.commandKey: LampLink.set, LampLink.paramsKey: p], byUser: byUser)
-            if !ok && !byUser { deferred = (p, Date()) }
+            // a failed automatic step is kept for a retry only if nothing newer is waiting behind it
+            if !ok && !byUser && pending == nil { deferred = (p, Date()) }
             // F22: a light you set and the lamp took becomes this time of day's memory (never an automatic one,
             // and only once it arrived, so a failed change is not remembered)
             if ok && byUser && pending == nil, let m = LampRules.memory(of: state) {

@@ -96,19 +96,26 @@ final class LampAutomation: ObservableObject {
 
     // MARK: asleep (F6)
 
-    /// the watch found that you fell asleep (night or nap): a lamp that is on fades off, the wind-down stops
-    func fellAsleep() {
+    private var asleepTask: Task<Void, Never>?
+
+    /// the watch found that you fell asleep at `onset` (night or nap): a lamp that is on fades off, the wind-down
+    /// stops. Not if you changed the lamp yourself after `onset` (LampRules.offWhenAsleep, tested).
+    func fellAsleep(onset: Date = .now) {
         windDownTask?.cancel(); windDownTask = nil
         guard offWhenAsleepOn else { return }
-        activity = "Off: you fell asleep"
         let lamp = LampModel.shared
-        guard lamp.state.on else { return }
-        // two steps rather than a cut, so a half-asleep glance never sees the room snap dark
+        guard lamp.state.on, LampRules.offWhenAsleep(onset: onset, lastUserChange: lamp.userChangedAt) else { return }
+        activity = "Off: you fell asleep"
+        // two steps rather than a cut, so a half-asleep glance never sees the room snap dark. The second step is
+        // cancelled by any change of yours in between (userChanged): you are awake, your light stays.
         let from = lamp.state.dimming
-        Task { @MainActor in
+        asleepTask?.cancel()
+        asleepTask = Task { @MainActor in
             lamp.set(["state": true, "dimming": max(10, from / 3)], byUser: false)
             try? await Task.sleep(for: .seconds(20))
+            guard !Task.isCancelled else { return }
             lamp.set(["state": false], byUser: false)
+            asleepTask = nil
         }
     }
 
@@ -119,6 +126,7 @@ final class LampAutomation: ObservableObject {
     func userChanged() {
         rangAt = nil
         if previewTask != nil { previewTask?.cancel(); previewTask = nil; previewing = false; activity = "" }   // no restore: yours wins
+        if asleepTask != nil { asleepTask?.cancel(); asleepTask = nil; activity = "" }      // awake after all: no second step
         if sunriseTask != nil { sunriseTask?.cancel(); sunriseTask = nil; activity = "" }
         if windingDown, let task = windDownTask {
             windDownPausedFor = nextBedtime().at

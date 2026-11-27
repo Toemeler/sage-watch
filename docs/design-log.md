@@ -658,3 +658,20 @@ multipath indoors).
   clicks once when it reaches all-61 or full size.
 - **Verified:** CI build; prototype JS parses. No new decision logic. **Needs the real watch:** that the toolbar
   button's swap reads as back, not as a different close.
+
+### 43 · 2026-11-27 — round 34: three ways automation could still beat you (watch app change, install after recording)
+- **Review (user vs automation, every state), three findings:**
+  1. "Off when asleep" fades in two steps 20 s apart. A change you made in between was overwritten by the second
+     step: the lamp went off although you had just set it — you were obviously awake.
+  2. A failed automatic step waits to be retried when the app comes to the front. A newer *automatic* step did not
+     replace it: an "off, you fell asleep" that failed during a nap would be sent after the alarm's full light, as
+     soon as you raised the wrist — the room goes dark right after waking. The same hole existed for a step that
+     failed while a newer one was already queued behind it.
+  3. Sleep onset is found after the fact. If you changed the lamp yourself after the moment the watch later calls
+     "fell asleep" (reading in bed, lying still), the lamp still went off.
+- **Changed:** the second asleep step is a task that any change of yours cancels; every change, yours or
+  automatic, drops an older deferred step, and a failed step is deferred only if nothing newer is waiting; the
+  asleep fade checks `LampRules.offWhenAsleep(onset:lastUserChange:)` (tested) with the onset the detector found.
+- **Prototype:** automation only; no visual change, not republished.
+- **Verified:** rule by unit tests (CI). **Needs real nights:** the contact log shows whether deferred steps are
+  still being sent, and when.

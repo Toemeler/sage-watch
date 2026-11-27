@@ -78,6 +78,13 @@ final class LampRulesTests: XCTestCase {
         XCTAssertFalse(LampRules.idleClose(idle: 300, touching: false, colours: true))    // choosing a colour
     }
 
+    func testAsleepOffNeverOverAChangeMadeAfterFallingAsleep() {
+        let onset = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertTrue(LampRules.offWhenAsleep(onset: onset, lastUserChange: nil))
+        XCTAssertTrue(LampRules.offWhenAsleep(onset: onset, lastUserChange: onset.addingTimeInterval(-600)))   // before
+        XCTAssertFalse(LampRules.offWhenAsleep(onset: onset, lastUserChange: onset.addingTimeInterval(120)))   // awake then
+    }
+
     func testPanelClosesWithTheWristButNotUnderAFinger() {
         XCTAssertTrue(LampRules.closeOnWristDown(active: false, touching: false))
         XCTAssertFalse(LampRules.closeOnWristDown(active: false, touching: true))
