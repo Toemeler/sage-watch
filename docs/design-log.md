@@ -51,6 +51,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F12 | **Night light from the bedside clock:** on the charger at night, turning the crown sets the lamp to a dim red night light (5 %), for getting up without waking fully; turning back down switches it off. Never bright | built (round 10, no answer; 10 % is the WiZ minimum) |
 | F13 | **Bedtime tap:** at your usual bedtime, if the lamp is still bright and wind-down is off, one quiet tap on the wrist with "Bedtime" (no sound); nothing if the lamp is already dim or off | built (round 10, no answer) |
 | F14 | **Try the sunrise:** a "Try sunrise" button in the long-press menu plays the whole wake-up light in 60 s (10 % candle → 80 % daylight → full), so you can see and judge it without waiting for a morning; any touch of the lamp stops it | built (round 12, no answer) |
+| F15 | **Walk direction in recordings:** record the compass heading once a second (device motion, magnetic north) alongside the barometer, so walks get a direction and length; with floor changes from the barometer, a change of room shows up in the data (for counting work like beds). Small battery cost; compass is disturbed near metal (bed frames), so direction changes, not absolute bearings, are used | proposed (Tom asked, round 13) |
 
 ## Iterations
 
