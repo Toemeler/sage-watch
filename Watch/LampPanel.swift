@@ -50,6 +50,22 @@ final class LampModel: ObservableObject {
     private var deferred: (params: [String: Any], at: Date)?
     private var sending = false
     private var lastLocalChange = Date.distantPast
+    /// the lamp panel is on screen (F16 never switches on under it)
+    var panelOpen = false
+    /// F16: the first and the last time the iPhone answered that no bulb replied (you are away); nil while at home
+    private var awaySince: Date? {
+        get { UserDefaults.standard.object(forKey: "lampAwaySince") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "lampAwaySince") }
+    }
+    private var awayLast: Date? {
+        get { UserDefaults.standard.object(forKey: "lampAwayLast") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "lampAwayLast") }
+    }
+    /// F16: when you last switched the lamp off yourself
+    private(set) var userOffAt: Date? {
+        get { UserDefaults.standard.object(forKey: "lampUserOffAt") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "lampUserOffAt") }
+    }
     private static let cacheKey = "lampLastState", cacheTimeKey = "lampLastStateTime"
 
     init() {
@@ -78,6 +94,7 @@ final class LampModel: ObservableObject {
         if byUser {
             LampAutomation.shared.userChanged()      // you took over: sunrise / wind-down step aside
             deferred = nil                           // and an older automatic step must never be sent after yours
+            if params["state"] as? Bool == false { userOffAt = Date() }
         }
         lastLocalChange = Date()
         apply(params)
@@ -173,6 +190,16 @@ final class LampModel: ObservableObject {
         problem = s.home ? nil : "No lamp answered. Open Sage on the iPhone once and allow Local Network, then retry."
         if s.home { confirmed = s; confirmedAt = Date() }
         remember(state)
+        // F16: only the iPhone's own answer "no bulb replied" counts as away; an iPhone out of Bluetooth range in
+        // another room does not (that never reaches here), so sitting at home is never taken for an arrival
+        if !s.home {
+            if awaySince == nil { awaySince = Date() }
+            awayLast = Date()
+        } else if let first = awaySince {
+            let last = awayLast ?? first
+            awaySince = nil; awayLast = nil
+            LampAutomation.shared.arrived(awaySpan: last.timeIntervalSince(first), sinceAway: Date().timeIntervalSince(last))
+        }
     }
 
     private func reachable(within seconds: Double) async -> Bool {
@@ -258,6 +285,8 @@ struct LampPanel: View {
                 Button { dismiss() } label: { Image(systemName: "xmark") }
             }
         }
+        .onAppear { lamp.panelOpen = true }
+        .onDisappear { lamp.panelOpen = false }
         // on both views: the "not reachable" screen must not keep the app in front forever either
         .task {
             while !Task.isCancelled {

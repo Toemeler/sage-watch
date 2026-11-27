@@ -29,6 +29,9 @@ final class LampAutomation: ObservableObject {
     @Published var bedtimeTapOn = UserDefaults.standard.object(forKey: "lampBedtimeTap") as? Bool ?? true {
         didSet { UserDefaults.standard.set(bedtimeTapOn, forKey: "lampBedtimeTap") }
     }
+    @Published var arrivalOn = UserDefaults.standard.object(forKey: "lampArrival") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(arrivalOn, forKey: "lampArrival") }
+    }
     /// when the bedtime tap last fired (the face shows a note for it)
     @Published private(set) var bedtimeTappedAt: Date?
     private var bedtimeTask: Task<Void, Never>?
@@ -179,6 +182,27 @@ final class LampAutomation: ObservableObject {
         scheduleWindDown()
         bedtimeTask?.cancel(); bedtimeTask = nil
         scheduleBedtimeTap()
+    }
+
+    // MARK: arrival light (F16)
+
+    /// The lamp answered again after you were away (the iPhone found no bulb over `awaySpan`, last `sinceAway` ago). After dark, with the
+    /// lamp off and nothing against it (LampRules.arrivalLight, tested), it comes on warm. Seen when the watch next
+    /// asks the lamp: raising the wrist at the door, not the moment the iPhone joins the Wi-Fi.
+    func arrived(awaySpan: TimeInterval, sinceAway: TimeInterval) {
+        guard arrivalOn else { return }
+        let lamp = LampModel.shared, now = Date()
+        let d = UserDefaults.standard
+        let lat = d.object(forKey: "approxLat") as? Double, lon = d.object(forKey: "approxLon") as? Double
+        var bed = nextBedtime(after: now)
+        while bed.nap { bed = nextBedtime(after: bed.at.addingTimeInterval(60)) }
+        guard let p = LampRules.arrivalLight(awaySpan: awaySpan, sinceAway: sinceAway, dark: Sun.dark(at: now, lat: lat, lon: lon),
+                                             sleeping: FaceMode.auto(now) == .sleeping, lampOn: lamp.state.on,
+                                             panelOpen: lamp.panelOpen,
+                                             sinceUserOff: lamp.userOffAt.map { now.timeIntervalSince($0) },
+                                             minutesToBed: bed.at.timeIntervalSince(now) / 60) else { return }
+        lamp.set(p, byUser: false)
+        activity = "Welcome home: lamp on"
     }
 
     // MARK: try the sunrise (F14)

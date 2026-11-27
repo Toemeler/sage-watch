@@ -111,6 +111,28 @@ enum LampRules {
         !busy && sinceLastTry >= reconnectEvery
     }
 
+    /// F16: "away" needs the iPhone to answer "no bulb replied" at least twice, this far apart (one flaky answer
+    /// at home is not leaving) ...
+    static let arrivalAway: TimeInterval = 20 * 60
+    /// ... and the lamp to answer again within this time of the last "away" answer (a home reply hours later says
+    /// only that the watch had not asked, not that you just walked in)
+    static let arrivalFresh: TimeInterval = 30 * 60
+    /// F16: a lamp you switched off this recently is not switched on again by an arrival
+    static let arrivalOffGrace: TimeInterval = 10 * 60
+
+    /// F16, coming home after dark: the lamp comes on warm, dimmer when bedtime is under an hour away (the level
+    /// wind-down would be heading to). `awaySpan`: from the first to the last "away" answer; `sinceAway`: from the
+    /// last "away" answer to now. Nil whenever it must not: away not proven, not fresh, not dark, a sleep block, the
+    /// lamp already on, the lamp panel open (you are about to set it yourself; a tap there would toggle it straight
+    /// back off), or you switched it off in the last 10 min. Automation never switches on over your own choice.
+    static func arrivalLight(awaySpan: TimeInterval, sinceAway: TimeInterval, dark: Bool, sleeping: Bool, lampOn: Bool,
+                             panelOpen: Bool, sinceUserOff: TimeInterval?, minutesToBed: Double) -> [String: Any]? {
+        guard awaySpan >= arrivalAway, sinceAway >= 0, sinceAway <= arrivalFresh else { return nil }
+        guard dark, !sleeping, !lampOn, !panelOpen else { return nil }
+        if let s = sinceUserOff, s >= 0, s < arrivalOffGrace { return nil }
+        return minutesToBed <= 60 ? ["state": true, "dimming": 25, "temp": 2200] : ["state": true, "dimming": 60, "temp": 2700]
+    }
+
     /// one sunrise step at progress `t` (0...1 through the wake window): eased like dawn, 10 → 80 % and
     /// 2200 → 4200 K. Nil when the lamp is already on and at least that bright (you or an earlier step set it):
     /// a sunrise never dims a lamp.

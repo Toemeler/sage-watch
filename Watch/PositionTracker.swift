@@ -129,6 +129,11 @@ final class PositionTracker: NSObject, CLLocationManagerDelegate {
         }
         if let last = locations.last {
             DispatchQueue.main.async { self.lastFix = last; self.onFix?(last) }
+            // a rough position (0.1° ≈ 10 km) for sunset times (F16); kept on the watch only
+            if last.horizontalAccuracy >= 0, last.horizontalAccuracy < 5000 {
+                UserDefaults.standard.set((last.coordinate.latitude * 10).rounded() / 10, forKey: "approxLat")
+                UserDefaults.standard.set((last.coordinate.longitude * 10).rounded() / 10, forKey: "approxLon")
+            }
         }
     }
 

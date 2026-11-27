@@ -84,6 +84,43 @@ final class LampRulesTests: XCTestCase {
         XCTAssertFalse(LampRules.retryReconnect(sinceLastTry: 60, busy: true))           // one still out
     }
 
+    func testArrivalLightOnlyWhenNothingSpeaksAgainstIt() {
+        func a(away: TimeInterval = 3600, since: TimeInterval = 120, dark: Bool = true, sleeping: Bool = false, on: Bool = false, panel: Bool = false,
+               off: TimeInterval? = nil, bed: Double = 240) -> [String: Any]? {
+            LampRules.arrivalLight(awaySpan: away, sinceAway: since, dark: dark, sleeping: sleeping, lampOn: on, panelOpen: panel,
+                                   sinceUserOff: off, minutesToBed: bed)
+        }
+        XCTAssertEqual(a()?["dimming"] as? Int, 60)
+        XCTAssertEqual(a()?["temp"] as? Int, 2700)
+        XCTAssertEqual(a(bed: 40)?["dimming"] as? Int, 25)            // close to bedtime: dim and warm
+        XCTAssertNil(a(away: 0))                                      // one flaky answer at home is not leaving
+        XCTAssertNil(a(away: 600))                                    // a short drop is not coming home
+        XCTAssertNil(a(since: 3 * 3600))                              // home for hours, the watch just had not asked
+        XCTAssertNil(a(dark: false))
+        XCTAssertNil(a(sleeping: true))
+        XCTAssertNil(a(on: true))                                     // never changes a lamp that is on
+        XCTAssertNil(a(panel: true))                                  // you are setting it yourself
+        XCTAssertNil(a(off: 120))                                     // you just switched it off
+        XCTAssertNotNil(a(off: 3600))
+    }
+
+    func testSunTimesForZurich() {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Europe/Zurich")!
+        func local(_ y: Int, _ m: Int, _ d: Int, _ h: Int, _ min: Int) -> Date {
+            cal.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min))!
+        }
+        let nov = Sun.times(on: local(2026, 11, 27, 12, 0), lat: 47.37, lon: 8.54, calendar: cal)!
+        XCTAssertEqual(nov.rise.timeIntervalSince(local(2026, 11, 27, 7, 46)), 0, accuracy: 5 * 60)
+        XCTAssertEqual(nov.set.timeIntervalSince(local(2026, 11, 27, 16, 40)), 0, accuracy: 5 * 60)
+        let jun = Sun.times(on: local(2026, 6, 21, 12, 0), lat: 47.37, lon: 8.54, calendar: cal)!
+        XCTAssertEqual(jun.set.timeIntervalSince(local(2026, 6, 21, 21, 25)), 0, accuracy: 5 * 60)
+        XCTAssertTrue(Sun.dark(at: local(2026, 11, 27, 17, 30), lat: 47.37, lon: 8.54, calendar: cal))
+        XCTAssertFalse(Sun.dark(at: local(2026, 6, 21, 20, 30), lat: 47.37, lon: 8.54, calendar: cal))
+        XCTAssertNil(Sun.times(on: local(2026, 6, 21, 12, 0), lat: 78, lon: 15, calendar: cal))   // midnight sun
+        XCTAssertTrue(Sun.dark(at: local(2026, 6, 21, 22, 0), lat: nil, lon: nil, calendar: cal))  // no position: by the hour
+    }
+
     func testWindDownNeverSwitchesOnAndLeavesColour() {
         XCTAssertNil(LampRules.windDown(t: 0.5, start: state(on: true, dim: 80), current: state(on: false, dim: 80)))
         let colour = LampRules.windDown(t: 0.5, start: state(on: true, dim: 80, temp: nil), current: state(on: true, dim: 80, temp: nil))
