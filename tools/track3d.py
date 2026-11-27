@@ -407,11 +407,14 @@ def build(d: Path):
         have |= near <= 30
     src = np.where(~have, "gap", np.where(~np.isnan(gx) & (gacc < 15), "gps", np.where(dist > 0, "steps", "still")))
     warnings = []
-    baro_up = sum(c["to"] - c["from"] for c in changes if c["to"] > c["from"])
-    baro_down = sum(c["from"] - c["to"] for c in changes if c["to"] < c["from"])
+    # Apple's step counter counts floors climbed on foot only: compare it with the barometer's *stairs*, not its
+    # lift rides (the real 27 Nov day warned about three lift rides the step counter could never have counted)
+    stairs = [c for c in changes if c.get("by") != "lift"]
+    baro_up = sum(c["to"] - c["from"] for c in stairs if c["to"] > c["from"])
+    baro_down = sum(c["from"] - c["to"] for c in stairs if c["to"] < c["from"])
     if ped_up is not None and (abs(ped_up - baro_up) > 1 or abs((ped_down or 0) - baro_down) > 1):
-        warnings.append(f"Apple's step counter counted floors up {ped_up} / down {ped_down}, the barometer "
-                        f"{baro_up} / {baro_down}: check the floor changes (lifts are not counted by the step counter)")
+        warnings.append(f"Apple's step counter counted floors up {ped_up} / down {ped_down} on foot, the barometer "
+                        f"{baro_up} / {baro_down} by stairs: check the floor changes")
     for p in borrowed:
         warnings.append(f"pocket period {p[0]//60:.0f}–{p[1]//60:.0f} min after start had no GPS walk: its direction "
                         f"is borrowed from the nearest period and may be off")

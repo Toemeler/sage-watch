@@ -944,3 +944,11 @@ multipath indoors).
   "While Using" and what that means. New usage text for "Always" in the Info.plist.
 - **Verified:** CI build. **Needs the real iPhone:** the upgrade prompt appears once; with Always, switching on at
   the watch starts the iPhone's tracking while Sage is closed.
+
+### 65 · 2026-11-27 — round 56: a warning that cried wolf on the real day (tools only, no new build)
+- **Review:** on 27 Nov the path's only warning said the step counter's floors (0 / 0) disagreed with the barometer
+  (7 / 4) — but 9 of those 11 floors were lift rides, which Apple's step counter never counts. A warning that fires
+  on a correct day teaches you to ignore warnings.
+- **Changed:** the step counter is compared with the barometer's stairs only; the real day now has no warning (1 / 1
+  by stairs against 0 / 0 is within the tolerance of one floor). Regression test 14/14.
+- No app change: build 124 is current.
