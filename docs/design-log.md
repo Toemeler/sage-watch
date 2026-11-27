@@ -1005,3 +1005,16 @@ multipath indoors).
   lies in December, so all of its watch pressure was dropped as "future". The bug's times are ~2.6e9 (2052): the
   cut is now a fixed 2.0e9 (2033) in both tools. The real 27 Nov result is unchanged.
 - Regression: 17/17.
+
+### 71 · 2026-11-27 — round 62: built with the current SDK (watch + iPhone, build 134)
+- **Review (platform consistency):** CI built with Xcode 16.4 (watchOS 11 SDK) on the macos-15 runner, which has no
+  Xcode 26. An app built with an old SDK keeps the old look on watchOS 26+ (Tom's watch runs 27): its buttons,
+  toggles, sheets and toolbars do not get the system's current (Liquid Glass) design, and `glassEffect` cannot be
+  used at all.
+- **Research:** `glassEffect` exists from watchOS 26 (default: regular glass in a capsule); GitHub's macos-26 runners
+  are generally available with Xcode 26 preinstalled.
+- **Changed:** CI runs on macos-26 with the newest Xcode 26 (26.6), falling back to Xcode 16 where 26 is missing.
+  Xcode 26's type checker timed out on three expressions (two HealthKit callbacks, the colour wheel's bubble
+  chain): split into typed steps / a `bubbleFace` view. Tests and build green (build 134).
+- **Needs the real watch:** the system controls now look current (toolbar buttons, the menu's lists and toggles);
+  everything drawn by Sage itself is unchanged. Next: glass for Sage's own pills and notes, gated to watchOS 26.
