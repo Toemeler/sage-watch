@@ -645,3 +645,16 @@ multipath indoors).
   arrival and bedtime notes.
 - **Verified:** CI build; prototype JS parses. **Needs the real watch:** the shrink on the 40 mm screen for the
   longest note ("Nap · up to 100 min" + Undo).
+
+### 42 · 2026-11-27 — round 33: way back from the colours (watch app change, install after recording)
+- **Research:** the watchOS 10 Home app: tapping an accessory toggles it, more control sits one level deeper
+  behind its own button — the same split as ours (tap = on/off, slider, colours behind a long press).
+- **Review:** in the colour wheel the corner ✕ closed the whole panel, while the only way back to the slider was
+  tapping empty space between bubbles (not discoverable, and the wheel is mostly bubbles). One level deeper should
+  have a back button in the corner, as every watchOS navigation does. The crown zoom also stopped silently at its
+  ends, unlike the slider, which clicks.
+- **Changed (Swift and prototype):** the corner button is a back chevron while the colours are open (closes them,
+  VoiceOver "Back to brightness") and ✕ on the slider; the icon swaps with the symbol transition. The crown zoom
+  clicks once when it reaches all-61 or full size.
+- **Verified:** CI build; prototype JS parses. No new decision logic. **Needs the real watch:** that the toolbar
+  button's swap reads as back, not as a different close.

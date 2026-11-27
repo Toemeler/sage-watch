@@ -301,7 +301,13 @@ struct LampPanel: View {
         }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button { dismiss() } label: { Image(systemName: "xmark") }
+                Button {
+                    if colours { closeColours() } else { dismiss() }
+                } label: {
+                    Image(systemName: colours ? "chevron.backward" : "xmark")
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .accessibilityLabel(Text(colours ? "Back to brightness" : "Close"))
             }
         }
         .onAppear { lamp.panelOpen = true }
@@ -396,9 +402,9 @@ struct LampPanel: View {
             guard abs(delta) < 50 else { return }            // ignore a jump of the binding itself
             if colours {
                 // in the colour wheel the crown zooms, as on the app grid: down shows all 61, up brings them close
-                withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.9)) {
-                    zoom = min(1, max(0.42, zoom + CGFloat(delta) * 0.012))
-                }
+                let next = min(1, max(0.42, zoom + CGFloat(delta) * 0.012))
+                if next != zoom && (next == 1 || next == 0.42) { WKInterfaceDevice.current().play(.click) }
+                withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.9)) { zoom = next }
                 return
             }
             guard !touching else { return }

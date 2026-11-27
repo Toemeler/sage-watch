@@ -359,7 +359,7 @@ requestAnimationFrame(frame);
 </style>
 <div class="watch"><div class="screen" id="lampScreen">
   <div class="lamp-root" id="lampRoot">
-    <div class="lamp-close">✕</div>
+    <div class="lamp-close" id="lampClose" style="cursor:pointer">✕</div>
     <div class="lamp-area" id="lampArea">
       <div class="val" id="lampVal"></div><div class="val" id="lampValDark"></div>
       <div class="lamp-fail" id="lampFail">⚠︎ Lamp didn't respond</div>
@@ -507,6 +507,7 @@ requestAnimationFrame(frame);
   const matches = sw => sw.temp ? (!lamp.rgb && lamp.temp === sw.temp) : (lamp.rgb && Math.abs(lamp.rgb[0] - sw.rgb[0]) + Math.abs(lamp.rgb[1] - sw.rgb[1]) + Math.abs(lamp.rgb[2] - sw.rgb[2]) < 12);
 
   function openColours() {
+    closeBtn.textContent = "‹";
     colours = true; mode.to(1, 0.45, 0.8);
     cells.forEach(c => { if (reduce) { c.bloom.jump(1); return; } c.bloom.jump(0); setTimeout(() => c.bloom.to(1, 0.5, 0.74), c.ring * 40); });
     // open centred on the colour that is set, as the app grid opens on the last app; on the middle of it and the
@@ -522,7 +523,10 @@ requestAnimationFrame(frame);
     const p0 = { x: -ctr.x, y: -ctr.y };
     pan = { ...p0 }; panBase = { ...p0 }; panS.x.jump(p0.x); panS.y.jump(p0.y);
   }
-  function closeColours() { colours = false; zoom = 1; mode.to(0, 0.45, 0.85); cells.forEach(c => c.bloom.to(0, 0.3, 1)); }
+  // the corner button: back from the colours (chevron), close from the slider (✕)
+  const closeBtn = document.getElementById("lampClose");
+  closeBtn.addEventListener("pointerdown", e => { e.stopPropagation(); if (colours) closeColours(); });
+  function closeColours() { closeBtn.textContent = "✕"; colours = false; zoom = 1; mode.to(0, 0.45, 0.85); cells.forEach(c => c.bloom.to(0, 0.3, 1)); }
 
   // capsule gestures
   const pt = e => { const r = area.getBoundingClientRect(); return { x: (e.clientX - r.left) / (r.width / AW), y: (e.clientY - r.top) / (r.height / AH) }; };
@@ -577,7 +581,11 @@ requestAnimationFrame(frame);
   // the Digital Crown
   document.getElementById("lampScreen").addEventListener("wheel", e => {
     e.preventDefault();
-    if (colours) { zoom = Math.min(1, Math.max(0.42, zoom - e.deltaY / 800)); return; }
+    if (colours) {
+      const next = Math.min(1, Math.max(0.42, zoom - e.deltaY / 800));
+      if (next !== zoom && (next === 1 || next === 0.42)) buzz();    // a click at either end of the zoom
+      zoom = next; return;
+    }
     if (touching) return;
     stopPreview();                                  // the crown is a change of yours too
     const l = Math.min(1, Math.max(0, modelLevel() - e.deltaY / 1000));
