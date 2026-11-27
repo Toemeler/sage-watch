@@ -86,6 +86,26 @@ def main(d: Path):
             rel = a[:, 2]
             line += f", height range {np.nanmin(rel):.1f} … {np.nanmax(rel):.1f} m"
         ok.append("✓ " + line)
+    # lessons from the first real day (27 Nov): the watch's switch was off, and its barometer was timestamped in 2052
+    import json, time
+    try:
+        segs = json.load(open(d / "segments.json"))
+    except (OSError, ValueError):
+        segs = []
+    watch_runs = [g for g in segs if not str(g.get("segment", "")).startswith("phone-")]
+    phone_runs = [g for g in segs if str(g.get("segment", "")).startswith("phone-")]
+    if phone_runs and watch_runs and not any(g.get("track_position") for g in watch_runs):
+        problems.append("! watch: position tracking was off in every run (Track position in the watch's long-press "
+                        "menu): only the iPhone recorded your path")
+    future = []
+    for name in ["pressure", "phonepressure", "heading", "phoneheading", "location", "phonelocation"]:
+        f = d / f"{name}.csv"
+        a = load(f) if f.exists() else None
+        if a is not None and np.nanmax(a[:, 0]) > time.time() + 86400:
+            future.append(name)
+    if future:
+        problems.append("✗ timestamps in the future in " + ", ".join(future) + " (the watchOS 27 altimeter clock; "
+                        "fixed in build 120, older files keep the wrong times)")
     print("\n".join(ok))
     if problems:
         print("\nTo look at:")

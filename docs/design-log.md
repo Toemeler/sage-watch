@@ -64,6 +64,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F25 | **Lamp panel closes with the wrist:** lowering the wrist (the app leaves the front) closes the lamp panel, so the next raise shows the face, as Control Center does; never while a finger is on it (then right after the touch ends) | built (round 31, no answer) |
 | F26 | **Night cap:** between your usual bedtime and wake (learned night), the slider and the crown stop at 30 % with a click and the stretch of the real top; a second push from the cap (a new drag starting there, or a crown turn after resting there ½ s) goes higher; switching on at night comes on at most 30 %; a light set brighter before is never pulled down; night changes are not remembered as the evening light (F22); toggle "Night cap" | built (round 42, no answer) |
 | F27 | **Adaptive white (like Apple Home's Adaptive Lighting):** while the lamp is on in white, its white follows the day: 2200 K before sunrise, 2700 K at sunrise rising to 4000 K at solar noon, back to 2700 K at sunset; ≤ 300 K steps every 4 min, brightness untouched, never on a colour. Evening and night only ever warmer (after the wind-down it stays candle-warm). Steps aside for the sunrise, its preview, the wind-down and the minutes after the alarm; a white or colour you pick pauses it until the lamp is next switched off; toggle "Adaptive white" | built (round 47, no answer) |
+| F28 | **One switch for position:** turning Track position on (or off) on the iPhone turns it on (or off) on the watch too, and the other way round, so a recording day never misses one device again (27 Nov: the watch's switch was off and only the iPhone recorded) | proposed (round 53) |
 
 ## Iterations
 
@@ -909,3 +910,13 @@ multipath indoors).
   3 by lift, 10:50 down 1 by stairs, 11:06 up 1 by stairs; ~234 min on floor 3, 16 min on floor 2, 23 min on the
   ground floor. Apple's step counter counted no floors (it misses lifts, and the iPhone in a pocket often misses
   stairs) — the barometer's events are the ones to trust.
+
+### 62 · 2026-11-27 — round 53: the real day's lessons into the tools (tools only, no new build)
+- **Review:** two of the real day's problems would have been caught at a glance by the health check if it had known
+  to look: the watch's Track position switch was off in every run while the iPhone's was on, and the watch
+  barometer's times lay in 2052.
+- **Changed:** `tools/check_export.py` now says when the watch's position tracking was off while the iPhone's was
+  on, and when any position or pressure file has times in the future (with the build that fixed it). Checked on
+  the 27 Nov export: both are reported.
+- **Proposed:** F28 one switch for position (built next round if unanswered).
+- No app change: build 120 is current.
