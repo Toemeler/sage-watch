@@ -23,7 +23,11 @@ jobs:
 
       - name: Select Xcode
         run: |
-          XC=$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)
+          # the newest Xcode 26 if the runner has one (watchOS 26 SDK: the system's Liquid Glass look for buttons,
+          # toggles and sheets), else the newest Xcode 16
+          ls -d /Applications/Xcode*.app
+          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -z "$XC" ] && XC=$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)
           echo "Using $XC"; sudo xcode-select -s "$XC"; xcodebuild -version
 
       - name: Install tools
