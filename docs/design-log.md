@@ -675,3 +675,17 @@ multipath indoors).
 - **Prototype:** automation only; no visual change, not republished.
 - **Verified:** rule by unit tests (CI). **Needs real nights:** the contact log shows whether deferred steps are
   still being sent, and when.
+
+### 44 · 2026-11-27 — round 35: text size and what VoiceOver hears on the face (watch app change, install after recording)
+- **Research:** Apple's typography guidance: use the system text styles, which follow Dynamic Type and Bold Text;
+  default sizes differ per watch size; fixed sizes truncate or clip at larger settings.
+- **Review:** every small text outside the clock was a fixed point size (the note 13/14 pt, the lamp pills 12 pt,
+  the "not reachable" text 13 pt) and ignored the wearer's text size. VoiceOver on the face heard only the time:
+  the battery bar, the recording dot and the sleep face said nothing — a VoiceOver user could not know the battery.
+- **Changed:** note, pills and lamp messages use footnote / caption styles; the note and the failure pill follow
+  the text size up to xxLarge (beyond that one line no longer fits the 40 mm pill; it still shrinks 75 % first).
+  The face's VoiceOver element reads e.g. "12:41, battery 78 percent, charging, recording, sleep time".
+  The clock digits stay drawn at their fixed design size (they are the face, and already large).
+- **Prototype:** default text size only, no visual change; not republished.
+- **Verified:** CI build. **Needs the real watch:** the note at the largest allowed size on 40 mm, and VoiceOver
+  reading order on the face.

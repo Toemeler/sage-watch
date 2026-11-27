@@ -80,6 +80,7 @@ struct FaceScreen: View {
                     // the spoken time follows the minute (it was fixed at the first draw before)
                     .accessibilityElement()
                     .accessibilityLabel(Text(minute.date.formatted(date: .omitted, time: .shortened)))
+                    .accessibilityValue(Text(faceSummary(minute.date)))
                 }
             }
             doubleTapTarget
@@ -89,13 +90,13 @@ struct FaceScreen: View {
                     HStack(spacing: 8) {
                         // on the bedside clock the note is red too, so it never lights the room
                         let night = Self.bedside(Date())
-                        Text(note).font(.system(size: 13, weight: .semibold))
+                        Text(note).font(.footnote.weight(.semibold))
                             .lineLimit(1).minimumScaleFactor(0.75)      // one line in the pill, on 40 and 44 mm
                             .foregroundStyle(night ? FaceRenderer.bedsideRed : FaceGeometry.Palette.ivory)
                         if let undo = noteUndo {
                             // a target a sleepy finger can hit: ~44 x 32 pt, not just the word
                             Button { undo(); hideNapNote() } label: {
-                                Text(noteActionLabel).font(.system(size: 14, weight: .semibold))
+                                Text(noteActionLabel).font(.footnote.weight(.bold))
                                     .frame(minWidth: 44, minHeight: 32)
                                     .contentShape(Rectangle())
                             }
@@ -107,6 +108,8 @@ struct FaceScreen: View {
                         }
                     }
                     .padding(.horizontal, 12).padding(.vertical, 8)
+                    // follows the wearer's text size, up to the size where one line still fits the pill
+                    .dynamicTypeSize(...DynamicTypeSize.xxLarge)
                     .background(Capsule().fill(Color(white: Self.bedside(Date()) ? 0.05 : 0.12).opacity(0.95)))
                     .padding(.bottom, 18)
                 }
@@ -225,6 +228,17 @@ struct FaceScreen: View {
         Canvas { ctx, size in draw(&ctx, size, date) }
             .accessibilityElement()
             .accessibilityLabel(Text(date.formatted(date: .omitted, time: .shortened)))
+            .accessibilityValue(Text(faceSummary(date)))
+    }
+
+    /// what the face shows besides the time, for VoiceOver: the battery bar, the recording dot, the sleep face
+    private func faceSummary(_ date: Date) -> String {
+        let power = BatteryReader.read(date)
+        var parts: [String] = []
+        if let p = power.percent { parts.append("battery \(p) percent" + (power.charging ? ", charging" : "")) }
+        if recorder.isRunning { parts.append("recording") }
+        if FaceMode.auto(date) == .sleeping { parts.append("sleep time") }
+        return parts.joined(separator: ", ")
     }
 
     /// charging at night (21:00–07:00): the face becomes a dim red bedside clock (F10)

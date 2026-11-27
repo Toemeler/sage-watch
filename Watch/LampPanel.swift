@@ -342,7 +342,7 @@ struct LampPanel: View {
         HStack(spacing: 6) {
             Image(systemName: "antenna.radiowaves.left.and.right").font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(FaceGeometry.Palette.sageLight)
-            Text("Reconnecting…").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+            Text("Reconnecting…").font(.caption.weight(.semibold)).foregroundStyle(.white)
         }
         .padding(.horizontal, 10).padding(.vertical, 5)
         .background(Capsule().fill(Color(white: 0.12).opacity(0.94)))
@@ -365,11 +365,11 @@ struct LampPanel: View {
         VStack(spacing: 10) {
             if lamp.busy || lamp.problem == nil || lamp.problem == "Checking…" {
                 ProgressView()                                  // moving, so it never looks frozen
-                Text("Checking…").font(.system(size: 13)).foregroundStyle(FaceGeometry.Palette.ivory)
+                Text("Checking…").font(.footnote).foregroundStyle(FaceGeometry.Palette.ivory)
             } else {
                 Image(systemName: "lightbulb.slash").font(.system(size: 26)).foregroundStyle(FaceGeometry.Palette.sage)
                 Text(lamp.problem ?? "")
-                    .font(.system(size: 13)).multilineTextAlignment(.center).foregroundStyle(FaceGeometry.Palette.ivory)
+                    .font(.footnote).multilineTextAlignment(.center).foregroundStyle(FaceGeometry.Palette.ivory)
                 Button("Retry") { lastUse = Date(); lamp.refresh(force: true) }
             }
         }
@@ -457,7 +457,8 @@ struct LampPanel: View {
     private var failureNote: some View {
         VStack {
             Label("Lamp didn't respond", systemImage: "exclamationmark.triangle.fill")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
+                .dynamicTypeSize(...DynamicTypeSize.xxLarge)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .background(Capsule().fill(Color(white: 0.12).opacity(0.94)))
