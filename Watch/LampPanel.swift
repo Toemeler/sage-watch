@@ -249,6 +249,9 @@ struct LampPanel: View {
     @State private var dragLevel: Double?
     @State private var dragStart: Double = 0
     @State private var touching = false
+    /// true while a finger is down; unlike `touching` it resets by itself when the system cancels the touch (a
+    /// notification, the wrist going down), where onEnded never runs
+    @GestureState private var fingerDown = false
     @State private var moved = false
     @State private var longFired = false
     @State private var lifted = false
@@ -265,6 +268,7 @@ struct LampPanel: View {
     @State private var zoom: CGFloat = 1             // colour wheel: the crown zooms out to see all of it
     @State private var lastUse = Date()              // closes itself after a while unused, as Control Center does
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var phase
 
     static func tint(_ s: LampLink.State) -> Color {
         if let c = s.rgb { return Color(red: Double(c.0) / 255, green: Double(c.1) / 255, blue: Double(c.2) / 255) }
@@ -302,6 +306,10 @@ struct LampPanel: View {
         }
         .onAppear { lamp.panelOpen = true }
         .onDisappear { lamp.panelOpen = false }
+        // F25: the wrist goes down, the panel goes away; the next raise shows the face
+        .onChange(of: phase) { _, p in
+            if LampRules.closeOnWristDown(active: p == .active, touching: touching) { dismiss() }
+        }
         // on both views: the "not reachable" screen must not keep the app in front forever either
         .task {
             while !Task.isCancelled {
@@ -467,8 +475,19 @@ struct LampPanel: View {
         .scaleEffect(x: 1 - stretch / h * 0.3, y: 1 + stretch / h, anchor: overshoot > 0 ? .bottom : .top)
         .contentShape(shape)
         .gesture(DragGesture(minimumDistance: 0)
+            .updating($fingerDown) { _, down, _ in down = true }
             .onChanged { touch($0, height: h) }
             .onEnded { _ in release() })
+        // a touch the system cancelled never reaches onEnded; `touching` would stick and block the idle and
+        // wrist-down close for good. If onEnded has not run shortly after the finger state reset, it was a cancel:
+        // end it without counting it as a tap (a cancel must never switch the lamp)
+        .onChange(of: fingerDown) { _, down in
+            guard !down, touching else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(150))
+                if touching && !fingerDown { cancelTouch() }
+            }
+        }
         .accessibilityElement()
         .accessibilityLabel(Text("Lamp"))
         .accessibilityValue(Text(level > 0 ? "\(Int((level * 100).rounded())) percent" : "Off"))
@@ -513,7 +532,17 @@ struct LampPanel: View {
         lamp.setLevel(clamped)
     }
 
+    /// the system took the touch away: undo the press look, keep whatever level the drag had already set, no tap
+    private func cancelTouch() {
+        pressTask?.cancel()
+        touching = false
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.55)) { overshoot = 0 }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { lifted = false; dragLevel = nil }
+        if moved { reveal(holding: false) }
+    }
+
     private func release() {
+        guard touching else { return }                   // once per touch
         pressTask?.cancel()
         defer { touching = false }
         guard !longFired else { return }

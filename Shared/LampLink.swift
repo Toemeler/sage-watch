@@ -120,6 +120,12 @@ enum LampRules {
     /// while "Reconnecting…" shows, the watch tries again this often
     static let reconnectEvery: TimeInterval = 8
 
+    /// F25: lowering the wrist (the app leaves the front) closes the panel, so the next raise shows the face, as
+    /// Control Center does; never while a finger is still on the slider
+    static func closeOnWristDown(active: Bool, touching: Bool) -> Bool {
+        !active && !touching
+    }
+
     /// close the panel when unused for `idleCloseAfter`; never under a finger or while the colours are open
     static func idleClose(idle: TimeInterval, touching: Bool, colours: Bool) -> Bool {
         !touching && !colours && idle > idleCloseAfter

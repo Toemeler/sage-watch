@@ -78,6 +78,12 @@ final class LampRulesTests: XCTestCase {
         XCTAssertFalse(LampRules.idleClose(idle: 300, touching: false, colours: true))    // choosing a colour
     }
 
+    func testPanelClosesWithTheWristButNotUnderAFinger() {
+        XCTAssertTrue(LampRules.closeOnWristDown(active: false, touching: false))
+        XCTAssertFalse(LampRules.closeOnWristDown(active: false, touching: true))
+        XCTAssertFalse(LampRules.closeOnWristDown(active: true, touching: false))
+    }
+
     func testReconnectRetriesWithoutPilingUp() {
         XCTAssertTrue(LampRules.retryReconnect(sinceLastTry: 8, busy: false))
         XCTAssertFalse(LampRules.retryReconnect(sinceLastTry: 3, busy: false))
