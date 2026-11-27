@@ -56,7 +56,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F17 | **Nap length on the crown:** after the long turn down starts a nap (F9), the note shows its length ("Nap · up to 100 min") and further turns change it in 5-min steps (4 detents each, 20–130 min, up = longer) while the note is up; each step keeps the note 3 s more | built (round 23, no answer) |
 | F18 | **Battery guard for the alarm:** at your usual bedtime, with Record on, below 30 % and not charging (the recorder and smart wake may not last the night): one quiet tap and the note "Charge for the alarm", once per night; nothing on the charger | built (round 25, no answer) |
 | F19 | **Recording stopped:** Record is on but no motion was written for 10 min (a crash, a revoked permission, a session that ended): one tap and the note "Recording stopped" with Restart (8 s). Not in the first 2 min of a run; during a sleep block it waits until the block ends, so it never taps you awake | built (round 25, no answer) |
-| F20 | **Earlier wind-down after a short night:** when last night's recorded sleep was over an hour shorter than your usual, the evening wind-down starts 30 min earlier (lamp only; the plan and alarm are unchanged) | proposed (round 25) |
+| F20 | **Earlier wind-down after a short night:** when the last recorded night was over an hour shorter than your usual (and it was last night, ended < 20 h ago), the night's wind-down starts 30 min earlier (90 min lead); naps unchanged; lamp only, the plan and alarm are unchanged | built (round 26, no answer) |
+| F21 | **Recent colours in the wheel:** the three colours you used last get a small ring mark and the wheel opens with them in reach next to the current one, like the app grid keeps recent apps near the middle | proposed (round 26) |
 
 ## Iterations
 
@@ -543,3 +544,19 @@ multipath indoors).
   background through the night (the bedtime tap relies on the same), and that a real stall (e.g. revoking Motion
   access) is found within ~11 min.
 - **Proposed:** F20 earlier wind-down after a short night.
+
+### 35 · 2026-11-27 — round 26: F20 built (unanswered → approved; watch + iPhone data change, install after recording)
+- **F20** (own commit): `TypicalSleep` now carries the newest night's length and end (sent with the averages, old
+  saved data decodes without them); `LampRules.windDownLead` adds 30 min when that night was > 60 min shorter than
+  the usual night and ended < 20 h ago (tested: short, slightly short, nap, an old night, no data). The bedtime
+  itself is unchanged, so the bedtime tap and the battery guard keep their times; the "Now" row says "Winding down
+  early (short night)".
+- **Review findings fixed:** the arrival light (F16) decided "close to bedtime" with a hard-coded 60 min, so after a
+  short night it would come on at 60 % inside a running 90-min wind-down, which then pulls it down again — the
+  light jumps up and creeps down. It now asks whether it is inside the actual wind-down lead (`inWindDown`).
+  The lamp menu's footer described three of the six automations; it now names all of them and says that your own
+  change always wins.
+- **Prototype:** no visual change this round (F20 only changes timing); not republished.
+- **Verified:** rules by unit tests (CI). **Needs real nights:** the iPhone must have analysed last night before
+  the evening for the watch to know it was short (it sends the averages after each sync).
+- **Proposed:** F21 recent colours in the wheel.

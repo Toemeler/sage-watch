@@ -74,7 +74,7 @@ struct RecorderControls: View {
             } header: {
                 Text("Lamp")
             } footer: {
-                Text("Sunrise: the lamp fades up while the wake window is open. Wind-down: in the hour before bed a lamp that is on dims and warms. Off when asleep: the lamp fades off once the watch sees you sleeping. Changing the lamp yourself pauses these. Night steps go through the iPhone while Sage runs in the background; the contact log shows whether they arrived.")
+                Text("Sunrise: the lamp fades up while the wake window is open. Wind-down: in the hour before your usual bedtime a lamp that is on dims and warms (90 min after a short night). Off when asleep: it fades off once the watch sees you sleeping. Bedtime tap: one tap if it is still bright at bedtime. Arrival light: on, warm, when you come home after dark and it is off. Changing the lamp yourself always wins over these. Night steps go through the iPhone while Sage runs in the background; the contact log shows whether they arrived.")
             }
 
             Section("Music") {
