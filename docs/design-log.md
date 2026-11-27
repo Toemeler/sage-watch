@@ -423,3 +423,14 @@ multipath indoors).
   the recording started).
 - **Result:** exactly 4 changes, floor right 100 % (1 min off, on the stairs themselves); the normal day 97 % (the
   3 % are the seconds on the stairs, where "which floor" is ambiguous). All earlier edge cases still run.
+
+### 28 · 2026-11-27 — round 19: an automated regression test for the 3D path (no app change)
+- **Review (quality gate):** track3d had seven test days, checked only by hand; a later change could quietly undo
+  an earlier fix. Also open from round 18: a climb at the edge of a data gap made the height change NaN and was
+  dropped silently.
+- **Added:** `tools/test_track3d.py` builds every synthetic day and checks limits: floors, floor-right share, outdoor
+  and indoor error, heading offsets per pocket period, gap minutes, warnings, watch-only. Run after every change.
+- **Found by the test on its first run:** a climb that spans a data gap (starts before, ends after) was not counted
+  (2 floor changes instead of 4). Fixed: the heights on both sides of a gap are compared and any floors in between
+  counted; climbs at a gap edge use the nearest valid heights within a minute.
+- **Result:** 13/13 checks pass.

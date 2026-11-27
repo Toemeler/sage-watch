@@ -115,12 +115,40 @@ def floors_from_stairs(t, h):
             while j < n and (climbing[j] or (j + 20 < n and climbing[j:j + 20].any())):
                 j += 1
             a_, b_ = max(0, i - W), min(n - 1, j + W)
-            change = np.nanmean(hs[b_:min(n, b_ + 20)]) - np.nanmean(hs[max(0, a_ - 20):a_ + 1])
+            # height before and after: the nearest valid values within a minute, so a climb at the edge of a data
+            # gap is still counted (an empty window used to make the change NaN and drop the event silently)
+            before = hs[max(0, a_ - 60):a_ + 1]; before = before[~np.isnan(before)]
+            after = hs[b_:min(n, b_ + 60)]; after = after[~np.isnan(after)]
+            if len(before) == 0 or len(after) == 0:
+                i = j
+                continue
+            change = np.mean(after[:20]) - np.mean(before[-20:])
             if abs(change) >= 2.2:
                 events.append((a_, b_, int(round(change / FLOOR_M))))
             i = j
         else:
             i += 1
+    # climbs hidden in a data gap (battery, restart): compare the height before and after the gap
+    nan = np.isnan(hs)
+    k = 0
+    while k < n:
+        if nan[k]:
+            m = k
+            while m < n and nan[m]:
+                m += 1
+            if k > 0 and m < n:
+                before = hs[max(0, k - 60):k]; before = before[~np.isnan(before)]
+                after = hs[m:min(n, m + 60)]; after = after[~np.isnan(after)]
+                if len(before) and len(after):
+                    # the quietest end of each side: before the gap its first values, after it its last ones, so a
+                    # climb that had just started before the gap is counted in full
+                    change = np.mean(after[-20:]) - np.mean(before[:20])
+                    if abs(change) >= 2.2 and not any(a_ <= m and b_ >= k for a_, b_, _ in events):
+                        events.append((k, m, int(round(change / FLOOR_M))))
+            k = m
+        else:
+            k += 1
+    events.sort()
     # the floor changes halfway through each stair event and stays put in between
     level, start = 0, 0
     for a_, b_, df in events:
