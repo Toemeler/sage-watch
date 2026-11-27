@@ -62,6 +62,16 @@ enum LampRules {
     /// how long after the lamp last answered the panel keeps its controls through a failed check
     static let reconnectGrace: TimeInterval = 120
 
+    /// a night light switches itself off after this long (you got up and went back to bed)
+    static let nightLightMinutes: TimeInterval = 15 * 60
+
+    /// whether the night light set at `setAt` should go off now: only if the lamp still shows it (dim red at 10 %)
+    /// and it has been on for nightLightMinutes; anything you changed since is yours and stays
+    static func nightLightExpired(current: LampLink.State, setAt: Date, now: Date) -> Bool {
+        guard current.on, current.dimming <= 10, let c = current.rgb, c.0 > 200, c.1 < 60, c.2 < 30 else { return false }
+        return now.timeIntervalSince(setAt) >= nightLightMinutes
+    }
+
     /// F13: at your usual bedtime, tap the wrist only when the lamp is still bright and nothing else is taking care
     /// of it (wind-down off). If wind-down is on (running or paused by your own change), you chose; no nagging.
     static func bedtimeTap(lampOn: Bool, dimming: Int, windDownOn: Bool) -> Bool {

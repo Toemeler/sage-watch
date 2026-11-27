@@ -34,7 +34,7 @@ quick check; note ✓ / ✗ and anything odd. Long-press the face → **Lamp →
       Change it by hand → "Wind-down paused"; it never gets brighter again.
 - [ ] Fall asleep with the lamp on → it fades off in two steps (Off when asleep).
 - [ ] On the charger after 21:00 → dim red bedside clock (if watchOS keeps Sage on screen there). Crown up → red
-      night light; crown down → lamp off.
+      night light; crown down → lamp off. Left alone, the night light goes off after 15 min.
 - [ ] Wind-down off, lamp bright at your usual bedtime → two quiet clicks and "Bedtime · lamp still bright".
 - [ ] Morning: lamp rises during the wake window, full light at the alarm.
 - [ ] **Most important:** next morning open Lamp → Contact log. Are the night entries ("change (auto) ·

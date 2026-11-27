@@ -88,9 +88,14 @@ struct FaceScreen: View {
                         Text(note).font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(night ? FaceRenderer.bedsideRed : FaceGeometry.Palette.ivory)
                         if let undo = noteUndo {
-                            Button("Undo") { undo(); hideNapNote() }
-                                .font(.system(size: 13, weight: .semibold)).buttonStyle(.plain)
-                                .foregroundStyle(night ? FaceRenderer.bedsideRed : FaceGeometry.Palette.sageLight)
+                            // a target a sleepy finger can hit: ~44 x 32 pt, not just the word
+                            Button { undo(); hideNapNote() } label: {
+                                Text("Undo").font(.system(size: 14, weight: .semibold))
+                                    .frame(minWidth: 44, minHeight: 32)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(night ? FaceRenderer.bedsideRed : FaceGeometry.Palette.sageLight)
                         }
                     }
                     .padding(.horizontal, 12).padding(.vertical, 8)
@@ -245,7 +250,8 @@ struct FaceScreen: View {
         WKInterfaceDevice.current().play(.click)
         if on {
             lamp.set(FaceRules.nightLight)
-            showNapNote("Night light", undo: { lamp.set(["state": false]) })
+            automation.nightLightStarted()
+            showNapNote("Night light · 15 min", undo: { lamp.set(["state": false]) })
         } else {
             lamp.set(["state": false])
             showNapNote("Lamp off")

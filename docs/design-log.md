@@ -50,6 +50,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F11 | **Double tap toggles the lamp:** on watches with the double-tap gesture (pinch twice), double tap on the face switches the lamp on or off, with the click haptic; nothing during a sleep block | built (round 7, no answer) |
 | F12 | **Night light from the bedside clock:** on the charger at night, turning the crown sets the lamp to a dim red night light (5 %), for getting up without waking fully; turning back down switches it off. Never bright | built (round 10, no answer; 10 % is the WiZ minimum) |
 | F13 | **Bedtime tap:** at your usual bedtime, if the lamp is still bright and wind-down is off, one quiet tap on the wrist with "Bedtime" (no sound); nothing if the lamp is already dim or off | built (round 10, no answer) |
+| F14 | **Try the sunrise:** a "Try sunrise" button in the long-press menu plays the whole wake-up light in 60 s (10 % candle → 80 % daylight → full), so you can see and judge it without waiting for a morning; any touch of the lamp stops it | proposed (round 11) |
 
 ## Iterations
 
@@ -323,3 +324,17 @@ down → lamp off; "Lamp not reachable" if it cannot be reached. F13 (`LampRules
 night bedtime, two clicks and "Bedtime · lamp still bright"; switch in the long-press menu. Each on its own commit.
 **Verified:** CI build and tests. **Needs the watch:** whether watchOS lets the crown wake the bedside clock and
 whether background clicks are felt at bedtime.
+
+### 20 · 2026-11-27 — critical round 11
+**Review:**
+1. *Night light left on all night (high).* Get up at 3 am, night light on, back to bed: "off when asleep" only
+   fires once per night (at the first sleep onset), so the room stayed red until the sunrise.
+2. *Undo too small.* The note's Undo was 13 pt text with no padding; half-asleep fingers miss it.
+**Changed:**
+- The night light switches itself off after 15 min, but only if the lamp still shows it (dim red at 10 %); turned
+  up or changed to a white, it is yours and stays (`LampRules.nightLightExpired`, tested). The note says
+  "Night light · 15 min".
+- Undo is a ~44 × 32 pt target.
+- Proposal F14 (try the sunrise in 60 s).
+**Verified:** CI build and tests. **Needs the watch:** the 15-min timeout while Sage is in the background at night
+(same background-delivery question as the other night steps; see the contact log).

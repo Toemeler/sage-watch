@@ -34,6 +34,17 @@ final class LampRulesTests: XCTestCase {
         XCTAssertNil(LampRules.windDown(t: 0.6, start: start, current: state(on: true, dim: 20, temp: 2700)))
     }
 
+    func testNightLightTimesOutUnlessYouChangedIt() {
+        var red = LampLink.State(); red.on = true; red.dimming = 10; red.rgb = (255, 28, 0); red.temp = nil
+        let t0 = Date(timeIntervalSince1970: 1_000_000)
+        XCTAssertFalse(LampRules.nightLightExpired(current: red, setAt: t0, now: t0.addingTimeInterval(600)))
+        XCTAssertTrue(LampRules.nightLightExpired(current: red, setAt: t0, now: t0.addingTimeInterval(900)))
+        var brighter = red; brighter.dimming = 40                        // you turned it up: yours, stays
+        XCTAssertFalse(LampRules.nightLightExpired(current: brighter, setAt: t0, now: t0.addingTimeInterval(3600)))
+        var white = red; white.rgb = nil; white.temp = 2700               // you picked a white: stays
+        XCTAssertFalse(LampRules.nightLightExpired(current: white, setAt: t0, now: t0.addingTimeInterval(3600)))
+    }
+
     func testBedtimeTapOnlyWhenNothingElseHandlesIt() {
         XCTAssertTrue(LampRules.bedtimeTap(lampOn: true, dimming: 80, windDownOn: false))
         XCTAssertFalse(LampRules.bedtimeTap(lampOn: true, dimming: 80, windDownOn: true))   // wind-down handles it

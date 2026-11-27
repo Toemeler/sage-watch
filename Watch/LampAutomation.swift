@@ -180,6 +180,26 @@ final class LampAutomation: ObservableObject {
         scheduleBedtimeTap()
     }
 
+    // MARK: night light timeout
+
+    private var nightLightTask: Task<Void, Never>?
+
+    /// the night light was switched on from the bedside clock: off again after 15 min if it is still the night
+    /// light (LampRules.nightLightExpired, tested), so a 3 am trip does not leave the room red until morning
+    func nightLightStarted() {
+        nightLightTask?.cancel()
+        let setAt = Date()
+        nightLightTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(LampRules.nightLightMinutes))
+            guard !Task.isCancelled else { return }
+            let lamp = LampModel.shared
+            if LampRules.nightLightExpired(current: lamp.state, setAt: setAt, now: Date()) {
+                lamp.set(["state": false], byUser: false)
+                activity = "Night light off after 15 min"
+            }
+        }
+    }
+
     // MARK: bedtime tap (F13)
 
     /// At your usual bedtime (the night's, not the nap's): two quiet clicks on the wrist when the lamp is still
