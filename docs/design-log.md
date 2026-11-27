@@ -48,6 +48,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F9 | **Nap from the face:** crown up opens the lamp; a long turn down (12 detents) starts a nap, with a note and Undo for 3 s | built (round 5, no answer) |
 | F10 | **Bedside mode:** while the watch charges at night, the face shows only the time in deep red at minimum brightness (no runner, no music), like a bedside clock that does not light the room | built (round 5, no answer) |
 | F11 | **Double tap toggles the lamp:** on watches with the double-tap gesture (pinch twice), double tap on the face switches the lamp on or off, with the click haptic; nothing during a sleep block | built (round 7, no answer) |
+| F12 | **Night light from the bedside clock:** on the charger at night, turning the crown sets the lamp to a dim red night light (5 %), for getting up without waking fully; turning back down switches it off. Never bright | proposed (round 9) |
+| F13 | **Bedtime tap:** at your usual bedtime, if the lamp is still bright and wind-down is off, one quiet tap on the wrist with "Bedtime" (no sound); nothing if the lamp is already dim or off | proposed (round 9) |
 
 ## Iterations
 
@@ -292,3 +294,19 @@ feature on unverified ones compounds the risk. This round adds nothing new: an e
 **Added:** `docs/test-on-watch.md`, a 10-minute checklist of everything unverified, with the contact log as the
 answer to the open background-delivery question.
 **Process:** no new feature proposals until Tom has run the checklist; rounds continue with audits and fixes.
+
+### 18 · 2026-11-27 — critical round 9 (loop resumed at Tom's request)
+**Review:**
+1. *Panel swapped away under the finger (high).* One failed background status check (iPhone briefly out of reach)
+   flipped "home" to false and replaced the open panel with the "not reachable" view mid-gesture.
+2. *Frozen-looking wait.* "Checking…" was static text.
+3. *Prototype parity.* The connection states could not be reviewed in the prototype.
+
+**Changed:**
+- `LampRules.showControls` (tested): the controls stay for 2 min after the lamp last answered, with a small
+  "Reconnecting…" pill that retries; only a lasting drop shows the reason and Retry.
+- The waiting view shows a spinner; the reason view keeps the icon, the plain-words problem and Retry.
+- Prototype: a "Connection" selector shows at home / short drop / unreachable.
+- Proposals F12 (night light from the bedside clock) and F13 (bedtime tap).
+
+**Verified:** CI build and tests. **Needs the watch:** the reconnect pill in a real drop.

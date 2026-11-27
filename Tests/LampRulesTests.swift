@@ -34,6 +34,13 @@ final class LampRulesTests: XCTestCase {
         XCTAssertNil(LampRules.windDown(t: 0.6, start: start, current: state(on: true, dim: 20, temp: 2700)))
     }
 
+    func testPanelKeepsItsControlsThroughAShortDrop() {
+        XCTAssertTrue(LampRules.showControls(home: true, sinceConfirmed: nil))
+        XCTAssertTrue(LampRules.showControls(home: false, sinceConfirmed: 30))      // one failed check: keep them
+        XCTAssertFalse(LampRules.showControls(home: false, sinceConfirmed: 300))    // gone for 5 min: say why
+        XCTAssertFalse(LampRules.showControls(home: false, sinceConfirmed: nil))    // never reached
+    }
+
     func testWindDownNeverSwitchesOnAndLeavesColour() {
         XCTAssertNil(LampRules.windDown(t: 0.5, start: state(on: true, dim: 80), current: state(on: false, dim: 80)))
         let colour = LampRules.windDown(t: 0.5, start: state(on: true, dim: 80, temp: nil), current: state(on: true, dim: 80, temp: nil))

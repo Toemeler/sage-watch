@@ -59,6 +59,17 @@ enum LampLink {
 /// The rules for automatic lamp steps, in one place so they can be tested. The principle: automation may only ever
 /// move the lamp in its own direction (sunrise brighter, wind-down dimmer and warmer), and never undo what you set.
 enum LampRules {
+    /// how long after the lamp last answered the panel keeps its controls through a failed check
+    static let reconnectGrace: TimeInterval = 120
+
+    /// keep the controls (with "Reconnecting…") when the lamp answered recently, so one failed background check
+    /// does not swap the panel away under your finger; show the "not reachable" view only after that
+    static func showControls(home: Bool, sinceConfirmed: TimeInterval?) -> Bool {
+        if home { return true }
+        guard let s = sinceConfirmed else { return false }
+        return s >= 0 && s < reconnectGrace
+    }
+
     /// one sunrise step at progress `t` (0...1 through the wake window): eased like dawn, 10 → 80 % and
     /// 2200 → 4200 K. Nil when the lamp is already on and at least that bright (you or an earlier step set it):
     /// a sunrise never dims a lamp.

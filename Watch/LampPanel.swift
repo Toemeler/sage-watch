@@ -21,6 +21,9 @@ final class LampModel: ObservableObject {
     var home: Bool { state.home }
     /// the last state the lamps confirmed; a change that never arrives falls back to it
     private var confirmed: LampLink.State?
+    /// when the lamp last answered (the panel keeps its controls for a while after, see LampRules.showControls)
+    @Published private(set) var confirmedAt: Date?
+    var showsControls: Bool { LampRules.showControls(home: home, sinceConfirmed: confirmedAt.map { Date().timeIntervalSince($0) }) }
 
     /// every message to the iPhone, newest first (kept across launches), so it can be seen whether night-time
     /// steps reach the lamp while the watch app is in the background
@@ -165,7 +168,7 @@ final class LampModel: ObservableObject {
         if pending == nil && Date().timeIntervalSince(lastLocalChange) > 2.5 { state = s }
         else { state.home = s.home; state.count = s.count }
         problem = s.home ? nil : "No lamp answered. Open Sage on the iPhone once and allow Local Network, then retry."
-        if s.home { confirmed = s }
+        if s.home { confirmed = s; confirmedAt = Date() }
         remember(state)
     }
 
@@ -241,7 +244,11 @@ struct LampPanel: View {
 
     var body: some View {
         Group {
-            if lamp.home { content } else { unavailable }
+            if lamp.showsControls {
+                content.overlay(alignment: .top) { if !lamp.home { reconnecting } }
+            } else {
+                unavailable
+            }
         }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -251,12 +258,30 @@ struct LampPanel: View {
     }
 
     /// not at home, or the iPhone could not reach the lamps: say why, offer a retry
+    /// a short drop while the panel is open: controls stay, this says the watch is reaching the lamp again
+    private var reconnecting: some View {
+        HStack(spacing: 6) {
+            ProgressView().controlSize(.mini)
+            Text("Reconnecting…").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
+        }
+        .padding(.horizontal, 10).padding(.vertical, 5)
+        .background(Capsule().fill(Color(white: 0.12).opacity(0.94)))
+        .padding(.top, 34)
+        .allowsHitTesting(false)
+        .onAppear { lamp.refresh(force: true) }
+    }
+
     private var unavailable: some View {
         VStack(spacing: 10) {
-            Image(systemName: "lightbulb.slash").font(.system(size: 26)).foregroundStyle(FaceGeometry.Palette.sage)
-            Text(lamp.busy ? "Checking…" : (lamp.problem ?? "Checking…"))
-                .font(.system(size: 13)).multilineTextAlignment(.center).foregroundStyle(FaceGeometry.Palette.ivory)
-            Button("Retry") { lamp.refresh(force: true) }.disabled(lamp.busy)
+            if lamp.busy || lamp.problem == nil || lamp.problem == "Checking…" {
+                ProgressView()                                  // moving, so it never looks frozen
+                Text("Checking…").font(.system(size: 13)).foregroundStyle(FaceGeometry.Palette.ivory)
+            } else {
+                Image(systemName: "lightbulb.slash").font(.system(size: 26)).foregroundStyle(FaceGeometry.Palette.sage)
+                Text(lamp.problem ?? "")
+                    .font(.system(size: 13)).multilineTextAlignment(.center).foregroundStyle(FaceGeometry.Palette.ivory)
+                Button("Retry") { lamp.refresh(force: true) }
+            }
         }
         .onAppear { lamp.refresh(force: true) }
     }
