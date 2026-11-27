@@ -136,6 +136,32 @@ enum LampRules {
         return 1 + 3 * (0.12 - dt) / 0.09
     }
 
+    /// F26: at night the slider and the crown stop here
+    static let nightCapLevel = 0.30
+
+    /// F26: is it night for the cap? Between your usual bedtime and wake, in night-clock minutes (after midnight
+    /// counts as 24+), the same clock the plan uses
+    static func inNightCap(nightClock m: Double, onset: Double, wake: Double) -> Bool {
+        m >= onset && m < wake
+    }
+
+    /// F26: the top of the slider / crown: 30 % at night until unlocked (a second push from the cap, or a fresh
+    /// turn after resting there), else 100 %. Never below where the lamp already is: a light set brighter before
+    /// is never pulled down by the cap.
+    static func sliderTop(night: Bool, unlocked: Bool, current: Double = 0) -> Double {
+        guard night && !unlocked else { return 1 }
+        return max(nightCapLevel, current)
+    }
+
+    /// F26: switching on at night brings back at most 30 %
+    static func nightCapped(_ params: [String: Any], night: Bool, currentDimming: Int) -> [String: Any] {
+        guard night, params["state"] as? Bool == true else { return params }
+        var p = params
+        let d = (p["dimming"] as? Int) ?? currentDimming
+        if d > Int(nightCapLevel * 100) { p["dimming"] = Int(nightCapLevel * 100) }
+        return p
+    }
+
     /// F25: lowering the wrist (the app leaves the front) closes the panel, so the next raise shows the face, as
     /// Control Center does; never while a finger is still on the slider
     static func closeOnWristDown(active: Bool, touching: Bool) -> Bool {

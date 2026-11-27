@@ -92,6 +92,22 @@ final class LampRulesTests: XCTestCase {
         XCTAssertEqual(LampRules.crownStep(secondsSinceLast: 0.075), 2.5, accuracy: 1e-9)
     }
 
+    func testNightCapStopsAtThirtyUnlessYouPushOn() {
+        XCTAssertTrue(LampRules.inNightCap(nightClock: 1500, onset: 1380, wake: 1860))      // 01:00
+        XCTAssertFalse(LampRules.inNightCap(nightClock: 1200, onset: 1380, wake: 1860))     // 20:00
+        XCTAssertEqual(LampRules.sliderTop(night: true, unlocked: false), 0.30)
+        XCTAssertEqual(LampRules.sliderTop(night: true, unlocked: true), 1)
+        XCTAssertEqual(LampRules.sliderTop(night: false, unlocked: false), 1)
+        XCTAssertEqual(LampRules.sliderTop(night: true, unlocked: false, current: 0.8), 0.8)  // never pulls it down
+        let on = LampRules.nightCapped(["state": true, "dimming": 80], night: true, currentDimming: 80)
+        XCTAssertEqual(on["dimming"] as? Int, 30)
+        let plain = LampRules.nightCapped(["state": true], night: true, currentDimming: 90)  // the bulb's own last light
+        XCTAssertEqual(plain["dimming"] as? Int, 30)
+        XCTAssertEqual(LampRules.nightCapped(["state": true, "dimming": 20], night: true, currentDimming: 90)["dimming"] as? Int, 20)
+        XCTAssertNil(LampRules.nightCapped(["state": false], night: true, currentDimming: 90)["dimming"])
+        XCTAssertEqual(LampRules.nightCapped(["state": true, "dimming": 80], night: false, currentDimming: 80)["dimming"] as? Int, 80)
+    }
+
     func testPanelClosesWithTheWristButNotUnderAFinger() {
         XCTAssertTrue(LampRules.closeOnWristDown(active: false, touching: false))
         XCTAssertFalse(LampRules.closeOnWristDown(active: false, touching: true))

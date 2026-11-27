@@ -36,9 +36,14 @@ final class LampAutomation: ObservableObject {
     @Published var switchOnMemoryOn = UserDefaults.standard.object(forKey: "lampSwitchOnMemory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(switchOnMemoryOn, forKey: "lampSwitchOnMemory") }
     }
-    /// how many of the six automations are on (the menu's summary)
+    /// F26: at night the slider and the crown stop at 30 %
+    @Published var nightCapOn = UserDefaults.standard.object(forKey: "lampNightCap") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(nightCapOn, forKey: "lampNightCap") }
+    }
+    static let automationCount = 7
+    /// how many of the automations are on (the menu's summary)
     var enabledCount: Int {
-        [sunriseOn, windDownOn, offWhenAsleepOn, bedtimeTapOn, arrivalOn, switchOnMemoryOn].filter { $0 }.count
+        [sunriseOn, windDownOn, offWhenAsleepOn, bedtimeTapOn, arrivalOn, switchOnMemoryOn, nightCapOn].filter { $0 }.count
     }
     /// when the bedtime tap last fired (the face shows a note for it)
     @Published private(set) var bedtimeTappedAt: Date?

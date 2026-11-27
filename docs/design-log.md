@@ -62,7 +62,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F23 | **Arrival in your evening light:** the arrival light (F16) comes on at your remembered evening light (F22) instead of a fixed 60 % (only with "Light by time of day" on), and still 25 % 2200 K inside the wind-down | built (round 29, no answer) |
 | F24 | **Double tap answers the note:** while a note with a button shows (Undo, Restart), double tap presses that button instead of toggling the lamp, as watchOS's double tap presses the primary button on screen; a ringing alarm still comes first; not in always-on (the note is not seen there) | built (round 30, no answer) |
 | F25 | **Lamp panel closes with the wrist:** lowering the wrist (the app leaves the front) closes the lamp panel, so the next raise shows the face, as Control Center does; never while a finger is on it (then right after the touch ends) | built (round 31, no answer) |
-| F26 | **Night cap:** between your usual bedtime and wake, the slider and the crown stop at 30 % with a click, so a sleepy fumble at 3 am never floods the room; push past the top a second time (or keep turning) to go higher, as Control Center's volume limit works | proposed (round 41) |
+| F26 | **Night cap:** between your usual bedtime and wake (learned night), the slider and the crown stop at 30 % with a click and the stretch of the real top; a second push from the cap (a new drag starting there, or a crown turn after resting there ½ s) goes higher; switching on at night comes on at most 30 %; a light set brighter before is never pulled down; night changes are not remembered as the evening light (F22); toggle "Night cap" | built (round 42, no answer) |
 
 ## Iterations
 
@@ -769,3 +769,17 @@ multipath indoors).
 - **Verified:** CI build; prototype JS parses. **Needs the real watch:** that the change from greyed to live reads as
   "it's ready", not as a flicker.
 - **Proposed:** F26 night cap.
+
+### 51 · 2026-11-27 — round 42: F26 night cap built (unanswered → approved; watch app change, install after recording)
+- **F26** (own commit): `LampRules.inNightCap`, `sliderTop(night:unlocked:current:)` and `nightCapped` (tested:
+  inside/outside the night, locked/unlocked, never pulling a brighter light down, a switch-on with and without a
+  remembered light, off untouched, daytime untouched). The slider's top at night is the cap — it stretches and
+  clicks there exactly as at 100 %, so it reads as "the end", and the next drag from it goes on. The crown stops
+  with a click; resting there ½ s and turning again goes on.
+- **Review findings fixed before commit:** a capped 30 % switch-on at 3 am would have become the remembered
+  evening light (F22), so the next evening the lamp would come on at 30 % — changes inside the night cap are not
+  remembered. Turning the crown down from a light set brighter before the night must not jump it to 30 % — the top
+  is never below where the lamp is.
+- **Prototype:** "Night, cap at 30 %" switch with the same slider, crown and switch-on behaviour.
+- **Verified:** rules by unit tests (CI); prototype JS parses. **Needs the real watch:** whether a second push feels
+  natural or the cap feels like a wall at a moment you need light.

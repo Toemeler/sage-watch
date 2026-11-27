@@ -66,7 +66,7 @@ struct RecorderControls: View {
                 NavigationLink {
                     LampAutomations()
                 } label: {
-                    row("Automations", "\(automation.enabledCount) of 6 on")
+                    row("Automations", "\(automation.enabledCount) of \(LampAutomation.automationCount) on")
                 }
                 Button(automation.previewing ? "Trying the sunrise…" : "Try sunrise (60 s)") { automation.trySunrise() }
                     .disabled(automation.previewing || !lamp.home)
@@ -145,7 +145,7 @@ struct RecorderControls: View {
 }
 
 /// Every lamp message of the last while: when, whether it arrived, and whether Sage was in the background then.
-/// The six lamp automations, each with one line saying what it does, under its switch.
+/// The lamp automations, each with one line saying what it does, under its switch.
 struct LampAutomations: View {
     @ObservedObject private var automation = LampAutomation.shared
 
@@ -159,6 +159,7 @@ struct LampAutomations: View {
                 .onChange(of: automation.bedtimeTapOn) { _, _ in automation.rescheduleWindDown() }
             item("Arrival light", $automation.arrivalOn, "On in your evening light when you come home after dark and it is off.")
             item("Light by time of day", $automation.switchOnMemoryOn, "Switching on brings back your last evening or daytime light.")
+            item("Night cap", $automation.nightCapOn, "Between bedtime and wake the slider and crown stop at 30 %; push again to go higher.")
             Text("Your own change always wins: any of these steps aside when you set the lamp. Night steps go through the iPhone while Sage runs in the background; the contact log shows whether they arrived.")
                 .font(.footnote).foregroundStyle(.secondary)
                 .listRowBackground(Color.clear)

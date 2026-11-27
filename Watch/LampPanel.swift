@@ -129,7 +129,14 @@ final class LampModel: ObservableObject {
         guard !state.on else { set(["state": false]); return }
         let memory = LampAutomation.shared.switchOnMemoryOn
             ? UserDefaults.standard.dictionary(forKey: Self.memoryKey(dark: Sun.darkHere())) : nil
-        set(LampRules.switchOn(memory: memory))
+        // F26: at night it comes on at most at 30 %, whatever was remembered
+        set(LampRules.nightCapped(LampRules.switchOn(memory: memory), night: nightCap, currentDimming: state.dimming))
+    }
+
+    /// F26: the night cap applies now (switched on, and between your usual bedtime and wake)
+    var nightCap: Bool {
+        LampAutomation.shared.nightCapOn
+            && LampRules.inNightCap(nightClock: Plan.nightClock(Date()), onset: Plan.nightPlan.onset, wake: Plan.nightPlan.wake)
     }
 
     /// F22: one memory for the evening (after dark) and one for the day
@@ -162,7 +169,8 @@ final class LampModel: ObservableObject {
             if !ok && !byUser && pending == nil { deferred = (p, Date()) }
             // F22: a light you set and the lamp took becomes this time of day's memory (never an automatic one,
             // and only once it arrived, so a failed change is not remembered)
-            if ok && byUser && pending == nil, let m = LampRules.memory(of: state) {
+            // F26: nor during the night cap: a 30 % switch-on at 3 am is not your evening light
+            if ok && byUser && pending == nil && !nightCap, let m = LampRules.memory(of: state) {
                 UserDefaults.standard.set(m, forKey: Self.memoryKey(dark: Sun.darkHere()))
             }
             sending = false
@@ -274,6 +282,8 @@ struct LampPanel: View {
     @State private var appeared = false
     @State private var crown: Double = 0             // the crown turns endlessly: only its movement is used
     @State private var lastCrownAt = Date.distantPast
+    @State private var capUnlocked = false           // F26: this drag started at the cap, so it may go past it
+    @State private var crownUnlocked = false         // F26: a fresh crown turn from the cap goes past it
     @State private var showValue = false
     @State private var pressTask: Task<Void, Never>?
     @State private var hideTask: Task<Void, Never>?
@@ -555,6 +565,7 @@ struct LampPanel: View {
         if !touching {
             touching = true; moved = false; longFired = false
             dragStart = modelLevel
+            capUnlocked = dragStart >= LampRules.nightCapLevel - 0.005   // the second push from the cap goes on
             lastEdge = dragStart <= 0 ? 0 : dragStart >= 1 ? 1 : -1
             pressTask?.cancel()
             pressTask = Task { @MainActor in
@@ -574,9 +585,11 @@ struct LampPanel: View {
             reveal(holding: true)
         }
         let raw = dragStart - Double(g.translation.height / h)
-        let clamped = min(1, max(0, raw))
+        // F26: at night the top is 30 % (it stretches and clicks there, like the real top) until a second push
+        let top = LampRules.sliderTop(night: lamp.nightCap, unlocked: capUnlocked, current: dragStart)
+        let clamped = min(top, max(0, raw))
         overshoot = reduceMotion ? 0 : Self.rubber(CGFloat(raw - clamped) * h, limit: h * 0.07)
-        let edge = clamped <= 0 ? 0 : clamped >= 1 ? 1 : -1
+        let edge = clamped <= 0 ? 0 : clamped >= top ? 1 : -1
         if edge != -1 && edge != lastEdge { WKInterfaceDevice.current().play(.click) }
         lastEdge = edge
         dragLevel = clamped
@@ -626,14 +639,18 @@ struct LampPanel: View {
     private func crownBrightness(by delta: Double) {
         let now = modelLevel
         // faster turns move further per detent (LampRules.crownStep, tested); slow turns stay at 1 %
-        let step = LampRules.crownStep(secondsSinceLast: Date().timeIntervalSince(lastCrownAt))
+        let sincePrev = Date().timeIntervalSince(lastCrownAt)
+        let step = LampRules.crownStep(secondsSinceLast: sincePrev)
         lastCrownAt = Date()
+        // F26: resting at the night cap, then turning up again, goes past it
+        if delta > 0 && now >= LampRules.nightCapLevel - 0.005 && sincePrev >= 0.5 { crownUnlocked = true }
+        let top = LampRules.sliderTop(night: lamp.nightCap, unlocked: crownUnlocked, current: now)
         var next = now + delta * step / 100
         if delta < 0 && now <= 0.1 { next = 0 }
         if delta > 0 && now == 0 { next = 0.1 }
-        next = min(1, max(0, next))
+        next = min(top, max(0, next))
         guard next != now else { return }
-        if (next == 0 || next == 1) { WKInterfaceDevice.current().play(.click) }
+        if next == 0 || next == top { WKInterfaceDevice.current().play(.click) }
         withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.9)) { lamp.setLevel(next) }
         reveal(holding: false)
     }
