@@ -244,9 +244,25 @@ def build(d: Path):
         lon = lon0 + np.degrees(xs[:, 0] / (R_EARTH * math.cos(math.radians(lat0))))
     else:
         lat = lon = None
-    src = np.where(~np.isnan(gx) & (gacc < 15), "gps", np.where(dist > 0, "steps", "still"))
+    # seconds without any sensor within +-30 s (dead battery, app restarted, watch off the wrist): a gap, not a walk
+    have = np.zeros(n, bool)
+    for arr in (allfix, steps, head, pres):
+        if arr is None:
+            continue
+        idx = np.clip(np.searchsorted(arr[:, 0], t), 1, len(arr) - 1)
+        near = np.minimum(np.abs(arr[idx, 0] - t), np.abs(arr[idx - 1, 0] - t))
+        have |= near <= 30
+    src = np.where(~have, "gap", np.where(~np.isnan(gx) & (gacc < 15), "gps", np.where(dist > 0, "steps", "still")))
+    warnings = []
+    if both.sum() < 30 and head is not None:
+        warnings.append("no GPS walk to learn the pocket/wrist heading offset: the path's shape is right but it may be "
+                        "rotated; the map orientation is not known")
+    if lat0 is None:
+        warnings.append("no GPS fix at all: positions are relative (metres from the start), not on a map")
+    if pres is None:
+        warnings.append("no barometer: height and floors come from GPS only and are coarse")
     return dict(t=t, x=xs[:, 0], y=xs[:, 1], lat=lat, lon=lon, alt=alt_s, floor=floor, hacc=hacc,
-                src=src, dist=dist, offset=offset_deg, steps_src=steps_name, head_src=head_name)
+                src=src, dist=dist, offset=offset_deg, steps_src=steps_name, head_src=head_name, warnings=warnings)
 
 
 def write(r, out: Path):
@@ -274,9 +290,10 @@ def write_html(r, out: Path, name: str):
     for i in range(0, len(r["t"]), step):
         alt = None if np.isnan(r["alt"][i]) else round(float(r["alt"][i]), 2)
         fl = None if np.isnan(r["floor"][i]) else int(r["floor"][i])
+        kind = {"gps": 0, "gap": 2}.get(r["src"][i], 1)
         pts.append([int(r["t"][i]), round(float(r["x"][i]), 2), round(float(r["y"][i]), 2), alt, fl,
-                    round(float(r["hacc"][i]), 1), 0 if r["src"][i] == "gps" else 1])
-    data = {"name": name, "step": step, "tz": "Europe/Zurich", "points": pts}
+                    round(float(r["hacc"][i]), 1), kind])
+    data = {"name": name, "step": step, "tz": "Europe/Zurich", "points": pts, "warnings": r["warnings"]}
     tpl = (Path(__file__).parent / "track_viewer.html").read_text(encoding="utf-8")
     html = tpl.replace("const TRACK = /*DATA*/null;", "const TRACK = " + json.dumps(data, separators=(",", ":")) + ";")
     (out / "track.html").write_text(html, encoding="utf-8")
@@ -288,7 +305,9 @@ def summary(r):
     changes = int(np.nansum(np.abs(np.diff(fl[~np.isnan(fl)])))) if not np.isnan(fl).all() else 0
     out = {"hours": (r["t"][-1] - r["t"][0]) / 3600, "walked_m": dist, "floor_changes": changes,
            "gps_share": float(np.mean(r["src"] == "gps")), "heading_offset_deg": r["offset"],
-           "median_h_acc_m": float(np.median(r["hacc"])), "steps_from": r["steps_src"], "heading_from": r["head_src"]}
+           "median_h_acc_m": float(np.median(r["hacc"][r["src"] != "gap"])) if (r["src"] != "gap").any() else None,
+           "steps_from": r["steps_src"], "heading_from": r["head_src"],
+           "gap_minutes": float((r["src"] == "gap").sum() / 60), "warnings": r["warnings"]}
     if not np.isnan(fl).all():
         out["minutes_per_floor"] = {int(k): float((fl == k).sum() / 60) for k in np.unique(fl[~np.isnan(fl)])}
     return out

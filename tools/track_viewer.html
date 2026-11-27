@@ -29,6 +29,7 @@
 <h1 id="title">Day path</h1>
 <div class="sub" id="sub">Drag to rotate, scroll or pinch to zoom. Colours are floors.</div>
 <div class="stats" id="stats"></div>
+<div class="sub" id="warn" style="color:#c9a877"></div>
 <div class="stage"><canvas id="c"></canvas><div class="hud" id="hud"></div></div>
 <div class="row">
   <label for="time">Time</label><input id="time" type="range" min="0" max="1000" value="1000">
@@ -52,6 +53,7 @@ const P = data.points;   // [t, x, y, alt, floor, h_acc, indoor]
 const tz = data.tz || undefined;
 const fmt = t => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: tz });
 document.getElementById("title").textContent = data.name || "Day path";
+document.getElementById("warn").textContent = (data.warnings || []).map(w => "⚠︎ " + w).join("  ");
 const floors = [...new Set(P.map(p => p[4]).filter(f => f !== null))].sort((a, b) => a - b);
 const palette = ["#8c9a7e", "#c9a877", "#7fa6c9", "#c98f7a", "#a98cc9", "#7ac9b0", "#c9c27a"];
 const colorOf = f => f === null ? "#666" : palette[(floors.indexOf(f) + palette.length) % palette.length];
@@ -65,7 +67,8 @@ const minutesPer = {}; for (const p of P) if (p[4] !== null) minutesPer[p[4]] = 
 const stat = (k, v) => `<div class="stat"><div>${k}</div><div>${v}</div></div>`;
 document.getElementById("stats").innerHTML =
   stat("Time", `${fmt(P[0][0])} – ${fmt(P[P.length - 1][0])}`) + stat("Walked", `${(walked / 1000).toFixed(2)} km`) +
-  stat("Floor changes", changes) + stat("Indoors", `${Math.round(P.filter(p => p[6]).length * (data.step || 1) / 60)} min`) +
+  stat("Floor changes", changes) + stat("Indoors", `${Math.round(P.filter(p => p[6] === 1).length * (data.step || 1) / 60)} min`) +
+  (P.some(p => p[6] === 2) ? stat("No data", `${Math.round(P.filter(p => p[6] === 2).length * (data.step || 1) / 60)} min`) : "") +
   floors.map(f => stat(`Floor ${f}`, `${Math.round(minutesPer[f])} min`)).join("");
 
 // 3D view: centre, orbit camera, simple perspective
@@ -98,6 +101,7 @@ function draw() {
   }
   ctx.lineWidth = 2 * (devicePixelRatio || 1); ctx.lineJoin = "round";
   for (let i = 1; i <= upTo; i++) {
+    if (P[i][6] === 2 || P[i - 1][6] === 2) continue;         // no data here: a break, not a straight line
     const a = project(P[i - 1]), b = project(P[i]);
     ctx.strokeStyle = colorOf(P[i][4]); ctx.globalAlpha = P[i][6] ? 0.95 : 0.7;
     ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke();
@@ -106,7 +110,8 @@ function draw() {
   const m = P[upTo], q = project(m);
   ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(q[0], q[1], 6 * (devicePixelRatio || 1), 0, 7); ctx.fill();
   document.getElementById("hud").innerHTML =
-    `<b>${fmt(m[0])}</b><br>Floor ${m[4] ?? "–"} · ${m[3] !== null ? m[3].toFixed(1) + " m" : "–"}<br>±${m[5].toFixed(1)} m · ${m[6] ? "indoors (steps + compass)" : "GPS"}`;
+    m[6] === 2 ? `<b>${fmt(m[0])}</b><br>no data (watch and iPhone off or restarting)`
+    : `<b>${fmt(m[0])}</b><br>Floor ${m[4] ?? "–"} · ${m[3] !== null ? m[3].toFixed(1) + " m" : "–"}<br>±${m[5].toFixed(1)} m · ${m[6] ? "indoors (steps + compass)" : "GPS"}`;
 }
 // interaction
 let drag = null;

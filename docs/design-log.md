@@ -381,3 +381,15 @@ GPS noise, optimistic), indoors 3.9 m after 14 min.
   small next to walking distances), colours per floor, a time slider moving a marker along the day with time, floor,
   height and accuracy, summary tiles (walked distance, floor changes, minutes indoors and per floor). Tested on the
   synthetic day and published as "Sage Day Path".
+
+### 24 · 2026-11-27 — round 15: the 3D path under real-world conditions (still no app change)
+Tested `track3d.py` on four edge cases built from the synthetic day: watch only (iPhone left behind), no GPS at all,
+an 8-minute gap in all data, and GPS from both devices at once. All run and give plausible numbers.
+**Found and fixed:**
+1. *Silent false orientation.* Without a GPS walk the pocket/wrist heading offset cannot be learned; the path's
+   shape is right but it may be rotated. The tool now says so (and that positions are relative without any fix)
+   instead of presenting a possibly rotated map as fact.
+2. *Gaps drawn as walks.* Seconds with no sensor within ±30 s are marked "gap": the viewer leaves a break, the HUD
+   says "no data", the summary counts the minutes.
+**Verified:** the four cases. **Needs a real day:** everything about real sensor noise (compass near metal, GPS
+multipath indoors).
