@@ -967,3 +967,19 @@ multipath indoors).
 - The on-watch checklist gains a "Position day" section for builds 120–126: the one switch on both devices (F28),
   the "Always" prompt, the battery tiers and battery log, and an export check that the watch barometer's times
   are right. No app change: build 126 is current.
+
+### 68 · 2026-11-27 — round 59: repairing the barometer already recorded (tools only, no new build)
+- **Why:** build 120 fixes new recordings, but every watch barometer line recorded so far (25–27 Nov, all app
+  versions: it is watchOS 27's clock, not one build) sits ~26 years ahead. `tools/fix_pressure_time.py` repairs an
+  export in place (keeps `pressure.orig.csv`).
+- **How:** the error is one constant per boot of the watch. Where the iPhone's barometer overlaps, the constant is
+  the one whose watch 60-s height changes match the iPhone's (lift rides and stairs; weather does not disturb 60-s
+  changes). Elsewhere, blocks of pressure lines are lined up with the watch's own motion recording (times right).
+- **What did not work, on the way:** anchoring blocks at recording-run starts (pauses inside a run made extra
+  blocks), and correlating absolute pressure (weather makes many shifts look alike) — both produced plausible-looking
+  but wrong times; caught because the iPhone's lift rides did not appear in the watch data at the same minutes.
+- **Result on 27 Nov:** iPhone match correlation 0.99; the watch barometer now spans 25 Nov 22:39 – 27 Nov 16:56
+  (its recording ended 16:49); the stairs at 10:50 and 11:06 show −2.1 / +2.1 m on both devices in the same
+  minute, the lift rides +5 / −5.5 / +4.4 m on the watch against ~±10 m on the iPhone (the watch's shorter
+  pressure blocks around the rides; timing matches). The older blocks (without the iPhone) rest on the motion
+  alignment and are less certain.
