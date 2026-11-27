@@ -59,7 +59,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F20 | **Earlier wind-down after a short night:** when the last recorded night was over an hour shorter than your usual (and it was last night, ended < 20 h ago), the night's wind-down starts 30 min earlier (90 min lead); naps unchanged; lamp only, the plan and alarm are unchanged | built (round 26, no answer) |
 | F21 | **Recent colours in the wheel:** the three colours you chose last carry a small white dot (VoiceOver: "recent"); the wheel opens on the middle of the current and recent colours when they all fit in the full-size centre, else on the current one | built (round 27, no answer) |
 | F22 | **Time-aware switch-on:** switching the lamp on from off (tap, double tap, VoiceOver) after dark brings back your own last evening light, in daylight your last daytime one; remembered only from your changes that reached the lamp, never the bedside night light or an automation; toggle "Light by time of day" | built (round 28, no answer) |
-| F23 | **Arrival in your evening light:** the arrival light (F16) comes on at your remembered evening light (F22) instead of a fixed 60 %, and still dim and warm inside the wind-down | proposed (round 28) |
+| F23 | **Arrival in your evening light:** the arrival light (F16) comes on at your remembered evening light (F22) instead of a fixed 60 % (only with "Light by time of day" on), and still 25 % 2200 K inside the wind-down | built (round 29, no answer) |
+| F24 | **Double tap answers the note:** while a note with a button shows (Undo, Restart), double tap presses that button instead of toggling the lamp, as watchOS's double tap presses the primary button on screen | proposed (round 29) |
 
 ## Iterations
 
@@ -591,3 +592,13 @@ multipath indoors).
 - **Verified:** rules by unit tests (CI), prototype JS parses. **Needs the real watch:** whether bringing back the
   evening light feels right or surprising the first evenings.
 - **Proposed:** F23 arrival in your evening light.
+
+### 38 · 2026-11-27 — round 29: F23 built (unanswered → approved; watch app change, install after recording)
+- **F23** (own commit): `LampRules.arrivalLight` takes the evening memory; outside the wind-down it returns
+  `switchOn(memory:)` of it, inside the wind-down still 25 % 2200 K (tested both). Without a memory, or with "Light by
+  time of day" off, it stays the warm 60 %.
+- **Review:** a remembered evening light can be a bright colour; that is your own last evening choice, so it is
+  the right light to come home to; the wind-down rule still wins near bedtime, so it never comes home bright then.
+- **Prototype:** no visual change (the arrival has no screen of its own beyond the note); not republished.
+- **Verified:** rule by unit tests (CI). **Needs the real watch:** as F16.
+- **Proposed:** F24 double tap answers the note.
