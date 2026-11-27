@@ -145,12 +145,17 @@ enum LampRules {
     /// last "away" answer to now. Nil whenever it must not: away not proven, not fresh, not dark, a sleep block, the
     /// lamp already on, the lamp panel open (you are about to set it yourself; a tap there would toggle it straight
     /// back off), or you switched it off in the last 10 min. Automation never switches on over your own choice.
+    /// F23: outside the wind-down it comes on in `evening`, your remembered evening light (F22), when there is one.
     static func arrivalLight(awaySpan: TimeInterval, sinceAway: TimeInterval, dark: Bool, sleeping: Bool, lampOn: Bool,
-                             panelOpen: Bool, sinceUserOff: TimeInterval?, inWindDown: Bool) -> [String: Any]? {
+                             panelOpen: Bool, sinceUserOff: TimeInterval?, inWindDown: Bool,
+                             evening: [String: Any]? = nil) -> [String: Any]? {
         guard awaySpan >= arrivalAway, sinceAway >= 0, sinceAway <= arrivalFresh else { return nil }
         guard dark, !sleeping, !lampOn, !panelOpen else { return nil }
         if let s = sinceUserOff, s >= 0, s < arrivalOffGrace { return nil }
-        return inWindDown ? ["state": true, "dimming": 25, "temp": 2200] : ["state": true, "dimming": 60, "temp": 2700]
+        if inWindDown { return ["state": true, "dimming": 25, "temp": 2200] }
+        // F23: your own evening light when there is one (F22), else a warm 60 %
+        if let e = evening, e["dimming"] != nil { return switchOn(memory: e) }
+        return ["state": true, "dimming": 60, "temp": 2700]
     }
 
     /// F20: how much earlier the night's wind-down starts after a short night

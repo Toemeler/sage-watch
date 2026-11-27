@@ -102,6 +102,15 @@ final class LampRulesTests: XCTestCase {
         XCTAssertNil(a(panel: true))                                  // you are setting it yourself
         XCTAssertNil(a(off: 120))                                     // you just switched it off
         XCTAssertNotNil(a(off: 3600))
+        // F23: your evening light when remembered; inside the wind-down still dim and warm
+        let mine: [String: Any] = ["dimming": 45, "r": 255, "g": 140, "b": 0]
+        let e = LampRules.arrivalLight(awaySpan: 3600, sinceAway: 60, dark: true, sleeping: false, lampOn: false,
+                                       panelOpen: false, sinceUserOff: nil, inWindDown: false, evening: mine)
+        XCTAssertEqual(e?["dimming"] as? Int, 45)
+        XCTAssertEqual(e?["g"] as? Int, 140)
+        let late = LampRules.arrivalLight(awaySpan: 3600, sinceAway: 60, dark: true, sleeping: false, lampOn: false,
+                                          panelOpen: false, sinceUserOff: nil, inWindDown: true, evening: mine)
+        XCTAssertEqual(late?["dimming"] as? Int, 25)
     }
 
     func testSunTimesForZurich() {

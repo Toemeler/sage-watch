@@ -214,7 +214,9 @@ final class LampAutomation: ObservableObject {
                                              sleeping: FaceMode.auto(now) == .sleeping, lampOn: lamp.state.on,
                                              panelOpen: lamp.panelOpen,
                                              sinceUserOff: lamp.userOffAt.map { now.timeIntervalSince($0) },
-                                             inWindDown: bed.at.timeIntervalSince(now) <= bed.lead) else { return }
+                                             inWindDown: bed.at.timeIntervalSince(now) <= bed.lead,
+                                             evening: switchOnMemoryOn ? UserDefaults.standard.dictionary(forKey: LampModel.memoryKey(dark: true)) : nil)
+        else { return }
         lamp.set(p, byUser: false)
         arrivedAt = now
         activity = "Welcome home: lamp on"
