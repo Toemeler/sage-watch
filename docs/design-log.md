@@ -983,3 +983,14 @@ multipath indoors).
   minute, the lift rides +5 / −5.5 / +4.4 m on the watch against ~±10 m on the iPhone (the watch's shorter
   pressure blocks around the rides; timing matches). The older blocks (without the iPhone) rest on the motion
   alignment and are less certain.
+
+### 69 · 2026-11-27 — round 60: the afternoon the iPhone missed (tools only, no new build)
+- **Changed (track3d):** the watch's barometer fills the iPhone's barometer gaps (joined at the offset of the last
+  stretch both recorded), using its absolute pressure — its relative altitude restarts at 0 with every recording
+  run, which read as floors at each restart (−17 floors at 16:45 on the first try). Stairs or lift is decided only
+  where the step counter was recording ("unknown (no step data)" otherwise; the afternoon was all "lift" before).
+  More than 6 floors at once is reported as a height change on the way (hill, car, train), not floors. The
+  step-counter check compares with events labelled stairs only. Regression 14/14.
+- **27 Nov, repaired export:** 4.8 h of height from the watch after 12:10; floor changes 12:13, 12:21, 12:29,
+  15:39, 15:41, 16:32 (no step data, so stairs or lift unknown); a 48 m descent at 16:45 (travel), and a jump at
+  16:57 across the iPhone's return. The morning is unchanged.

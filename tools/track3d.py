@@ -95,6 +95,9 @@ def interp(t, src_t, src_v):
     return out
 
 
+MAX_FLOORS = 6
+
+
 def floors_from_stairs(t, h):
     """Floors from stair (or lift) events, not from absolute height: weather drifts the barometer by 1-2 m an hour,
     which over a long indoor stretch would invent floors. Climbing shows as >= 1.2 m per minute (drift is ~40x
@@ -160,6 +163,11 @@ def floors_from_stairs(t, h):
         else:
             k += 1
     events.sort()
+    # more than 6 floors (~20 m) at once is not a building: a hill, a car, a train (27 Nov, 16:45: 50 m down with the
+    # iPhone dead, no GPS to tell). It changes no floor; the summary lists it as a height change on the way.
+    travel = [e for e in events if abs(e[2]) > MAX_FLOORS]
+    events = [e for e in events if abs(e[2]) <= MAX_FLOORS]
+    floors_from_stairs.travel = travel
     # the floor changes halfway through each stair event and stays put in between
     level, start = 0, 0
     for a_, b_, df, *_ in events:
@@ -185,6 +193,18 @@ def build(d: Path):
     p_steps, steps_name = pick(d, "phonesteps", "steps")
     p_head, head_name = pick(d, "phoneheading", "heading")
     p_pres, _ = pick(d, "phonepressure", "pressure")
+    # the watch's barometer fills the iPhone's gaps (27 Nov: the iPhone's battery died at 12:10, the watch went on);
+    # lines with impossible times (recorded before build 120, not repaired with fix_pressure_time.py) are left out
+    p_wpres = d / "pressure.csv" if p_pres is not None and p_pres.name == "phonepressure.csv" else None
+    wpres = load(p_wpres, [0, 1]) if p_wpres is not None and p_wpres.exists() else None
+    if wpres is not None:
+        wpres = wpres[(wpres[:, 0] < datetime.now().timestamp() + 86400) & (wpres[:, 1] > 30)]
+        if len(wpres) > 1:
+            # height from absolute pressure (kPa): its relative altitude restarts at 0 with every recording run,
+            # which would read as a jump of floors at each restart
+            wpres = np.column_stack([wpres[:, 0], 44330.0 * (1 - (wpres[:, 1] / 101.325) ** 0.1903)])
+        else:
+            wpres = None
     p_abs, _ = pick(d, "phonealtitude", "altitude")
     steps = load(p_steps, [0, 1, 2, 3, 4]) if p_steps else None
     head = load(p_head, [0, 1, 2, 3, 4, 5]) if p_head else None
@@ -192,6 +212,12 @@ def build(d: Path):
     absalt = load(p_abs, [0, 1, 2]) if p_abs else None
     starts = [a[0, 0] for a in (allfix, steps, head, pres) if a is not None]
     ends = [a[-1, 0] for a in (allfix, steps, head, pres) if a is not None]
+    if wpres is not None and starts:
+        wpres = wpres[(wpres[:, 0] >= min(starts)) & (wpres[:, 0] <= wpres[:, 0].max())]
+        if len(wpres) > 1:
+            ends.append(wpres[-1, 0])
+        else:
+            wpres = None
     if not starts:
         raise SystemExit("no position data in this export (turn on Track position)")
     t = np.arange(math.floor(min(starts)), math.ceil(max(ends)) + 1, 1.0)
@@ -199,6 +225,20 @@ def build(d: Path):
 
     # ---------- height
     rel = interp(t, pres[:, 0], pres[:, 1]) if pres is not None else np.full(n, np.nan)
+    filled_from_watch = 0
+    if wpres is not None:
+        wrel = interp(t, wpres[:, 0], wpres[:, 1])
+        both = ~np.isnan(rel) & ~np.isnan(wrel)
+        if both.sum() > 600:
+            # the two barometers read the same height changes but from different zeros: join the watch's on
+            # with the offset of the last stretch where both had data before each gap
+            gaps = np.isnan(rel) & ~np.isnan(wrel)
+            off = np.nan
+            for i in range(n):
+                if both[i]:
+                    off = rel[i] - wrel[i] if np.isnan(off) else 0.98 * off + 0.02 * (rel[i] - wrel[i])
+                elif gaps[i] and not np.isnan(off):
+                    rel[i] = wrel[i] + off; filled_from_watch += 1
     anchors_t, anchors_v, anchors_w = [], [], []
     if allfix is not None:
         g = allfix[(allfix[:, 5] > 0) & (allfix[:, 5] < 15)]
@@ -235,6 +275,8 @@ def build(d: Path):
         alt = interp(t, np.array(anchors_t), np.array(anchors_v))
     alt_s = lowpass(t, alt, 5)
     floor, floor_events = floors_from_stairs(t, rel if not np.isnan(rel).all() else alt)
+    travel = [{"time": float(t[(a_ + b_) // 2]), "metres": round(df * FLOOR_M)}
+              for a_, b_, df, *_ in getattr(floors_from_stairs, "travel", [])]
 
     # ---------- step distance per second (cumulative distance -> increments)
     dist = np.zeros(n)
@@ -244,6 +286,11 @@ def build(d: Path):
         inc = np.diff(np.nan_to_num(cum_t, nan=0.0), prepend=0.0)
         inc[(inc < 0) | (inc > 4)] = 0.0                             # resets / glitches
         dist = inc
+    # where the step counter was recording at all (the pedometer writes every few seconds while it runs)
+    steps_have = np.zeros(n, bool)
+    if steps is not None and len(steps) > 1:
+        si = np.clip(np.searchsorted(steps[:, 0], t), 1, len(steps) - 1)
+        steps_have = np.minimum(np.abs(steps[si, 0] - t), np.abs(steps[si - 1, 0] - t)) < 120
 
     # ---------- each floor change: when, from/to, stairs or lift (walked during the climb or not)
     changes = []
@@ -253,6 +300,8 @@ def build(d: Path):
         # count those steps as stairs
         if c0 is None:
             by, walked = "unknown (data gap)", 0.0
+        elif not steps_have[c0:c1 + 1].any():
+            by, walked = "unknown (no step data)", 0.0          # no steps recorded: stairs and lift look alike
         else:
             walked = float(dist[c0:c1 + 1].sum())
             by = "stairs" if walked > 0.25 * (c1 - c0 + 1) and walked > 3 else "lift"
@@ -409,7 +458,7 @@ def build(d: Path):
     warnings = []
     # Apple's step counter counts floors climbed on foot only: compare it with the barometer's *stairs*, not its
     # lift rides (the real 27 Nov day warned about three lift rides the step counter could never have counted)
-    stairs = [c for c in changes if c.get("by") != "lift"]
+    stairs = [c for c in changes if c.get("by") == "stairs"]
     baro_up = sum(c["to"] - c["from"] for c in stairs if c["to"] > c["from"])
     baro_down = sum(c["from"] - c["to"] for c in stairs if c["to"] < c["from"])
     if ped_up is not None and (abs(ped_up - baro_up) > 1 or abs((ped_down or 0) - baro_down) > 1):
@@ -425,7 +474,7 @@ def build(d: Path):
         warnings.append("no GPS fix at all: positions are relative (metres from the start), not on a map")
     if pres is None:
         warnings.append("no barometer: height and floors come from GPS only and are coarse")
-    return dict(t=t, x=xs[:, 0], y=xs[:, 1], lat=lat, lon=lon, alt=alt_s, floor=floor, hacc=hacc,
+    return dict(travel=travel, watch_baro_min=filled_from_watch / 60, t=t, x=xs[:, 0], y=xs[:, 1], lat=lat, lon=lon, alt=alt_s, floor=floor, hacc=hacc,
                 src=src, dist=dist, offset=offset_deg, steps_src=steps_name, head_src=head_name, warnings=warnings,
                 changes=changes, pocket_periods=[(int(p[0]), int(p[1]), None if p[2] is None else round(p[2], 1), p[3]) for p in periods])
 
@@ -474,6 +523,9 @@ def summary(r):
            "median_h_acc_m": float(np.median(r["hacc"][r["src"] != "gap"])) if (r["src"] != "gap").any() else None,
            "steps_from": r["steps_src"], "heading_from": r["head_src"],
            "gap_minutes": float((r["src"] == "gap").sum() / 60), "warnings": r["warnings"],
+           "height_from_watch_min": round(float(r["watch_baro_min"]), 1),
+           "height_changes_not_floors": [{"at": datetime.fromtimestamp(c["time"], ZoneInfo("Europe/Zurich")).strftime("%H:%M"),
+                                          "metres": c["metres"]} for c in r["travel"]],
            "floor_change_list": [{"at": datetime.fromtimestamp(c["time"], ZoneInfo("Europe/Zurich")).strftime("%H:%M"),
                                   "from": c["from"], "to": c["to"], "by": c["by"]} for c in r["changes"]],
            "pocket_periods": [{"from_min": a // 60, "to_min": b // 60, "offset_deg": o, "learned": l}
