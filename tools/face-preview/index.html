@@ -371,6 +371,7 @@ requestAnimationFrame(frame);
         <div style="font-size:14px;font-weight:600;background:#2c2c2e;border-radius:99px;padding:8px 22px">Retry</div>
       </div>
       <div class="cap" id="cap"><div class="cap-fill" id="capFill"></div>
+        <div id="capMark" style="position:absolute;left:18%;right:18%;height:1.5px;background:rgba(255,255,255,.35);display:none"></div>
         <svg class="cap-icon" id="capIcon" viewBox="0 0 24 24"><path id="capIconPath" d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z" stroke-width="2" stroke-linecap="round"/></svg>
       </div>
       <div id="honey"></div>
@@ -633,6 +634,9 @@ requestAnimationFrame(frame);
     const ms = 1 - 0.5 * mode.x;
     cap.style.transform = `scale(${ms * (1 - st / H * 0.3)}, ${ms * (1 + st / H)})`; cap.style.opacity = (1 - mode.x) * (connSel.value === "checking" ? 0.35 : 1); cap.style.filter = `blur(${6 * mode.x}px)`;
     fill.style.height = H * L + "px"; fill.style.backgroundColor = tint();
+    // F26: the 30 % stop as a hairline at night while below it
+    const mark = document.getElementById("capMark");
+    mark.style.display = nightNow() && L < CAP ? "block" : "none"; mark.style.bottom = H * CAP + "px";
     icon.style.width = icon.style.height = "30px"; icon.style.bottom = "20px";
     const dark = L > 0.12; iconPath.setAttribute("stroke", dark ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.8)");
     iconPath.setAttribute("fill", L > 0 ? (dark ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.8)") : "none");

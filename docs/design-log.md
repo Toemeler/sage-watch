@@ -783,3 +783,14 @@ multipath indoors).
 - **Prototype:** "Night, cap at 30 %" switch with the same slider, crown and switch-on behaviour.
 - **Verified:** rules by unit tests (CI); prototype JS parses. **Needs the real watch:** whether a second push feels
   natural or the cap feels like a wall at a moment you need light.
+
+### 52 · 2026-11-27 — round 43: the night cap on every path, and visible (watch app change, install after recording)
+- **Review of F26 against every input path:** slider ✓, crown ✓, tap and double tap (toggle) ✓, colour pick
+  (keeps the brightness) ✓, automations (not capped, by design: they are not a fumble) ✓ — but VoiceOver's
+  adjustable action went straight to `setLevel` and stepped past the cap. And the cap was only felt, never seen:
+  a stop with no visual sign reads as a bug the first time.
+- **Changed:** VoiceOver increments stop at 30 % at night and the next increment from there goes on (the same
+  "second push"). At night, while the light is below 30 %, a faint hairline marks the stop on the slider (Swift and
+  prototype); it disappears once the light is above it.
+- **Verified:** uses the tested `sliderTop`; prototype JS parses. **Needs the real watch:** that the hairline is
+  visible but quiet at night brightness.

@@ -524,6 +524,13 @@ struct LampPanel: View {
             // the track brightens a touch while held (the full-screen stand-in for Control Center's lift)
             Rectangle().fill(Color.white.opacity(lifted ? 0.22 : 0.16))
             Rectangle().fill(Self.tint(lamp.state)).frame(height: h * level)
+            // F26: at night a hairline marks the 30 % stop, so the stop is seen before it is felt
+            if lamp.nightCap && level < LampRules.nightCapLevel {
+                Rectangle().fill(Color.white.opacity(0.35)).frame(height: 1.5)
+                    .padding(.horizontal, w * 0.18)
+                    .offset(y: -h * LampRules.nightCapLevel)
+                    .allowsHitTesting(false)
+            }
             Image(systemName: level > 0 ? "lightbulb.fill" : "lightbulb")
                 .font(.system(size: 26, weight: .medium))
                 .foregroundStyle(level > 0.12 ? Color.black.opacity(0.55) : Color.white.opacity(0.8))
@@ -554,7 +561,10 @@ struct LampPanel: View {
         .accessibilityValue(Text(level > 0 ? "\(Int((level * 100).rounded())) percent" : "Off"))
         .accessibilityAdjustableAction { dir in
             lastUse = Date()                             // VoiceOver use is use: the panel must not close under it
-            lamp.setLevel(min(1, max(0, modelLevel + (dir == .increment ? 0.1 : -0.1))))
+            // F26 for VoiceOver too: up to 30 % at night; the next increment from the cap goes on (the second push)
+            let atCap = modelLevel >= LampRules.nightCapLevel - 0.005
+            let top = LampRules.sliderTop(night: lamp.nightCap, unlocked: atCap, current: modelLevel)
+            lamp.setLevel(min(top, max(0, modelLevel + (dir == .increment ? 0.1 : -0.1))))
         }
         .accessibilityAction { lastUse = Date(); lamp.toggle() }
         .accessibilityAction(named: Text("Colours")) { lastUse = Date(); withAnimation { colours = true } }
