@@ -459,9 +459,16 @@ requestAnimationFrame(frame);
     const sw = c.ring === 0 ? { temp: 2700 } : c.ring === 1 ? { temp: whites[wi++] } : { rgb: hue(c.a / (2 * Math.PI), SAT[c.ring]) };
     const el = document.createElement("div"); el.className = "bub";
     el.style.background = sw.temp ? kelvin(sw.temp) : `rgb(${sw.rgb.join(",")})`;
+    // F21: the recent-colour dot (white with a faint dark edge, so it shows on whites too)
+    const dot = document.createElement("div");
+    dot.style.cssText = "position:absolute;left:50%;bottom:6px;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35);display:none";
+    el.appendChild(dot);
     honey.appendChild(el);
-    return { ...c, sw, el, bloom: new Spring(0, 0.5, 0.74) };
+    return { ...c, sw, el, dot, bloom: new Spring(0, 0.5, 0.74) };
   });
+  // F21: recent colours, newest first, three at most (LampRules.recents); kept in the page while it is open
+  let recent = [];
+  const addRecent = i => { recent = [i, ...recent.filter(r => r !== i)].slice(0, 3); };
   let zoom = 1;   // the crown zooms the colour wheel
   let pan = { x: 0, y: 0 }, panBase = { x: 0, y: 0 }; const panS = { x: new Spring(0, 0.45, 0.75), y: new Spring(0, 0.45, 0.75) };
   let panning = false;
@@ -481,8 +488,17 @@ requestAnimationFrame(frame);
   function openColours() {
     colours = true; mode.to(1, 0.45, 0.8);
     cells.forEach(c => { if (reduce) { c.bloom.jump(1); return; } c.bloom.jump(0); setTimeout(() => c.bloom.to(1, 0.5, 0.74), c.ring * 40); });
-    // open centred on the colour that is set, as the app grid opens on the last app
-    const cur = cells.find(c => matches(c.sw)); const p0 = cur ? { x: -cur.x, y: -cur.y } : { x: 0, y: 0 };
+    // open centred on the colour that is set, as the app grid opens on the last app; on the middle of it and the
+    // recent ones when they all fit in the full-size zone around that middle (LampRules.openCentre)
+    const cur = cells.find(c => matches(c.sw));
+    const pts = (cur ? [cur] : []).concat(recent.map(i => cells[i]));
+    let ctr = { x: 0, y: 0 };
+    if (pts.length) {
+      const mid = { x: pts.reduce((a, q) => a + q.x, 0) / pts.length, y: pts.reduce((a, q) => a + q.y, 0) / pts.length };
+      const hx = AW / 2 - D * 0.75, hy = AH / 2 - D * 0.75;
+      ctr = pts.every(q => Math.abs(q.x - mid.x) <= hx && Math.abs(q.y - mid.y) <= hy) ? mid : (cur || pts[0]);
+    }
+    const p0 = { x: -ctr.x, y: -ctr.y };
     pan = { ...p0 }; panBase = { ...p0 }; panS.x.jump(p0.x); panS.y.jump(p0.y);
   }
   function closeColours() { colours = false; zoom = 1; mode.to(0, 0.45, 0.85); cells.forEach(c => c.bloom.to(0, 0.3, 1)); }
@@ -530,7 +546,7 @@ requestAnimationFrame(frame);
         const f = fisheye(c.x * zoom + pan.x, c.y * zoom + pan.y), d = Math.hypot(p.x - AW / 2 - f.x, p.y - AH / 2 - f.y);
         if (d <= Math.max(D / 2 * f.s * zoom + 3, 15) && d < best) { best = d; hit = c; }
       }
-      if (hit) { buzz(); if (hit.sw.temp) { lamp.temp = hit.sw.temp; lamp.rgb = null; } else lamp.rgb = hit.sw.rgb; lamp.on = true; level.to(modelLevel(), 0.45, 0.86); }
+      if (hit) { buzz(); addRecent(cells.indexOf(hit)); if (hit.sw.temp) { lamp.temp = hit.sw.temp; lamp.rgb = null; } else lamp.rgb = hit.sw.rgb; lamp.on = true; level.to(modelLevel(), 0.45, 0.86); }
       closeColours(); return;
     }
     if (longFired) return;
@@ -585,6 +601,7 @@ requestAnimationFrame(frame);
       c.el.style.transform = `scale(${Math.max(0.001, (0.15 + 0.85 * b) * f.s * zoom)})`; c.el.style.opacity = Math.min(1, b);
       c.el.style.display = b < 0.01 && !colours ? "none" : "block";
       c.el.classList.toggle("sel", !!matches(c.sw));
+      c.dot.style.display = !matches(c.sw) && recent.includes(cells.indexOf(c)) ? "block" : "none";
     });
     requestAnimationFrame(tick);
   }

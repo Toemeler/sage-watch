@@ -57,7 +57,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F18 | **Battery guard for the alarm:** at your usual bedtime, with Record on, below 30 % and not charging (the recorder and smart wake may not last the night): one quiet tap and the note "Charge for the alarm", once per night; nothing on the charger | built (round 25, no answer) |
 | F19 | **Recording stopped:** Record is on but no motion was written for 10 min (a crash, a revoked permission, a session that ended): one tap and the note "Recording stopped" with Restart (8 s). Not in the first 2 min of a run; during a sleep block it waits until the block ends, so it never taps you awake | built (round 25, no answer) |
 | F20 | **Earlier wind-down after a short night:** when the last recorded night was over an hour shorter than your usual (and it was last night, ended < 20 h ago), the night's wind-down starts 30 min earlier (90 min lead); naps unchanged; lamp only, the plan and alarm are unchanged | built (round 26, no answer) |
-| F21 | **Recent colours in the wheel:** the three colours you used last get a small ring mark and the wheel opens with them in reach next to the current one, like the app grid keeps recent apps near the middle | proposed (round 26) |
+| F21 | **Recent colours in the wheel:** the three colours you chose last carry a small white dot (VoiceOver: "recent"); the wheel opens on the middle of the current and recent colours when they all fit in the full-size centre, else on the current one | built (round 27, no answer) |
+| F22 | **Time-aware switch-on:** switching the lamp on from off (tap, double tap) after dark brings back your last evening brightness and warmth, in daylight your last daytime one, instead of whatever it was last; your own changes set those memories | proposed (round 27) |
 
 ## Iterations
 
@@ -560,3 +561,17 @@ multipath indoors).
 - **Verified:** rules by unit tests (CI). **Needs real nights:** the iPhone must have analysed last night before
   the evening for the watch to know it was short (it sends the averages after each sync).
 - **Proposed:** F21 recent colours in the wheel.
+
+### 36 · 2026-11-27 — round 27: F21 built (unanswered → approved; watch app change, install after recording)
+- **F21** (own commit): recents are cell ids, newest first, three at most (`LampRules.recents`, tested: first,
+  move to front, cap). The wheel's opening centre is `LampRules.openCentre` (tested): the middle of the current and
+  recent colours when every one of them stays inside the full-size centre zone, else the current colour (as before),
+  else the recents, else the wheel's middle. Marked with a 7 pt white dot with a faint dark edge (visible on whites
+  and vivid colours alike); the set colour keeps only its ring.
+- **Review findings fixed before commit:** the first version read the recents from UserDefaults inside each bubble's
+  body — 61 reads per frame while panning on a watch. They are now read once when the wheel opens. Recording a
+  recent is part of choosing (the same path for touch and VoiceOver).
+- **Prototype:** the same rules, dot and opening centre; recents kept while the page is open.
+- **Verified:** rules by unit tests (CI), prototype JS parses. **Needs the real watch:** whether the dot reads at
+  the fringe's smallest bubble size (it scales with the bubble).
+- **Proposed:** F22 time-aware switch-on.
