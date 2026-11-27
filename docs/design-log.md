@@ -852,3 +852,15 @@ multipath indoors).
 - **Checked, fine:** F27 with the switch-on memory (only your own changes are remembered), the night cap (no
   brightness change), arrival (sets a white the next step continues from), deferred retries (superseded by newer).
 - **Verified:** CI build. **Needs the real watch:** nothing new beyond F27 itself.
+
+### 58 · 2026-11-27 — round 49: steps that say "on" must know the lamp is on (watch app change, install after recording)
+- **Review (user wins, stale state):** the wind-down and adaptive white decide from the watch's last known lamp
+  state, which can be hours old while the app sat in the background. Their steps carry `"state": true`. Switch the
+  lamp off at the wall or in the iPhone app in the evening and the next wind-down or adaptive step would switch it
+  back on — automation overriding the plainest possible choice. (Arrival works on a fresh answer; the asleep
+  fade only switches off; the sunrise is meant to switch on.)
+- **Changed:** before such a step the state must be confirmed within 90 s (`LampRules.freshEnough`, tested); if it
+  is older the watch asks once and waits up to 4 s, and skips the step when no answer comes. It asks only when the
+  last known state says a step could happen (on, and white for adaptive), so a lamp that is off costs no messages.
+  The on-watch checklist gains the wall-switch case, adaptive white and the log filter.
+- **Verified:** rule by unit tests (CI). **Needs the real watch:** the wall-switch case in the checklist.

@@ -2,7 +2,7 @@
 
 Everything below passed the cloud build and unit tests but has **not** been seen on a real watch. Each line is one
 quick check; note ✓ / ✗ and anything odd. Long-press the face → **Lamp → Contact log** shows every lamp message.
-Up to date with build 111 (design log rounds 1–44).
+Up to date with build 116 (design log rounds 1–49).
 
 ## Face (3 min)
 - [ ] Time centred, no date, thin battery bar; bar yellow ≤ 20 %, red ≤ 10 %, green while charging.
@@ -76,6 +76,13 @@ Up to date with build 111 (design log rounds 1–44).
       with a click and "Night · drag again for more"; a second drag goes higher. Crown stops at 30 %; rest ½ s and
       turn again to go on. Switching on at night comes on at most 30 %. Next evening the lamp still comes on in your
       evening light (not 30 %). VoiceOver: increments stop at 30 %, the next one goes on.
+- [ ] Adaptive white (daytime, lamp on in white): the white drifts slowly (cooler toward midday, warmer toward
+      evening), never noticed as a jump; "Now" shows "Adaptive white · … K". Pick a white in the wheel → it stays;
+      switch off and on → it drifts again. In the evening it never gets cooler.
+- [ ] Switch the lamp off with the wall switch or the iPhone app in the evening, then wait 10 min: the wind-down
+      and adaptive white must **not** switch it back on.
+- [ ] Contact log: adaptive steps hidden by default ("Hide adaptive white"); last night's entries are still there
+      in the evening.
 - [ ] On the charger after 21:00 → dim red bedside clock (if watchOS keeps Sage on screen there). Crown up → red
       night light; crown down → lamp off. Left alone, the night light goes off after 15 min.
 - [ ] Wind-down off, lamp bright at your usual bedtime → two quiet clicks and "Bedtime · lamp is bright".

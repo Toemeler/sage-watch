@@ -132,6 +132,12 @@ final class LampRulesTests: XCTestCase {
                                               onlyWarmer: true)?["temp"] as? Int, 3700)
     }
 
+    func testStepsThatSwitchOnNeedAFreshState() {
+        XCTAssertTrue(LampRules.freshEnough(sinceConfirmed: 10))
+        XCTAssertFalse(LampRules.freshEnough(sinceConfirmed: 600))      // ten minutes old: ask again
+        XCTAssertFalse(LampRules.freshEnough(sinceConfirmed: nil))      // never answered
+    }
+
     func testPanelClosesWithTheWristButNotUnderAFinger() {
         XCTAssertTrue(LampRules.closeOnWristDown(active: false, touching: false))
         XCTAssertFalse(LampRules.closeOnWristDown(active: false, touching: true))

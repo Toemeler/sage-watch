@@ -210,8 +210,12 @@ final class LampAutomation: ObservableObject {
             let step: TimeInterval = bed.nap ? 60 : 180
             while !Task.isCancelled && Date() < bed.at {
                 let t = min(1, max(0, 1 - bed.at.timeIntervalSinceNow / bed.lead))
-                // only ever lower and warmer, never on, colour left alone (LampRules, tested)
-                if let p = LampRules.windDown(t: t, start: startState, current: lamp.state) { lamp.set(p, byUser: false) }
+                // only ever lower and warmer, never on, colour left alone (LampRules, tested) — decided on a
+                // freshly confirmed state, so a lamp switched off at the wall is not switched back on
+                // (asked only when the last known state says there is something to lower: a stale "off" just
+                // means one step is skipped, the safe direction)
+                if lamp.state.on, await freshState(), !Task.isCancelled,
+                   let p = LampRules.windDown(t: t, start: startState, current: lamp.state) { lamp.set(p, byUser: false) }
                 try? await Task.sleep(for: .seconds(step))
             }
             guard !Task.isCancelled else { return }      // cancelled: whoever cancelled it owns what comes next
@@ -264,7 +268,11 @@ final class LampAutomation: ObservableObject {
         guard adaptiveTask == nil else { return }
         adaptiveTask = Task { @MainActor in
             while !Task.isCancelled {
-                adaptiveTick(now: Date())
+                // ask the lamp only when a step could happen at all (on, white, not paused), not every 4 min all day
+                let s = LampModel.shared.state
+                if adaptiveOn, !adaptivePaused, s.on, s.rgb == nil, await freshState(), !Task.isCancelled {
+                    adaptiveTick(now: Date())
+                }
                 try? await Task.sleep(for: .seconds(240))
             }
         }
@@ -293,6 +301,19 @@ final class LampAutomation: ObservableObject {
                 activity = "Adaptive white · \(p["temp"] as? Int ?? target) K"      // why the white just changed
             }
         }
+    }
+
+    /// the lamp's state confirmed within `LampRules.freshFor`; if older, ask once and wait up to 4 s for the answer
+    private func freshState() async -> Bool {
+        let lamp = LampModel.shared
+        func fresh() -> Bool { LampRules.freshEnough(sinceConfirmed: lamp.confirmedAt.map { Date().timeIntervalSince($0) }) }
+        if fresh() { return true }
+        lamp.refresh(force: true)
+        for _ in 0..<8 {
+            try? await Task.sleep(for: .milliseconds(500))
+            if fresh() { return true }
+        }
+        return false
     }
 
     /// F27: the lamp went off (by anyone): the next time it is on, the adaptive white may take it again

@@ -187,6 +187,15 @@ enum LampRules {
         return ["state": true, "temp": next, "dimming": current.dimming]
     }
 
+    /// a step that sends "on" (wind-down, adaptive white) may only rely on a lamp state confirmed this recently: an
+    /// older one may predate you switching the lamp off at the wall or in the iPhone app, and the step would switch
+    /// it back on
+    static let freshFor: TimeInterval = 90
+    static func freshEnough(sinceConfirmed s: TimeInterval?) -> Bool {
+        guard let s else { return false }
+        return s >= 0 && s < freshFor
+    }
+
     /// F25: lowering the wrist (the app leaves the front) closes the panel, so the next raise shows the face, as
     /// Control Center does; never while a finger is still on the slider
     static func closeOnWristDown(active: Bool, touching: Bool) -> Bool {
