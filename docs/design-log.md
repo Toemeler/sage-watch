@@ -704,3 +704,14 @@ multipath indoors).
   pixel, so it is not mirrored.
 - **Verified:** schedule by unit tests (CI). **Needs the real watch:** battery over a day compared with before
   (Battery in Settings shows Sage's share).
+
+### 46 · 2026-11-27 — round 37: the menu's lamp section, one screen instead of four (watch app change, install after recording)
+- **Review:** the long-press menu's lamp section had grown to six toggles, a button, two rows, a link and a
+  six-paragraph footer — four screens of crown scrolling, with each automation explained far from its switch.
+  The disabled "Try sunrise" (when the lamp cannot be reached) gave no reason.
+- **Changed:** the lamp section shows what matters at a glance — Now, Last contact, "Automations: 5 of 6 on",
+  Try sunrise, Contact log — and a one-line footer (your change always wins; or why Try sunrise is off). The six
+  toggles are on their own "Automations" page, each with a one-line description under its title, as watchOS
+  settings lists do, and the closing note about the iPhone and the contact log.
+- **Prototype:** has no menu; not republished.
+- **Verified:** CI build. No new decision logic.

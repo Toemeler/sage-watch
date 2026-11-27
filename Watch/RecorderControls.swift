@@ -56,26 +56,26 @@ struct RecorderControls: View {
                 Text("Nap: wakes you when the cycle ends, \(Int(s.napEarliest))–\(Int(s.napLatest)) min after you fall asleep. Stop with the button, a hard shake or the iPhone.")
             }
 
+            // the lamp's state at a glance here; the six automations on their own page, each explained where it is
+            // switched (a footer of six paragraphs under six toggles was not read)
             Section {
-                Toggle("Sunrise wake", isOn: $automation.sunriseOn)
-                Toggle("Wind-down", isOn: $automation.windDownOn)
-                    .onChange(of: automation.windDownOn) { _, _ in automation.scheduleWindDown() }
-                Toggle("Off when asleep", isOn: $automation.offWhenAsleepOn)
-                Toggle("Bedtime tap", isOn: $automation.bedtimeTapOn)
-                    .onChange(of: automation.bedtimeTapOn) { _, _ in automation.rescheduleWindDown() }
-                Toggle("Arrival light", isOn: $automation.arrivalOn)
-                Toggle("Light by time of day", isOn: $automation.switchOnMemoryOn)
-                Button(automation.previewing ? "Trying the sunrise…" : "Try sunrise (60 s)") { automation.trySunrise() }
-                    .disabled(automation.previewing || !lamp.home)
                 if !automation.activity.isEmpty { row("Now", automation.activity) }
                 if let c = lamp.contacts.first {
                     row("Last contact", "\(c.at.formatted(date: .omitted, time: .shortened)) \(c.ok ? "ok" : "failed")\(c.background ? " · background" : "")")
                 }
+                NavigationLink {
+                    LampAutomations()
+                } label: {
+                    row("Automations", "\(automation.enabledCount) of 6 on")
+                }
+                Button(automation.previewing ? "Trying the sunrise…" : "Try sunrise (60 s)") { automation.trySunrise() }
+                    .disabled(automation.previewing || !lamp.home)
                 NavigationLink("Contact log") { LampContactLog() }
             } header: {
                 Text("Lamp")
             } footer: {
-                Text("Sunrise: the lamp fades up while the wake window is open. Wind-down: in the hour before your usual bedtime a lamp that is on dims and warms (90 min after a short night). Off when asleep: it fades off once the watch sees you sleeping. Bedtime tap: one tap if it is still bright at bedtime. Arrival light: on, warm, when you come home after dark and it is off. Light by time of day: switching on brings back your last evening or daytime light. Changing the lamp yourself always wins over these. Night steps go through the iPhone while Sage runs in the background; the contact log shows whether they arrived.")
+                Text(lamp.home ? "Changing the lamp yourself always wins over the automations."
+                               : "Try sunrise needs the lamp: open Sage on the iPhone at home.")
             }
 
             Section("Music") {
@@ -145,6 +145,37 @@ struct RecorderControls: View {
 }
 
 /// Every lamp message of the last while: when, whether it arrived, and whether Sage was in the background then.
+/// The six lamp automations, each with one line saying what it does, under its switch.
+struct LampAutomations: View {
+    @ObservedObject private var automation = LampAutomation.shared
+
+    var body: some View {
+        List {
+            item("Sunrise wake", $automation.sunriseOn, "Fades up while the wake window is open; full light when the alarm rings.")
+            item("Wind-down", $automation.windDownOn, "In the hour before your usual bedtime a lamp that is on dims and warms; 90 min after a short night.")
+                .onChange(of: automation.windDownOn) { _, _ in automation.scheduleWindDown() }
+            item("Off when asleep", $automation.offWhenAsleepOn, "Fades off once the watch sees you sleeping.")
+            item("Bedtime tap", $automation.bedtimeTapOn, "One quiet tap if the lamp is still bright at bedtime.")
+                .onChange(of: automation.bedtimeTapOn) { _, _ in automation.rescheduleWindDown() }
+            item("Arrival light", $automation.arrivalOn, "On in your evening light when you come home after dark and it is off.")
+            item("Light by time of day", $automation.switchOnMemoryOn, "Switching on brings back your last evening or daytime light.")
+            Text("Your own change always wins: any of these steps aside when you set the lamp. Night steps go through the iPhone while Sage runs in the background; the contact log shows whether they arrived.")
+                .font(.footnote).foregroundStyle(.secondary)
+                .listRowBackground(Color.clear)
+        }
+        .navigationTitle("Automations")
+    }
+
+    private func item(_ title: String, _ on: Binding<Bool>, _ what: String) -> some View {
+        Toggle(isOn: on) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(what).font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
 struct LampContactLog: View {
     @ObservedObject private var lamp = LampModel.shared
 

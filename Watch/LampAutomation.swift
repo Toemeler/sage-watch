@@ -36,6 +36,10 @@ final class LampAutomation: ObservableObject {
     @Published var switchOnMemoryOn = UserDefaults.standard.object(forKey: "lampSwitchOnMemory") as? Bool ?? true {
         didSet { UserDefaults.standard.set(switchOnMemoryOn, forKey: "lampSwitchOnMemory") }
     }
+    /// how many of the six automations are on (the menu's summary)
+    var enabledCount: Int {
+        [sunriseOn, windDownOn, offWhenAsleepOn, bedtimeTapOn, arrivalOn, switchOnMemoryOn].filter { $0 }.count
+    }
     /// when the bedtime tap last fired (the face shows a note for it)
     @Published private(set) var bedtimeTappedAt: Date?
     /// when the arrival light (F16) last switched the lamp on (the face shows a note with Undo)
