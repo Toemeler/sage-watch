@@ -92,6 +92,48 @@ def interp(t, src_t, src_v):
     return out
 
 
+def floors_from_stairs(t, h):
+    """Floors from stair (or lift) events, not from absolute height: weather drifts the barometer by 1-2 m an hour,
+    which over a long indoor stretch would invent floors. Climbing shows as >= 1.2 m per minute (drift is ~40x
+    slower); an event that changes height by >= 2.2 m counts as round(change / 3 m) floors. Between events the floor
+    stays fixed. Floor 0 = where the recording started."""
+    n = len(t)
+    floor = np.full(n, np.nan)
+    if np.isnan(h).all():
+        return floor
+    hs = lowpass(t, h, 10)
+    W = 30
+    rate = np.full(n, 0.0)
+    rate[W:-W] = (hs[2 * W:] - hs[:-2 * W]) / (2 * W)          # m/s over a minute
+    rate = np.nan_to_num(rate)
+    climbing = np.abs(rate) > 0.02
+    events = []
+    i = 0
+    while i < n:
+        if climbing[i]:
+            j = i
+            while j < n and (climbing[j] or (j + 20 < n and climbing[j:j + 20].any())):
+                j += 1
+            a_, b_ = max(0, i - W), min(n - 1, j + W)
+            change = np.nanmean(hs[b_:min(n, b_ + 20)]) - np.nanmean(hs[max(0, a_ - 20):a_ + 1])
+            if abs(change) >= 2.2:
+                events.append((a_, b_, int(round(change / FLOOR_M))))
+            i = j
+        else:
+            i += 1
+    # the floor changes halfway through each stair event and stays put in between
+    level, start = 0, 0
+    for a_, b_, df in events:
+        mid = (a_ + b_) // 2
+        floor[start:mid] = level
+        level += df
+        floor[mid:b_] = level
+        start = b_
+    floor[start:] = level
+    floor[np.isnan(h)] = np.nan
+    return floor
+
+
 # ------------------------------------------------------------------ main pipeline
 
 def build(d: Path):
@@ -153,10 +195,7 @@ def build(d: Path):
     elif anchors_t:
         alt = interp(t, np.array(anchors_t), np.array(anchors_v))
     alt_s = lowpass(t, alt, 5)
-    floor = np.full(n, np.nan)
-    if not np.isnan(alt_s).all():
-        base = np.nanpercentile(alt_s, 5)
-        floor = np.round((alt_s - base) / FLOOR_M)
+    floor = floors_from_stairs(t, rel if not np.isnan(rel).all() else alt)
 
     # ---------- step distance per second (cumulative distance -> increments)
     dist = np.zeros(n)

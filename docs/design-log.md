@@ -412,3 +412,14 @@ multipath indoors).
   one and the summary warns about it. Not applied to the watch (a wrist turns constantly).
 - **Result:** the re-pocketing is found at minute 12, offsets 35.0° / 109.9° (true 35 / 110), errors back to 0.6 m
   outdoors / 3.9 m indoors; the normal day is unchanged.
+
+### 27 · 2026-11-27 — round 18: weather must not climb stairs (no app change)
+- **Review:** floors came from absolute barometer height. Weather drifts the barometer 1–2 m per hour; outdoors GPS
+  pins it, but a long indoor stretch without GPS drifts freely.
+- **Measured** (`tools/synth_indoor.py`: 4.4 h, 4 h indoors, 0→2→1→0 floors, 1.8 m/h drift): **78** floor changes
+  instead of 4, floor right only **37 %** of the time.
+- **Changed:** floors come from stair/lift events: climbing shows as ≥ 1.2 m/min (drift is ~40× slower); an event
+  with ≥ 2.2 m change counts as round(change / 3 m) floors; between events the floor stays fixed (floor 0 = where
+  the recording started).
+- **Result:** exactly 4 changes, floor right 100 % (1 min off, on the stairs themselves); the normal day 97 % (the
+  3 % are the seconds on the stairs, where "which floor" is ambiguous). All earlier edge cases still run.
