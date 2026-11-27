@@ -49,6 +49,13 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertLessThan(n, 20)
     }
 
+    func testMusicBarsRideOutABriefDrop() {
+        XCTAssertTrue(FaceRules.keepMusicBars(lastPlaying: true, sinceAnswer: 12))
+        XCTAssertFalse(FaceRules.keepMusicBars(lastPlaying: true, sinceAnswer: 45))    // gone too long
+        XCTAssertFalse(FaceRules.keepMusicBars(lastPlaying: false, sinceAnswer: 5))
+        XCTAssertFalse(FaceRules.keepMusicBars(lastPlaying: true, sinceAnswer: nil))   // never answered
+    }
+
     func testCrownDoesNothingWhileAsleep() {
         XCTAssertEqual(FaceRules.crownAction(delta: 20, sleeping: true), .none)
         XCTAssertEqual(FaceRules.crownAction(delta: -20, sleeping: true), .none)

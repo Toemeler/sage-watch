@@ -39,6 +39,17 @@ enum FaceRules {
         return sinceLastSample >= stallSeconds
     }
 
+    /// the music bars stay this long after the last "playing" answer when the iPhone briefly cannot be asked
+    static let musicGrace: TimeInterval = 30
+
+    /// whether the music bars show after a check that failed (link asleep, a dropped reply): keep what was last
+    /// known for a short while instead of flickering the bars off mid-song; a real "nothing playing" answer hides
+    /// them at once (that path does not come through here)
+    static func keepMusicBars(lastPlaying: Bool, sinceAnswer: TimeInterval?) -> Bool {
+        guard lastPlaying, let s = sinceAnswer else { return false }
+        return s >= 0 && s < musicGrace
+    }
+
     /// a pause longer than this starts a new crown gesture
     static let gesturePause: TimeInterval = 1.5
 

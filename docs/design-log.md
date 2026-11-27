@@ -803,3 +803,15 @@ multipath indoors).
   Prototype in step. The on-watch checklist now covers builds 107–111 (night cap on every path, the checking state,
   the nap-length carry-over).
 - **Verified:** CI build; prototype JS parses. **Needs the real watch:** caption legibility at night brightness.
+
+### 54 · 2026-11-27 — round 45: the music bars ride out a dropped check (watch app change, install after recording)
+- **Review:** the Now Playing sheet is the system's own (fine). The bars behind it are not: the watch asks the
+  iPhone every 10 s, and one unreachable moment or one dropped reply set "playing" to false at once — the bars
+  vanished mid-song and came back 10 s later. WatchConnectivity's reachability drops briefly all the time (the
+  iPhone's link sleeps), so this flicker would be common exactly when music plays for a long time.
+- **Changed:** a failed check keeps the last known "playing" for up to 30 s after the last real answer
+  (`FaceRules.keepMusicBars`, tested: brief drop, long drop, not playing, never answered); a real "nothing
+  playing" answer still hides the bars at once. Polling stays at 10 s (Tom asked for the bars to appear without
+  "Check again"; a slower poll would delay that).
+- **Prototype:** the music switch already shows the steady state; no change.
+- **Verified:** rule by unit tests (CI). **Needs the real watch:** that the bars no longer blink during a long song.
