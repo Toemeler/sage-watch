@@ -64,7 +64,11 @@ final class HealthStore: ObservableObject {
         let pred = HKQuery.predicateForSamples(withStart: start, end: .now)
         return await withCheckedContinuation { cont in
             let q = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: pred, options: .cumulativeSum) { _, stats, error in
-                cont.resume(returning: (stats?.sumQuantity().map { Int($0.doubleValue(for: .count())) }, Self.describe(error, "Steps")))
+                // split up: Xcode 26's type checker times out on the one-line form
+                var steps: Int? = nil
+                if let sum: HKQuantity = stats?.sumQuantity() { steps = Int(sum.doubleValue(for: HKUnit.count())) }
+                let problem: String? = Self.describe(error, "Steps")
+                cont.resume(returning: (steps, problem))
             }
             store.execute(q)
         }
@@ -75,8 +79,12 @@ final class HealthStore: ObservableObject {
         let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
         return await withCheckedContinuation { cont in
             let q = HKSampleQuery(sampleType: type, predicate: nil, limit: 1, sortDescriptors: [sort]) { _, samples, error in
-                let bpm = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
-                cont.resume(returning: (bpm.map { Int($0.rounded()) }, Self.describe(error, "Heart rate")))
+                let perMinute: HKUnit = HKUnit.count().unitDivided(by: HKUnit.minute())
+                let bpm: Double? = (samples?.first as? HKQuantitySample)?.quantity.doubleValue(for: perMinute)
+                var value: Int? = nil
+                if let b: Double = bpm { value = Int(b.rounded()) }
+                let problem: String? = Self.describe(error, "Heart rate")
+                cont.resume(returning: (value, problem))
             }
             store.execute(q)
         }
