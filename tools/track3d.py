@@ -314,12 +314,29 @@ def build(d: Path):
         np.add.at(Z, sec[ok], np.column_stack([zx, zy, zz])[ok]); np.add.at(C, sec[ok], 1)
         have = C > 0
         Z[have] /= np.linalg.norm(Z[have], axis=1, keepdims=True)
+        # A re-pocketing is a lasting change: the phone's orientation in the minute before and the minute after
+        # each steady (resultant length > 0.9: in a pocket, not in a hand) and > 45 deg apart. A quick turn of the
+        # body, or the phone out in the hand for a moment, is not one. (Real day 27 Nov: the old test, any 45 deg
+        # within 10 s, cut the day into dozens of periods of seconds, and none could learn an offset.)
+        W = 60
+        cs = np.vstack([np.zeros(3), np.cumsum(np.where(have[:, None], Z, 0), axis=0)])
+        cc = np.concatenate([[0], np.cumsum(have)])
+        def window(a, b):
+            k = cc[b] - cc[a]
+            if k < W * 0.6:
+                return None, 0.0
+            v = cs[b] - cs[a]; L = np.linalg.norm(v)
+            return v / max(L, 1e-9), L / k
         last = -999
-        for i in range(10, n):
-            if have[i] and have[i - 10]:
-                ang = math.degrees(math.acos(max(-1.0, min(1.0, float(Z[i] @ Z[i - 10])))))
-                if ang > 45 and i - last > 30:
-                    bounds.append(i); last = i
+        for i in range(W, n - W, 5):
+            if i - last <= 120:
+                continue
+            u1, r1 = window(i - W, i); u2, r2 = window(i, i + W)
+            if u1 is None or u2 is None or r1 < 0.9 or r2 < 0.9:
+                continue
+            ang = math.degrees(math.acos(max(-1.0, min(1.0, float(u1 @ u2)))))
+            if ang > 45:
+                bounds.append(i); last = i
     bounds.append(n)
     periods = []
     for a_, b_ in zip(bounds[:-1], bounds[1:]):

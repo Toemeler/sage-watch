@@ -891,3 +891,21 @@ multipath indoors).
   always-on and on the sleep face too, at 60 % opacity. Prototype in step.
 - **Verified:** rule by unit tests (CI); prototype JS parses. **Needs the real watch:** that always-on keeps it
   legible and it does not count as a bright element at night (it is small and only at ≤ 10 %).
+
+### 61 · 2026-11-27 — round 52: the first real day (27 Nov) through the tools
+- **Export (07:38–16:59):** iPhone GPS (median accuracy 16 m, 8 % of the time with a usable fix: mostly indoors),
+  compass (4.8 lines/s: iOS halves device motion in the background), steps (6605), barometer and absolute
+  altitude. The iPhone stopped at 12:10 — **its battery was empty** (Tom), not a tracking bug — and resumed at 16:58.
+  The watch's own position tracking was off that day (the switch defaults to off).
+- **Bug found (app):** the watch's barometer was timestamped ~26 years ahead, so the export's range "ended" in 2052
+  and the watch barometer could not be used. The altimeter on watchOS 27 gives seconds since 2001, not since boot;
+  adding the boot time put it in 2052. `RecordingFormat.unixTime` handles both (tested) and is now used for every
+  Core Motion timestamp on both devices. Already recorded files keep the wrong times.
+- **Bug found (tools):** the re-pocketing detection (any 45° turn within 10 s) cut the real day into dozens of
+  periods of seconds; none could learn an offset, so the indoor path used none. A re-pocketing now needs the minute
+  before and the minute after to each be steady (in a pocket, not a hand) and > 45° apart. The real day: one
+  period, offset 96° learned from its GPS walks. Regression test 14/14 still passes.
+- **The day, from the iPhone:** 9.4 h, ~4.7 km walked; floors: 07:40 up 3 by lift, 10:19 down 3 by lift, 10:39 up
+  3 by lift, 10:50 down 1 by stairs, 11:06 up 1 by stairs; ~234 min on floor 3, 16 min on floor 2, 23 min on the
+  ground floor. Apple's step counter counted no floors (it misses lifts, and the iPhone in a pocket often misses
+  stairs) — the barometer's events are the ones to trust.
