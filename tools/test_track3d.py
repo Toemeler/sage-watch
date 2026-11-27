@@ -96,6 +96,52 @@ def main():
         s, _ = track(watch)
         check("watch only: runs", s["floor_changes"] == 4 and s["steps_from"] == "steps", f'{s["floor_changes"]} changes, steps from {s["steps_from"]}')
 
+        # the iPhone dies halfway (27 Nov): the watch's barometer (absolute pressure; its relative altitude restarts
+        # at 0 with every run) carries the floors on; a 50 m descent at the end is travel, not floors
+        died = tmp / "died"; died.mkdir()
+        rows = [l.split(",") for l in (indoor / "phonepressure.csv").read_text().splitlines()[1:]]
+        tt = np.array([float(r[0]) for r in rows]); rel = np.array([float(r[2]) for r in rows])
+        cut = tt[0] + 0.55 * (tt[-1] - tt[0])
+        for f in ("phonelocation.csv", "phonesteps.csv"):
+            (died / f).write_text((indoor / f).read_text())
+        lines = (indoor / "phonepressure.csv").read_text().splitlines(True)
+        (died / "phonepressure.csv").write_text(lines[0] + "".join(l for l in lines[1:] if float(l.split(",")[0]) < cut))
+        h = 500 + rel
+        tail = tt > tt[-1] - 300
+        h[tail] -= np.linspace(0, 50, tail.sum())              # 50 m down in the last 5 min
+        kpa = 101.325 * (1 - h / 44330.0) ** (1 / 0.1903)
+        with open(died / "pressure.csv", "w") as f:
+            f.write("unix_time,pressure_kpa,relative_altitude_m\n")
+            run0 = 0
+            for k in range(len(tt)):
+                if k % 1800 == 0:
+                    run0 = h[k]                                     # a new recording run: relative restarts at 0
+                f.write(f"{tt[k]:.3f},{kpa[k]:.4f},{h[k] - run0:.2f}\n")
+        s, _ = track(died)
+        kinds = [(c["from"], c["to"], c["by"]) for c in s["floor_change_list"]]
+        check("iPhone dies: floors from the watch", kinds == [(0, 2, "stairs"), (2, 1, "stairs"), (1, 0, "lift")] and
+              s["height_from_watch_min"] > 30, f'{kinds}, {s["height_from_watch_min"]} min from the watch')
+        trav = s.get("height_changes_not_floors", [])
+        check("iPhone dies: 50 m is travel", len(trav) == 1 and abs(trav[0]["metres"] + 50) <= 6, str(trav))
+
+        # fix_pressure_time.py: barometer lines written ~26 years ahead come back to their true time
+        fx = tmp / "fix"; fx.mkdir()
+        true_t = np.arange(1_796_000_000, 1_796_000_000 + 7200, 2.5)
+        true_t = true_t[(true_t < 1_796_002_000) | (true_t > 1_796_003_000)]   # two runs with a pause
+        with open(fx / "motion1s.csv", "w") as f:
+            f.write("unix_second,samples\n")
+            for x in np.unique(np.floor(true_t)):
+                f.write(f"{x:.0f},50\n")
+        boot = 1_795_990_000.0
+        with open(fx / "pressure.csv", "w") as f:
+            f.write("unix_time,pressure_kpa,relative_altitude_m\n")
+            for x in true_t:
+                f.write(f"{x + boot - 978307200:.3f},95.0000,0.00\n")
+        run(HERE / "fix_pressure_time.py", fx)
+        back = np.array([float(l.split(",")[0]) for l in (fx / "pressure.csv").read_text().splitlines()[1:]])
+        err = np.abs(np.sort(back) - true_t).max() if len(back) == len(true_t) else float("inf")
+        check("fix pressure times", err < 3, f"max error {err:.1f} s over {len(back)} lines")
+
     print("\nall pass" if not fails else f"\n{len(fails)} failed: {', '.join(fails)}")
     return 1 if fails else 0
 

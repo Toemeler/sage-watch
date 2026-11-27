@@ -994,3 +994,14 @@ multipath indoors).
 - **27 Nov, repaired export:** 4.8 h of height from the watch after 12:10; floor changes 12:13, 12:21, 12:29,
   15:39, 15:41, 16:32 (no step data, so stairs or lift unknown); a 48 m descent at 16:45 (travel), and a jump at
   16:57 across the iPhone's return. The morning is unchanged.
+
+### 70 · 2026-11-27 — round 61: tests for last round's tools, and the bug they found (tools only)
+- **Quality gate:** rounds 59–60 added decision logic to the tools (barometer repair, the watch filling the
+  iPhone's gaps, travel vs floors) checked only on the real day. Three regression cases now: the iPhone dies halfway
+  and the watch (absolute pressure, relative altitude restarting every run) must carry the floors 0→2→1→0 with
+  stairs/stairs/lift; a 50 m descent must be reported as travel; barometer lines written ~26 years ahead must come
+  back to their true time.
+- **Found by the new test on its first run:** "impossible times" were cut at *now + 1 day* — the synthetic test day
+  lies in December, so all of its watch pressure was dropped as "future". The bug's times are ~2.6e9 (2052): the
+  cut is now a fixed 2.0e9 (2033) in both tools. The real 27 Nov result is unchanged.
+- Regression: 17/17.

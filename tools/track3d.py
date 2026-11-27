@@ -198,7 +198,7 @@ def build(d: Path):
     p_wpres = d / "pressure.csv" if p_pres is not None and p_pres.name == "phonepressure.csv" else None
     wpres = load(p_wpres, [0, 1]) if p_wpres is not None and p_wpres.exists() else None
     if wpres is not None:
-        wpres = wpres[(wpres[:, 0] < datetime.now().timestamp() + 86400) & (wpres[:, 1] > 30)]
+        wpres = wpres[(wpres[:, 0] < 2.0e9) & (wpres[:, 1] > 30)]     # 2.0e9 = 2033: the clock bug wrote ~2.6e9
         if len(wpres) > 1:
             # height from absolute pressure (kPa): its relative altitude restarts at 0 with every recording run,
             # which would read as a jump of floors at each restart

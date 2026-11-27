@@ -21,7 +21,7 @@ from pathlib import Path
 
 import numpy as np
 
-FUTURE = time.time() + 86400
+FUTURE = 2.0e9          # 2033: the clock bug wrote ~2.6e9 (2052); real and test data stay well below
 
 
 def blocks(ts, gap=120.0):
