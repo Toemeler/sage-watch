@@ -54,8 +54,9 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F15 | **Walk direction in recordings:** record the compass heading once a second (device motion, magnetic north) alongside the barometer, so walks get a direction and length; with floor changes from the barometer, a change of room shows up in the data (for counting work like beds). Small battery cost; compass is disturbed near metal (bed frames), so direction changes, not absolute bearings, are used | built (Tom asked for full position tracking) |
 | F16 | **Arrival light:** when you come home after dark and the lamp is off, it comes on warm (60 % 2700 K; 25 % 2200 K within an hour of bedtime). "Away" = the iPhone answered "no bulb" at least twice ≥ 20 min apart, and the lamp answers within 30 min of the last one. Never on a lamp that is on, in a sleep block, under the open lamp panel, or within 10 min of your own switch-off. Toggle "Arrival light" | built (round 23, no answer) |
 | F17 | **Nap length on the crown:** after the long turn down starts a nap (F9), the note shows its length ("Nap · up to 100 min") and further turns change it in 5-min steps (4 detents each, 20–130 min, up = longer) while the note is up; each step keeps the note 3 s more | built (round 23, no answer) |
-| F18 | **Battery guard for the alarm:** at your usual bedtime, if the watch is below 30 % and not charging (the recorder and smart wake may not last the night), one quiet tap and the note "Charge for the alarm"; nothing once it is on the charger | proposed (round 24) |
-| F19 | **Recording stopped:** if Record is on but nothing was written for 10 min (a crash, a revoked permission), one tap and the note "Recording stopped · tap to restart"; never during a sleep block's first minutes of a normal restart | proposed (round 24) |
+| F18 | **Battery guard for the alarm:** at your usual bedtime, with Record on, below 30 % and not charging (the recorder and smart wake may not last the night): one quiet tap and the note "Charge for the alarm", once per night; nothing on the charger | built (round 25, no answer) |
+| F19 | **Recording stopped:** Record is on but no motion was written for 10 min (a crash, a revoked permission, a session that ended): one tap and the note "Recording stopped" with Restart (8 s). Not in the first 2 min of a run; during a sleep block it waits until the block ends, so it never taps you awake | built (round 25, no answer) |
+| F20 | **Earlier wind-down after a short night:** when last night's recorded sleep was over an hour shorter than your usual, the evening wind-down starts 30 min earlier (lamp only; the plan and alarm are unchanged) | proposed (round 25) |
 
 ## Iterations
 
@@ -523,3 +524,22 @@ multipath indoors).
 - **Verified:** CI build. No new decision logic (the arrival rule is unchanged and tested). **Needs the real
   watch:** that the announcement does not cut into VoiceOver reading something else.
 - **Proposed:** F18 battery guard for the alarm, F19 recording-stopped warning.
+
+### 34 · 2026-11-27 — round 25: F18 and F19 built (unanswered → approved; watch app change, install after recording)
+- **F18, battery guard** (own commit): `WatchGuard` checks once a minute; within 5 min after the usual night bedtime,
+  `FaceRules.batteryGuard` (Record on, not charging, < 30 %, unknown level quiet; tested) gives one click and
+  "Charge for the alarm", once per night.
+- **F19, recording stopped** (own commit): the recorder counts motion every 10 s; no change for 10 min with Record
+  on is a stall (`FaceRules.recordingStalled`, tested), reported once until samples move again, with Restart.
+  `Recorder.restart()` ends the run and starts a new one when the end has gone through (new files; nothing
+  recorded is lost).
+  - **Review findings fixed before commit:** a stall in the night would have tapped you awake (only the smart wake
+    may) — it now waits for the end of the sleep block; a warning with an action needs longer than a 3 s
+    confirmation — it stays 8 s, and the menu's Record switch remains the way back after that; F18 and F19 are
+    split so each can be reverted alone (the haptic lives with its own feature).
+- **Prototype:** the face preview's note takes any text and button (Undo, Restart or none) and duration; buttons
+  show the F18 and F19 notes.
+- **Verified:** rules by unit tests (CI). **Needs the real watch:** that the minute check keeps running in the
+  background through the night (the bedtime tap relies on the same), and that a real stall (e.g. revoking Motion
+  access) is found within ~11 min.
+- **Proposed:** F20 earlier wind-down after a short night.
