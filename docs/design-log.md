@@ -933,3 +933,14 @@ multipath indoors).
   (not shown on the card yet — open Sage on the iPhone once after switching on the watch if in doubt).
 - **Verified:** rule by unit tests (CI). **Needs the real devices:** switch on the watch → iPhone card shows
   tracking within a minute; switch on the iPhone → the watch's menu shows it on.
+
+### 64 · 2026-11-27 — round 55: the watch's switch must reach a closed iPhone app (iPhone change)
+- **Review of F28:** the watch can now switch the iPhone's tracking, but with location permission "While Using"
+  iOS does not let a closed or backgrounded Sage start location updates — the switch would silently do nothing
+  until Sage is opened. The same permission also stops iOS from reopening Sage after it closed it (a significant
+  move relaunches only apps with "Always").
+- **Changed:** once "While Using" is granted and tracking runs, Sage asks iOS once to upgrade to "Always" (iOS
+  shows that prompt only once, and only when the app is in use); the iPhone card says plainly when it is still
+  "While Using" and what that means. New usage text for "Always" in the Info.plist.
+- **Verified:** CI build. **Needs the real iPhone:** the upgrade prompt appears once; with Always, switching on at
+  the watch starts the iPhone's tracking while Sage is closed.

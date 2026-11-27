@@ -37,6 +37,7 @@ targets:
         NSHealthUpdateUsageDescription: The watch recorder runs as a Mind & Body session. It is only saved to Health if you turn that on.
         UIFileSharingEnabled: true
         NSLocationWhenInUseUsageDescription: With Track position on, Sage records where you go (GPS outdoors, compass and steps indoors) together with the watch. Nothing leaves your devices.
+        NSLocationAlwaysAndWhenInUseUsageDescription: With Always, Track position can be started from the watch and keeps recording if iOS closes Sage in the background. Nothing leaves your devices.
         NSMotionUsageDescription: With Track position on, Sage records steps, floors, compass heading and the barometer to follow your path indoors.
         UIBackgroundModes: [location]
         NSLocalNetworkUsageDescription: Sage controls your WiZ lamps on your home network from the watch.

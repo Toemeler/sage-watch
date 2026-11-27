@@ -21,6 +21,9 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
     @Published private(set) var floorsUp = 0
     @Published private(set) var floorsDown = 0
     @Published private(set) var problem: String?
+    /// "While Using" only: the watch's switch (F28) cannot start tracking here while Sage is closed, and iOS will
+    /// not reopen Sage after closing it in the background
+    @Published private(set) var needsAlways = false
 
     private let manager = CLLocationManager()
     private let motion = CMMotionManager()
@@ -183,10 +186,14 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         DispatchQueue.main.async {
+            self.needsAlways = status == .authorizedWhenInUse
             if status == .denied || status == .restricted {
                 self.problem = "Location is off for Sage: Settings › Privacy & Security › Location Services › Sage."
-            } else if self.running {
-                self.manager.startUpdatingLocation()
+            } else {
+                // with "While Using" granted, ask once to upgrade to "Always": then the watch can start tracking here
+                // and a significant move reopens Sage after iOS closed it (iOS shows this prompt only once)
+                if status == .authorizedWhenInUse && self.running { self.manager.requestAlwaysAuthorization() }
+                if self.running { self.manager.startUpdatingLocation() }
             }
         }
     }
@@ -262,6 +269,10 @@ struct PhoneTrackerCard: View {
                 if tracker.saver { Text("Battery below 20 %: GPS saves power (~10 m)").font(.footnote).foregroundStyle(.orange) }
             }
             if let p = tracker.problem { Text(p).font(.footnote).foregroundStyle(.red) }
+            if tracker.needsAlways {
+                Text("Location is \"While Using\": the watch's switch can only start tracking here while Sage is open. For a full day, set Settings › Privacy & Security › Location Services › Sage to Always.")
+                    .font(.footnote).foregroundStyle(.orange)
+            }
             Button("Export today's position data") { exportToday() }
         } header: {
             Text("Position")
