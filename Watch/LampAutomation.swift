@@ -32,6 +32,10 @@ final class LampAutomation: ObservableObject {
     @Published var arrivalOn = UserDefaults.standard.object(forKey: "lampArrival") as? Bool ?? true {
         didSet { UserDefaults.standard.set(arrivalOn, forKey: "lampArrival") }
     }
+    /// F22: switching on brings back your last light for this time of day (evening or daytime)
+    @Published var switchOnMemoryOn = UserDefaults.standard.object(forKey: "lampSwitchOnMemory") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(switchOnMemoryOn, forKey: "lampSwitchOnMemory") }
+    }
     /// when the bedtime tap last fired (the face shows a note for it)
     @Published private(set) var bedtimeTappedAt: Date?
     /// when the arrival light (F16) last switched the lamp on (the face shows a note with Undo)
@@ -204,11 +208,9 @@ final class LampAutomation: ObservableObject {
     func arrived(awaySpan: TimeInterval, sinceAway: TimeInterval) {
         guard arrivalOn else { return }
         let lamp = LampModel.shared, now = Date()
-        let d = UserDefaults.standard
-        let lat = d.object(forKey: "approxLat") as? Double, lon = d.object(forKey: "approxLon") as? Double
         var bed = nextBedtime(after: now)
         while bed.nap { bed = nextBedtime(after: bed.at.addingTimeInterval(60)) }
-        guard let p = LampRules.arrivalLight(awaySpan: awaySpan, sinceAway: sinceAway, dark: Sun.dark(at: now, lat: lat, lon: lon),
+        guard let p = LampRules.arrivalLight(awaySpan: awaySpan, sinceAway: sinceAway, dark: Sun.darkHere(at: now),
                                              sleeping: FaceMode.auto(now) == .sleeping, lampOn: lamp.state.on,
                                              panelOpen: lamp.panelOpen,
                                              sinceUserOff: lamp.userOffAt.map { now.timeIntervalSince($0) },

@@ -21,6 +21,12 @@ enum Sun {
         return (midnight.addingTimeInterval(rise * 60), midnight.addingTimeInterval(set * 60))
     }
 
+    /// is it dark here at `date`, from the rough position the watch keeps from its last GPS fix (F16, F22)
+    static func darkHere(at date: Date = .now) -> Bool {
+        let d = UserDefaults.standard
+        return dark(at: date, lat: d.object(forKey: "approxLat") as? Double, lon: d.object(forKey: "approxLon") as? Double)
+    }
+
     /// is it dark at `date`? With no position known: dark from 17:00 to 07:00, right for winter evenings; a summer
     /// evening would count as dark too early, so the watch keeps a rough position from its last GPS fix
     static func dark(at date: Date, lat: Double?, lon: Double?, calendar: Calendar = .current) -> Bool {

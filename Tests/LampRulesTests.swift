@@ -154,6 +154,26 @@ final class LampRulesTests: XCTestCase {
         XCTAssertEqual(LampRules.openCentre(current: nil, recents: [CGPoint(x: 94, y: 40)], half: half), CGPoint(x: 94, y: 40))
     }
 
+    func testSwitchOnMemoryKeepsYourLightButNotTheNightLight() {
+        XCTAssertNil(LampRules.memory(of: state(on: false, dim: 60)))
+        let warm = LampRules.memory(of: state(on: true, dim: 35, temp: 2200))
+        XCTAssertEqual(warm?["dimming"] as? Int, 35)
+        XCTAssertEqual(warm?["temp"] as? Int, 2200)
+        XCTAssertNil(warm?["state"])
+        var night = state(on: true, dim: 10, temp: nil)
+        night.rgb = (255, 28, 0)
+        XCTAssertNil(LampRules.memory(of: night))                      // the night light is not a memory
+        var blue = state(on: true, dim: 50, temp: nil)
+        blue.rgb = (0, 80, 255)
+        XCTAssertEqual(LampRules.memory(of: blue)?["b"] as? Int, 255)
+
+        let on = LampRules.switchOn(memory: warm)
+        XCTAssertEqual(on["state"] as? Bool, true)
+        XCTAssertEqual(on["dimming"] as? Int, 35)
+        XCTAssertEqual(LampRules.switchOn(memory: nil).count, 1)        // nothing remembered: just on
+        XCTAssertEqual(LampRules.switchOn(memory: ["state": false, "dimming": 20])["state"] as? Bool, true)
+    }
+
     func testWindDownNeverSwitchesOnAndLeavesColour() {
         XCTAssertNil(LampRules.windDown(t: 0.5, start: state(on: true, dim: 80), current: state(on: false, dim: 80)))
         let colour = LampRules.windDown(t: 0.5, start: state(on: true, dim: 80, temp: nil), current: state(on: true, dim: 80, temp: nil))

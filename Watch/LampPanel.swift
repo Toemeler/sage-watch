@@ -111,7 +111,17 @@ final class LampModel: ObservableObject {
         set(d.params, byUser: false)
     }
 
-    func toggle() { set(["state": !state.on]) }
+    /// on / off. F22: switching on brings back your own last light for this time of day (evening after dark,
+    /// daytime otherwise); off is always just off
+    func toggle() {
+        guard !state.on else { set(["state": false]); return }
+        let memory = LampAutomation.shared.switchOnMemoryOn
+            ? UserDefaults.standard.dictionary(forKey: Self.memoryKey(dark: Sun.darkHere())) : nil
+        set(LampRules.switchOn(memory: memory))
+    }
+
+    /// F22: one memory for the evening (after dark) and one for the day
+    static func memoryKey(dark: Bool) -> String { dark ? "lampMemoryEvening" : "lampMemoryDay" }
     /// one slider for everything, like Control Center: 0 is off, anything above sets the brightness (10...100 %)
     func setLevel(_ level: Double) {
         if level < 0.02 { if state.on { set(["state": false]) }; return }
@@ -137,6 +147,11 @@ final class LampModel: ObservableObject {
         Task {
             let ok = await send([LampLink.commandKey: LampLink.set, LampLink.paramsKey: p], byUser: byUser)
             if !ok && !byUser { deferred = (p, Date()) }
+            // F22: a light you set and the lamp took becomes this time of day's memory (never an automatic one,
+            // and only once it arrived, so a failed change is not remembered)
+            if ok && byUser && pending == nil, let m = LampRules.memory(of: state) {
+                UserDefaults.standard.set(m, forKey: Self.memoryKey(dark: Sun.darkHere()))
+            }
             sending = false
             flush()
         }

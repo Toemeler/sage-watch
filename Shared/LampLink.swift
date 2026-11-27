@@ -72,6 +72,25 @@ enum LampRules {
         return p
     }
 
+    /// F22: what to remember of a light you set yourself (nil when it is off, or the bedside night light, which
+    /// must never come back as the evening's light)
+    static func memory(of s: LampLink.State) -> [String: Any]? {
+        guard s.on else { return nil }
+        if let c = s.rgb, c.0 == 255, c.1 == 28, c.2 == 0, s.dimming <= 10 { return nil }
+        var p = restore(s)
+        p["state"] = nil
+        return p
+    }
+
+    /// F22: switching on from off brings back the light remembered for this time of day; nothing remembered:
+    /// just on (the bulb keeps its own last light)
+    static func switchOn(memory: [String: Any]?) -> [String: Any] {
+        var p: [String: Any] = [:]
+        for k in ["dimming", "temp", "r", "g", "b"] { if let v = memory?[k] { p[k] = v } }
+        p["state"] = true
+        return p
+    }
+
     /// a night light switches itself off after this long (you got up and went back to bed)
     static let nightLightMinutes: TimeInterval = 15 * 60
 

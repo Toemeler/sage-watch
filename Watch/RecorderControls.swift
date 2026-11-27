@@ -64,6 +64,7 @@ struct RecorderControls: View {
                 Toggle("Bedtime tap", isOn: $automation.bedtimeTapOn)
                     .onChange(of: automation.bedtimeTapOn) { _, _ in automation.rescheduleWindDown() }
                 Toggle("Arrival light", isOn: $automation.arrivalOn)
+                Toggle("Light by time of day", isOn: $automation.switchOnMemoryOn)
                 Button(automation.previewing ? "Trying the sunrise…" : "Try sunrise (60 s)") { automation.trySunrise() }
                     .disabled(automation.previewing || !lamp.home)
                 if !automation.activity.isEmpty { row("Now", automation.activity) }
@@ -74,7 +75,7 @@ struct RecorderControls: View {
             } header: {
                 Text("Lamp")
             } footer: {
-                Text("Sunrise: the lamp fades up while the wake window is open. Wind-down: in the hour before your usual bedtime a lamp that is on dims and warms (90 min after a short night). Off when asleep: it fades off once the watch sees you sleeping. Bedtime tap: one tap if it is still bright at bedtime. Arrival light: on, warm, when you come home after dark and it is off. Changing the lamp yourself always wins over these. Night steps go through the iPhone while Sage runs in the background; the contact log shows whether they arrived.")
+                Text("Sunrise: the lamp fades up while the wake window is open. Wind-down: in the hour before your usual bedtime a lamp that is on dims and warms (90 min after a short night). Off when asleep: it fades off once the watch sees you sleeping. Bedtime tap: one tap if it is still bright at bedtime. Arrival light: on, warm, when you come home after dark and it is off. Light by time of day: switching on brings back your last evening or daytime light. Changing the lamp yourself always wins over these. Night steps go through the iPhone while Sage runs in the background; the contact log shows whether they arrived.")
             }
 
             Section("Music") {
