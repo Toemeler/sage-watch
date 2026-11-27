@@ -37,6 +37,8 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
     @Published var gyroscope: Bool { didSet { UserDefaults.standard.set(gyroscope, forKey: Keys.gyro) } }
     /// save the session as a workout in Apple Health when it ends (off: the session is discarded, Health stays untouched)
     @Published var saveWorkout: Bool { didSet { UserDefaults.standard.set(saveWorkout, forKey: Keys.save) } }
+    /// position tracking: GPS, compass/orientation (10 Hz), steps and floors, absolute altitude (PositionTracker)
+    @Published var trackPosition: Bool { didSet { UserDefaults.standard.set(trackPosition, forKey: Keys.position); applyPositionTracking() } }
 
     /// 10 Hz feed of |acceleration| in g, delivered on the main queue
     var motionTap: ((Double) -> Void)?
@@ -51,7 +53,8 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
     var segmentID: String? { segment }
 
     private enum Keys {
-        static let keepRunning = "rec.keepRunning", rawHz = "rec.rawHz", gyro = "rec.gyro", save = "rec.saveWorkout"
+        static let keepRunning = "rec.keepRunning", rawHz = "rec.rawHz", gyro = "rec.gyro", save = "rec.saveWorkout",
+                   position = "rec.position"
         static let segment = "rec.segment", started = "rec.started"
     }
 
@@ -80,6 +83,9 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
     private var summaryFile: RotatingCSV?
     private var rawFile: RotatingCSV?
     private var pressureFile: RotatingCSV?
+    private var headingFile: RotatingCSV?
+    private var headingStride = 5
+    private var headingCount = 0
     private var summarizer = MotionSummarizer()
     private var bootOffset: TimeInterval = 0
     private var motionCount = 0
@@ -103,6 +109,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         rawMotionHz = d.object(forKey: Keys.rawHz) as? Int ?? 50
         gyroscope = d.object(forKey: Keys.gyro) as? Bool ?? false
         saveWorkout = d.object(forKey: Keys.save) as? Bool ?? false
+        trackPosition = d.object(forKey: Keys.position) as? Bool ?? false
         super.init()
     }
 
@@ -221,7 +228,13 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let rawHeader = gyroscope ? RecordingFormat.rawGyroHeader : RecordingFormat.rawHeader
         let wantsRaw = rawMotionHz > 0
+        let wantsHeading = trackPosition
+        if trackPosition { PositionTracker.shared.start(directory: dir, segment: id) }
         motionQueue.addOperation {
+            self.headingFile = wantsHeading
+                ? RotatingCSV(directory: dir, prefix: PositionFormat.heading, header: PositionFormat.headingHeader,
+                              period: RecordingFormat.chunkSeconds, segment: id)
+                : nil
             self.summarizer = MotionSummarizer()
             let period = RecordingFormat.chunkSeconds
             self.summaryFile = RotatingCSV(directory: dir, prefix: RecordingFormat.summaryPrefix, header: RecordingFormat.summaryHeader,
@@ -243,7 +256,9 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
 
     /// Closes the open chunks so they go to the iPhone now ("Send now"); recording carries on in new chunks.
     func shipOpenChunks() {
+        PositionTracker.shared.shipOpenChunks()
         motionQueue.addOperation {
+            self.headingFile?.close()
             self.summaryFile?.close()
             self.rawFile?.close()
             self.pressureFile?.close()
@@ -273,7 +288,10 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
     }
 
     private func closeFiles() {
+        PositionTracker.shared.stop()
         motionQueue.addOperation {
+            self.headingFile?.close()
+            self.headingFile = nil
             if let line = self.summarizer.flush() { self.summaryFile?.append(line, at: Date().timeIntervalSince1970) }
             self.summaryFile?.close()
             self.rawFile?.close()
@@ -302,6 +320,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
             "barometer": CMAltimeter.isRelativeAltitudeAvailable() ? Self.motionAuthorization : "unavailable",
             "gyroscope": gyroscope,
             "save_workout": saveWorkout,
+            "track_position": trackPosition,
             "watch": device.model,
             "watchos": device.systemVersion,
             "app": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?",
@@ -326,17 +345,26 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         let wantsRaw = rawMotionHz > 0
         let hz = max(10, wantsRaw ? rawMotionHz : 10)
         let withGyro = wantsRaw && gyroscope && motion.isDeviceMotionAvailable
+        let position = trackPosition && motion.isDeviceMotionAvailable
         motionQueue.addOperation {
+            self.headingStride = max(1, hz / 10)        // heading at 10 Hz
+            self.headingCount = 0
             self.tapStride = max(1, hz / 10)
             self.tapCount = 0
             self.bootOffset = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime
         }
-        if withGyro {
+        if withGyro || position {
             motion.deviceMotionUpdateInterval = 1.0 / Double(hz)
-            motion.startDeviceMotionUpdates(to: motionQueue) { [weak self] data, _ in
+            // with position tracking: magnetic north as the reference, so every sample carries a compass heading
+            let frames = CMMotionManager.availableAttitudeReferenceFrames()
+            let frame: CMAttitudeReferenceFrame = position && frames.contains(.xMagneticNorthZVertical) ? .xMagneticNorthZVertical
+                : (frames.contains(.xArbitraryCorrectedZVertical) ? .xArbitraryCorrectedZVertical : .xArbitraryZVertical)
+            motion.startDeviceMotionUpdates(using: frame, to: motionQueue) { [weak self] data, _ in
                 guard let self, let d = data else { return }
                 let a = d.userAcceleration, g = d.gravity, r = d.rotationRate
-                self.handleSample(time: d.timestamp, x: a.x + g.x, y: a.y + g.y, z: a.z + g.z, rotation: (r.x, r.y, r.z), hz: hz)
+                self.handleSample(time: d.timestamp, x: a.x + g.x, y: a.y + g.y, z: a.z + g.z,
+                                  rotation: withGyro ? (r.x, r.y, r.z) : nil, hz: hz)
+                if position { self.logHeading(d, hz: hz) }
             }
         } else if motion.isAccelerometerAvailable {
             motion.accelerometerUpdateInterval = 1.0 / Double(hz)
@@ -385,6 +413,39 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         let line = "\(RecordingFormat.unix(Date())),\(String(format: "%.2f", Double(device.batteryLevel))),\(state),\(bpm.map(String.init) ?? ""),\(heartSamples),\(motionSamples)"
         let now = Date().timeIntervalSince1970
         heartQueue.async { self.statusFile?.append(line, at: now) }
+    }
+
+    /// runs on motionQueue: one orientation line at 10 Hz
+    private func logHeading(_ d: CMDeviceMotion, hz: Int) {
+        headingCount += 1
+        guard headingCount >= headingStride, let file = headingFile else { return }
+        headingCount = 0
+        let t = d.timestamp + bootOffset
+        let q = d.attitude.quaternion, a = d.userAcceleration, r = d.rotationRate
+        file.append(PositionFormat.heading(t: t, heading: d.heading, q: (q.w, q.x, q.y, q.z), a: (a.x, a.y, a.z),
+                                           r: (r.x, r.y, r.z)), at: t)
+    }
+
+    /// Switching "Track position" while a run is going: start or stop the position streams now and restart the
+    /// motion stream with (or without) the compass reference. Main thread.
+    private func applyPositionTracking() {
+        guard isRunning, let id = segment else { return }
+        let dir = Self.liveRoot.appendingPathComponent(id, isDirectory: true)
+        motion.stopAccelerometerUpdates()
+        motion.stopDeviceMotionUpdates()
+        if trackPosition {
+            PositionTracker.shared.start(directory: dir, segment: id)
+            motionQueue.addOperation {
+                if self.headingFile == nil {
+                    self.headingFile = RotatingCSV(directory: dir, prefix: PositionFormat.heading, header: PositionFormat.headingHeader,
+                                                   period: RecordingFormat.chunkSeconds, segment: id)
+                }
+            }
+        } else {
+            PositionTracker.shared.stop()
+            motionQueue.addOperation { self.headingFile?.close(); self.headingFile = nil }
+        }
+        startMotion()
     }
 
     /// runs on motionQueue

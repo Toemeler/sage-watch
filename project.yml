@@ -63,6 +63,8 @@ targets:
         UIAppFonts: [PlayfairDisplay-Regular.ttf, PlayfairDisplay-Italic.ttf]
         NSHealthShareUsageDescription: Sage shows your steps and heart rate on the face and records your heart rate while the recorder runs. Nothing leaves your devices.
         NSHealthUpdateUsageDescription: The recorder runs as a Mind & Body session to keep Sage on screen and read heart rate every few seconds. It is only saved to Health if you turn that on.
+        NSLocationWhenInUseUsageDescription: With Track position on, Sage records where you go (GPS outdoors, compass and steps indoors) into your recordings. Nothing leaves your devices.
+        UIBackgroundModes: [location]
         NSMotionUsageDescription: Sage records wrist motion, air pressure and what you are doing (still, walking, running, cycling, driving) for your sleep and day data, and feels for the moment you fall asleep and wake. The files go only to your iPhone.
         WKBackgroundModes: [smart-alarm, workout-processing]
     settings:

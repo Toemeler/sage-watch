@@ -78,6 +78,17 @@ struct RecorderControls: View {
                 Button("Check again") { audio.refresh(force: true) }
             }
 
+            Section {
+                Toggle("Track position", isOn: $recorder.trackPosition)
+                if recorder.trackPosition, let fix = PositionTracker.shared.lastFix {
+                    row("GPS", "±\(Int(fix.horizontalAccuracy.rounded())) m · \(fix.timestamp.formatted(date: .omitted, time: .shortened))")
+                }
+            } header: {
+                Text("Position")
+            } footer: {
+                Text("GPS when available, compass and steps indoors, barometer for stairs and floors. Uses a lot of battery; works while Record is on.")
+            }
+
             Section("Capture") {
                 Picker("Raw motion", selection: $recorder.rawMotionHz) {
                     Text("Off").tag(0)
