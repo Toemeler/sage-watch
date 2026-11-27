@@ -22,6 +22,9 @@ import json
 import math
 from pathlib import Path
 
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 import numpy as np
 
 R_EARTH = 6_371_000.0
@@ -100,7 +103,7 @@ def floors_from_stairs(t, h):
     n = len(t)
     floor = np.full(n, np.nan)
     if np.isnan(h).all():
-        return floor
+        return floor, []
     hs = lowpass(t, h, 10)
     W = 30
     rate = np.full(n, 0.0)
@@ -124,7 +127,15 @@ def floors_from_stairs(t, h):
                 continue
             change = np.mean(after[:20]) - np.mean(before[-20:])
             if abs(change) >= 2.2:
-                events.append((a_, b_, int(round(change / FLOOR_M))))
+                # core = the steep part, from a 10 s rate (the 1-minute rate above smears ~30 s past a lift ride,
+                # into the walk away from it): used to tell stairs from a lift
+                r10 = np.full(b_ - a_, 0.0)
+                seg = hs[a_:b_]
+                if len(seg) > 10:
+                    r10[5:-5] = np.nan_to_num((seg[10:] - seg[:-10]) / 10)
+                steep = np.flatnonzero(np.abs(r10) > 0.5 * max(np.abs(r10).max(), 1e-9))
+                c0, c1 = (a_ + steep[0], a_ + steep[-1]) if len(steep) else (i, j)
+                events.append((a_, b_, int(round(change / FLOOR_M)), c0, c1))
             i = j
         else:
             i += 1
@@ -143,15 +154,15 @@ def floors_from_stairs(t, h):
                     # the quietest end of each side: before the gap its first values, after it its last ones, so a
                     # climb that had just started before the gap is counted in full
                     change = np.mean(after[-20:]) - np.mean(before[:20])
-                    if abs(change) >= 2.2 and not any(a_ <= m and b_ >= k for a_, b_, _ in events):
-                        events.append((k, m, int(round(change / FLOOR_M))))
+                    if abs(change) >= 2.2 and not any(e[0] <= m and e[1] >= k for e in events):
+                        events.append((k, m, int(round(change / FLOOR_M)), None, None))   # in a gap: how is unknown
             k = m
         else:
             k += 1
     events.sort()
     # the floor changes halfway through each stair event and stays put in between
     level, start = 0, 0
-    for a_, b_, df in events:
+    for a_, b_, df, *_ in events:
         mid = (a_ + b_) // 2
         floor[start:mid] = level
         level += df
@@ -159,7 +170,7 @@ def floors_from_stairs(t, h):
         start = b_
     floor[start:] = level
     floor[np.isnan(h)] = np.nan
-    return floor
+    return floor, events
 
 
 # ------------------------------------------------------------------ main pipeline
@@ -223,7 +234,7 @@ def build(d: Path):
     elif anchors_t:
         alt = interp(t, np.array(anchors_t), np.array(anchors_v))
     alt_s = lowpass(t, alt, 5)
-    floor = floors_from_stairs(t, rel if not np.isnan(rel).all() else alt)
+    floor, floor_events = floors_from_stairs(t, rel if not np.isnan(rel).all() else alt)
 
     # ---------- step distance per second (cumulative distance -> increments)
     dist = np.zeros(n)
@@ -233,6 +244,27 @@ def build(d: Path):
         inc = np.diff(np.nan_to_num(cum_t, nan=0.0), prepend=0.0)
         inc[(inc < 0) | (inc > 4)] = 0.0                             # resets / glitches
         dist = inc
+
+    # ---------- each floor change: when, from/to, stairs or lift (walked during the climb or not)
+    changes = []
+    level = 0
+    for a_, b_, df, c0, c1 in sorted(floor_events, key=lambda e: e[0]):
+        # steps only while the height was changing: you walk straight out of a lift, and the padded window would
+        # count those steps as stairs
+        if c0 is None:
+            by, walked = "unknown (data gap)", 0.0
+        else:
+            walked = float(dist[c0:c1 + 1].sum())
+            by = "stairs" if walked > 0.25 * (c1 - c0 + 1) and walked > 3 else "lift"
+        changes.append({"time": float(t[(a_ + b_) // 2]), "from": level, "to": level + df,
+                        "by": by, "walked_m": round(walked, 1)})
+        level += df
+    ped_up = ped_down = None
+    if steps is not None and steps.shape[1] >= 5:
+        if not np.isnan(steps[:, 3]).all():
+            ped_up = int(np.nanmax(steps[:, 3]) - np.nanmin(steps[:, 3]))
+        if not np.isnan(steps[:, 4]).all():
+            ped_down = int(np.nanmax(steps[:, 4]) - np.nanmin(steps[:, 4]))
 
     # ---------- heading per second (circular mean of the 10 Hz stream)
     hdg = np.full(n, np.nan)
@@ -358,6 +390,11 @@ def build(d: Path):
         have |= near <= 30
     src = np.where(~have, "gap", np.where(~np.isnan(gx) & (gacc < 15), "gps", np.where(dist > 0, "steps", "still")))
     warnings = []
+    baro_up = sum(c["to"] - c["from"] for c in changes if c["to"] > c["from"])
+    baro_down = sum(c["from"] - c["to"] for c in changes if c["to"] < c["from"])
+    if ped_up is not None and (abs(ped_up - baro_up) > 1 or abs((ped_down or 0) - baro_down) > 1):
+        warnings.append(f"Apple's step counter counted floors up {ped_up} / down {ped_down}, the barometer "
+                        f"{baro_up} / {baro_down}: check the floor changes (lifts are not counted by the step counter)")
     for p in borrowed:
         warnings.append(f"pocket period {p[0]//60:.0f}–{p[1]//60:.0f} min after start had no GPS walk: its direction "
                         f"is borrowed from the nearest period and may be off")
@@ -370,7 +407,7 @@ def build(d: Path):
         warnings.append("no barometer: height and floors come from GPS only and are coarse")
     return dict(t=t, x=xs[:, 0], y=xs[:, 1], lat=lat, lon=lon, alt=alt_s, floor=floor, hacc=hacc,
                 src=src, dist=dist, offset=offset_deg, steps_src=steps_name, head_src=head_name, warnings=warnings,
-                pocket_periods=[(int(p[0]), int(p[1]), None if p[2] is None else round(p[2], 1), p[3]) for p in periods])
+                changes=changes, pocket_periods=[(int(p[0]), int(p[1]), None if p[2] is None else round(p[2], 1), p[3]) for p in periods])
 
 
 def write(r, out: Path):
@@ -401,7 +438,8 @@ def write_html(r, out: Path, name: str):
         kind = {"gps": 0, "gap": 2}.get(r["src"][i], 1)
         pts.append([int(r["t"][i]), round(float(r["x"][i]), 2), round(float(r["y"][i]), 2), alt, fl,
                     round(float(r["hacc"][i]), 1), kind])
-    data = {"name": name, "step": step, "tz": "Europe/Zurich", "points": pts, "warnings": r["warnings"]}
+    data = {"name": name, "step": step, "tz": "Europe/Zurich", "points": pts, "warnings": r["warnings"],
+            "changes": r["changes"]}
     tpl = (Path(__file__).parent / "track_viewer.html").read_text(encoding="utf-8")
     html = tpl.replace("const TRACK = /*DATA*/null;", "const TRACK = " + json.dumps(data, separators=(",", ":")) + ";")
     (out / "track.html").write_text(html, encoding="utf-8")
@@ -416,6 +454,8 @@ def summary(r):
            "median_h_acc_m": float(np.median(r["hacc"][r["src"] != "gap"])) if (r["src"] != "gap").any() else None,
            "steps_from": r["steps_src"], "heading_from": r["head_src"],
            "gap_minutes": float((r["src"] == "gap").sum() / 60), "warnings": r["warnings"],
+           "floor_change_list": [{"at": datetime.fromtimestamp(c["time"], ZoneInfo("Europe/Zurich")).strftime("%H:%M"),
+                                  "from": c["from"], "to": c["to"], "by": c["by"]} for c in r["changes"]],
            "pocket_periods": [{"from_min": a // 60, "to_min": b // 60, "offset_deg": o, "learned": l}
                               for a, b, o, l in r["pocket_periods"]]}
     if not np.isnan(fl).all():

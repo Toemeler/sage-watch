@@ -13,7 +13,7 @@ out = Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)
 T0, R, lat0, lon0 = 1_796_100_000.0, 6_371_000.0, 47.37, 8.54
 FLOOR = 3.2
 plan = [(600, 0, False)]                                     # (seconds, floor, indoors)
-plan += [(3000, 0, True), (60, "up2", True), (5400, 2, True), (40, "down1", True), (3600, 1, True), (40, "down1", True),
+plan += [(3000, 0, True), (60, "up2", True), (5400, 2, True), (40, "down1", True), (3600, 1, True), (30, "lift1", True),
          (2400, 0, True), (600, 0, False)]
 t, z, fl, ind, spd = [], [], [], [], []
 cur_z, cur_f, now = 0.0, 0, T0
@@ -23,6 +23,8 @@ for dur, f, indoors in plan:
             cur_z += 2 * FLOOR / dur; moving = 0.5
         elif f == "down1":
             cur_z -= FLOOR / dur; moving = 0.5
+        elif f == "lift1":
+            cur_z -= FLOOR / dur; moving = 0.0             # a lift: height changes, no steps
         else:
             cur_f = f; moving = 1.0 if (k // 120) % 3 == 0 else 0.0   # walk 2 min, stand 4 min
         t.append(now); z.append(cur_z); fl.append(round(cur_z / FLOOR)); ind.append(indoors); spd.append(moving)

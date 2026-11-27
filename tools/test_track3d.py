@@ -72,6 +72,8 @@ def main():
         check("indoor drift: floors", s["floor_changes"] == 4, f'{s["floor_changes"]} changes (4, despite 7.9 m drift)')
         fr = floor_right(indoor, est, lambda tr: tr[:, 1])
         check("indoor drift: floor right", fr > 0.95, f"{fr*100:.0f} % (> 95 %)")
+        kinds = [(c["from"], c["to"], c["by"]) for c in s["floor_change_list"]]
+        check("indoor: stairs vs lift", kinds == [(0, 2, "stairs"), (2, 1, "stairs"), (1, 0, "lift")], str(kinds))
 
         # derived cases from the normal day
         def derived(name, files):

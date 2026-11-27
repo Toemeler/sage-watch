@@ -37,6 +37,7 @@
   <label><input id="top" type="checkbox"> Top view</label>
 </div>
 <div class="legend" id="legend"></div>
+<div id="changes" class="sub"></div>
 <script>
 const TRACK = /*DATA*/null;
 // demo data when opened without a day (a loop with stairs), so the page is never empty
@@ -53,6 +54,8 @@ const P = data.points;   // [t, x, y, alt, floor, h_acc, indoor]
 const tz = data.tz || undefined;
 const fmt = t => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", timeZone: tz });
 document.getElementById("title").textContent = data.name || "Day path";
+document.getElementById("changes").innerHTML = (data.changes || []).length
+  ? "<b style='color:var(--fg)'>Floor changes</b><br>" + data.changes.map(c => `${fmt(c.time)} · ${c.by} · ${c.from} → ${c.to}`).join("<br>") : "";
 document.getElementById("warn").textContent = (data.warnings || []).map(w => "⚠︎ " + w).join("  ");
 const floors = [...new Set(P.map(p => p[4]).filter(f => f !== null))].sort((a, b) => a - b);
 const palette = ["#8c9a7e", "#c9a877", "#7fa6c9", "#c98f7a", "#a98cc9", "#7ac9b0", "#c9c27a"];

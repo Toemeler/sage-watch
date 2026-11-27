@@ -434,3 +434,13 @@ multipath indoors).
   (2 floor changes instead of 4). Fixed: the heights on both sides of a gap are compared and any floors in between
   counted; climbs at a gap edge use the nearest valid heights within a minute.
 - **Result:** 13/13 checks pass.
+
+### 29 · 2026-11-27 — round 20: "it should see when I go up the stairs" (no app change)
+- **Added:** every floor change is an event in the result and the viewer: time, from → to, and **stairs or lift**
+  (steps taken while the height was changing). Apple's step counter also counts floors; when it disagrees with the
+  barometer the summary warns (lifts are not counted there).
+- **Found by the regression test:** a lift ride was labelled "stairs". Two causes, both fixed: the event window was
+  padded by 30 s (you walk straight out of a lift), and the 1-minute climbing rate smears ~30 s past the ride.
+  The classification now uses only the steep part of the height change (10 s rate, above half its peak).
+- **Test:** the long indoor day now has a lift ride; the regression test checks 0→2 stairs, 2→1 stairs, 1→0 lift.
+  14/14 pass.
