@@ -330,7 +330,8 @@ requestAnimationFrame(frame);
   <p class="lamp-help" style="grid-column: 1 / -1; margin: 0">Tap the capsule: on / off. Press and slide: brightness (bottom is off, it stretches past the ends).
   Hold ~0.4 s: colours. In colours: drag to pan, scroll (crown) to zoom out and see all 61, tap a bubble to pick, tap empty space to go back.
   Scroll wheel or two-finger scroll = Digital Crown.
-  <button type="button" id="failBtn" onclick="simulateFailure()">Simulate a change that fails</button></p>
+  <button type="button" id="failBtn" onclick="simulateFailure()">Simulate a change that fails</button>
+  <button type="button" id="trySunBtn" onclick="trySunrise()">Try sunrise (60 s)</button></p>
 </div>
 <script>
 (() => {
@@ -362,6 +363,26 @@ requestAnimationFrame(frame);
   const failEl = document.getElementById("lampFail");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   // the prototype's stand-in for a change that never reached the lamps: snap back and say so
+  // F14: the whole wake-up light in 60 s along the real curve, full light 5 s, then back to how it was;
+  // touching the lamp stops it (no restore)
+  let preview = null;
+  window.trySunrise = () => {
+    if (preview) return;
+    const before = { ...lamp }, t0 = performance.now();
+    preview = { before };
+    lamp.on = true; lamp.dimming = 10; lamp.temp = 2200; lamp.rgb = null; level.to(modelLevel(), 0.45, 0.86);
+    const step = () => {
+      if (!preview) return;
+      const t = Math.min(1, (performance.now() - t0) / 60000), e = t * t;
+      const dim = Math.round(10 + 70 * e);
+      if (lamp.dimming < dim) { lamp.dimming = dim; lamp.temp = Math.round(2200 + 2000 * e); level.to(modelLevel(), 0.6, 0.9); }
+      if (t < 1) { preview.timer = setTimeout(step, 500); return; }
+      lamp.dimming = 100; lamp.temp = 4500; level.to(modelLevel(), 0.45, 0.86);
+      preview.timer = setTimeout(() => { Object.assign(lamp, preview.before); level.to(modelLevel(), 0.45, 0.86); preview = null; }, 5000);
+    };
+    step();
+  };
+  const stopPreview = () => { if (preview) { clearTimeout(preview.timer); preview = null; } };
   window.simulateFailure = () => { lamp.on = !lamp.on; level.to(modelLevel(), 0.35, 0.8); failEl.style.opacity = 1; setTimeout(() => failEl.style.opacity = 0, 2500); };
   // the whole display is the slider, inset a hair
   const AW = 184, AH = 224, H = AH - 6, W = AW - 6;
@@ -424,6 +445,7 @@ requestAnimationFrame(frame);
   // capsule gestures
   const pt = e => { const r = area.getBoundingClientRect(); return { x: (e.clientX - r.left) / (r.width / AW), y: (e.clientY - r.top) / (r.height / AH) }; };
   area.addEventListener("pointerdown", e => {
+    stopPreview();                                  // touching the lamp: yours wins, no restore
     area.setPointerCapture(e.pointerId);
     const p = pt(e); startX = p.x; startY = p.y; touching = true; moved = false; longFired = false; panning = false;
     if (colours) return;
@@ -475,6 +497,7 @@ requestAnimationFrame(frame);
     e.preventDefault();
     if (colours) { zoom = Math.min(1, Math.max(0.42, zoom - e.deltaY / 800)); return; }
     if (touching) return;
+    stopPreview();                                  // the crown is a change of yours too
     const l = Math.min(1, Math.max(0, modelLevel() - e.deltaY / 1000));
     setLevel(l); level.to(modelLevel(), 0.22, 0.9); reveal(false);
   }, { passive: false });

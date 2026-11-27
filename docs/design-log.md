@@ -50,7 +50,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F11 | **Double tap toggles the lamp:** on watches with the double-tap gesture (pinch twice), double tap on the face switches the lamp on or off, with the click haptic; nothing during a sleep block | built (round 7, no answer) |
 | F12 | **Night light from the bedside clock:** on the charger at night, turning the crown sets the lamp to a dim red night light (5 %), for getting up without waking fully; turning back down switches it off. Never bright | built (round 10, no answer; 10 % is the WiZ minimum) |
 | F13 | **Bedtime tap:** at your usual bedtime, if the lamp is still bright and wind-down is off, one quiet tap on the wrist with "Bedtime" (no sound); nothing if the lamp is already dim or off | built (round 10, no answer) |
-| F14 | **Try the sunrise:** a "Try sunrise" button in the long-press menu plays the whole wake-up light in 60 s (10 % candle → 80 % daylight → full), so you can see and judge it without waiting for a morning; any touch of the lamp stops it | proposed (round 11) |
+| F14 | **Try the sunrise:** a "Try sunrise" button in the long-press menu plays the whole wake-up light in 60 s (10 % candle → 80 % daylight → full), so you can see and judge it without waiting for a morning; any touch of the lamp stops it | built (round 12, no answer) |
 
 ## Iterations
 
@@ -338,3 +338,15 @@ whether background clicks are felt at bedtime.
 - Proposal F14 (try the sunrise in 60 s).
 **Verified:** CI build and tests. **Needs the watch:** the 15-min timeout while Sage is in the background at night
 (same background-delivery question as the other night steps; see the contact log).
+
+### 21 · 2026-11-27 — critical round 12: F14 try the sunrise
+**Design review before building:**
+- A preview must leave the lamp exactly as it was; a 60 s test that leaves it at full brightness is a bug.
+  `LampRules.restore` (tested) puts back off / the white / the colour.
+- Touching the lamp (or the crown) during the preview stops it and keeps your setting: no restore after.
+- It must start at the dawn end even when the lamp is already bright, otherwise the "never dim a brighter lamp"
+  rule would leave nothing to see; it then follows the real curve (`LampRules.sunrise`), 2 s steps.
+**Changed:** long-press menu → Lamp → "Try sunrise (60 s)": 10 % candle → 80 % daylight in 60 s, full light 5 s
+(as the alarm), then back. The prototype has the same button. Real sunrise and preview never run together.
+**Verified:** CI build and tests. **Needs the watch:** how the steps look on the real bulb (2 s step rate over the
+iPhone link).

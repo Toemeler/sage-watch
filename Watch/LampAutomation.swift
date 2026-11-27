@@ -108,6 +108,7 @@ final class LampAutomation: ObservableObject {
     /// - a running wind-down pauses until that sleep (one only scheduled for later is left alone)
     func userChanged() {
         rangAt = nil
+        if previewTask != nil { previewTask?.cancel(); previewTask = nil; previewing = false; activity = "" }   // no restore: yours wins
         if sunriseTask != nil { sunriseTask?.cancel(); sunriseTask = nil; activity = "" }
         if windingDown, let task = windDownTask {
             windDownPausedFor = nextBedtime().at
@@ -178,6 +179,41 @@ final class LampAutomation: ObservableObject {
         scheduleWindDown()
         bedtimeTask?.cancel(); bedtimeTask = nil
         scheduleBedtimeTap()
+    }
+
+    // MARK: try the sunrise (F14)
+
+    @Published private(set) var previewing = false
+    private var previewTask: Task<Void, Never>?
+
+    /// The whole wake-up light in 60 s: from 10 % candle along the same curve as the real sunrise (LampRules.sunrise)
+    /// to 80 % daylight, then full light as the alarm would, held 5 s, then the lamp goes back to exactly how it was.
+    /// Touching the lamp at any point stops it and keeps what you set (no restore).
+    func trySunrise() {
+        guard !previewing else { return }
+        sunriseTask?.cancel(); sunriseTask = nil
+        let lamp = LampModel.shared
+        let before = lamp.state
+        previewing = true
+        activity = "Trying the sunrise (60 s)"
+        previewTask = Task { @MainActor in
+            defer { previewing = false; previewTask = nil }
+            // start from the dawn end even if the lamp is on bright, so there is something to see
+            lamp.set(["state": true, "dimming": 10, "temp": 2200], byUser: false)
+            let start = Date(), span: TimeInterval = 60
+            while !Task.isCancelled {
+                let t = min(1, Date().timeIntervalSince(start) / span)
+                if let p = LampRules.sunrise(t: t, current: lamp.state) { lamp.set(p, byUser: false) }
+                if t >= 1 { break }
+                try? await Task.sleep(for: .seconds(2))
+            }
+            guard !Task.isCancelled else { return }
+            lamp.set(["state": true, "dimming": 100, "temp": 4500], byUser: false)      // the alarm's full light
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            lamp.set(LampRules.restore(before), byUser: false)
+            activity = ""
+        }
     }
 
     // MARK: night light timeout

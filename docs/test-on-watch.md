@@ -16,6 +16,8 @@ quick check; note ✓ / ✗ and anything odd. Long-press the face → **Lamp →
 - [ ] The percentage appears only while changing; split dark/white exactly at the fill edge.
 - [ ] Crown: 1 % per click, click at 100 % and at off; below 10 % one more click down = off.
 - [ ] Hold ~0.4 s → colour wheel blooms; pan does **not** pick; tap picks; edge bubbles easy to hit; crown zooms out.
+- [ ] Long-press the face → Lamp → Try sunrise (60 s): dims to candle, rises to daylight, full light, then back
+      to exactly how it was. Touch the lamp midway → it stops and keeps yours.
 - [ ] Leave it untouched 30 s → closes by itself (not while the colour wheel is open).
 - [ ] iPhone in another room / Bluetooth off → change something → "Lamp didn't respond", slider snaps back.
 

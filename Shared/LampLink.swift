@@ -62,6 +62,15 @@ enum LampRules {
     /// how long after the lamp last answered the panel keeps its controls through a failed check
     static let reconnectGrace: TimeInterval = 120
 
+    /// setPilot params that put the lamp back exactly as it was (after a preview): off stays off, a colour comes
+    /// back as that colour, a white as that white
+    static func restore(_ s: LampLink.State) -> [String: Any] {
+        guard s.on else { return ["state": false] }
+        var p: [String: Any] = ["state": true, "dimming": s.dimming]
+        if let c = s.rgb { p["r"] = c.0; p["g"] = c.1; p["b"] = c.2 } else { p["temp"] = s.temp ?? 2700 }
+        return p
+    }
+
     /// a night light switches itself off after this long (you got up and went back to bed)
     static let nightLightMinutes: TimeInterval = 15 * 60
 

@@ -34,6 +34,18 @@ final class LampRulesTests: XCTestCase {
         XCTAssertNil(LampRules.windDown(t: 0.6, start: start, current: state(on: true, dim: 20, temp: 2700)))
     }
 
+    func testRestorePutsTheLampBackExactly() {
+        var off = LampLink.State(); off.on = false
+        XCTAssertEqual(LampRules.restore(off)["state"] as? Bool, false)
+        XCTAssertNil(LampRules.restore(off)["dimming"])
+        var white = LampLink.State(); white.on = true; white.dimming = 35; white.temp = 3000
+        XCTAssertEqual(LampRules.restore(white)["temp"] as? Int, 3000)
+        XCTAssertEqual(LampRules.restore(white)["dimming"] as? Int, 35)
+        var colour = LampLink.State(); colour.on = true; colour.dimming = 60; colour.rgb = (10, 20, 255); colour.temp = nil
+        XCTAssertEqual(LampRules.restore(colour)["b"] as? Int, 255)
+        XCTAssertNil(LampRules.restore(colour)["temp"])
+    }
+
     func testNightLightTimesOutUnlessYouChangedIt() {
         var red = LampLink.State(); red.on = true; red.dimming = 10; red.rgb = (255, 28, 0); red.temp = nil
         let t0 = Date(timeIntervalSince1970: 1_000_000)

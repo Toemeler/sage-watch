@@ -60,6 +60,8 @@ struct RecorderControls: View {
                 Toggle("Off when asleep", isOn: $automation.offWhenAsleepOn)
                 Toggle("Bedtime tap", isOn: $automation.bedtimeTapOn)
                     .onChange(of: automation.bedtimeTapOn) { _, _ in automation.rescheduleWindDown() }
+                Button(automation.previewing ? "Trying the sunrise…" : "Try sunrise (60 s)") { automation.trySunrise() }
+                    .disabled(automation.previewing || !lamp.home)
                 if !automation.activity.isEmpty { row("Now", automation.activity) }
                 if let c = lamp.contacts.first {
                     row("Last contact", "\(c.at.formatted(date: .omitted, time: .shortened)) \(c.ok ? "ok" : "failed")\(c.background ? " · background" : "")")
