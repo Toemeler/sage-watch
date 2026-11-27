@@ -497,7 +497,20 @@ struct LampPanel: View {
             text.foregroundStyle(Color.black.opacity(0.7))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .mask(alignment: .bottom) { Rectangle().frame(height: max(0, fillHeight)) }
+            // F26: stopped at the night cap: say why and how to go on, right under the number (over the track, so
+            // always white: the cap is below the middle of the slider)
+            if atNightCap {
+                Text(touching ? "Night · drag again for more" : "Night · turn again for more")
+                    .font(.caption2.weight(.semibold)).foregroundStyle(.white.opacity(0.8))
+                    .offset(y: 34)
+                    .transition(.opacity)
+            }
         }
+    }
+
+    /// F26: the light is held at the night cap right now (not yet pushed past it)
+    private var atNightCap: Bool {
+        lamp.nightCap && !capUnlocked && !crownUnlocked && abs(level - LampRules.nightCapLevel) < 0.005
     }
 
     /// a short note when a change did not reach the lamps; the slider has already gone back to their real state

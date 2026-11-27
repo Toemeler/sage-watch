@@ -794,3 +794,12 @@ multipath indoors).
   prototype); it disappears once the light is above it.
 - **Verified:** uses the tested `sliderTop`; prototype JS parses. **Needs the real watch:** that the hairline is
   visible but quiet at night brightness.
+
+### 53 · 2026-11-27 — round 44: the night cap explains itself (watch app change, install after recording)
+- **Review:** the hairline shows where the night cap is, but at the moment the slider stops nothing says *why*, or
+  that a second push exists — the one thing someone fumbling at 3 am needs to know.
+- **Changed:** while the light is held at the cap (not yet pushed past), a small caption under the percentage says
+  "Night · drag again for more" (dragging) or "Night · turn again for more" (crown); it fades with the percentage.
+  Prototype in step. The on-watch checklist now covers builds 107–111 (night cap on every path, the checking state,
+  the nap-length carry-over).
+- **Verified:** CI build; prototype JS parses. **Needs the real watch:** caption legibility at night brightness.

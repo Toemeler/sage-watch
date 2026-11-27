@@ -362,6 +362,7 @@ requestAnimationFrame(frame);
     <div class="lamp-close" id="lampClose" style="cursor:pointer">✕</div>
     <div class="lamp-area" id="lampArea">
       <div class="val" id="lampVal"></div><div class="val" id="lampValDark"></div>
+      <div id="capHint" style="position:absolute;left:0;right:0;text-align:center;font-size:11px;font-weight:600;color:rgba(255,255,255,.8);z-index:3;pointer-events:none;opacity:0"></div>
       <div class="lamp-fail" id="lampFail">⚠︎ Lamp didn't respond</div>
       <div class="lamp-fail" id="lampChecking" style="top:50%;transform:translate(-50%,-50%)">Checking…</div>
       <div class="lamp-fail" id="lampReconnect"><span style="color:#B9C4AA">((·))</span> Reconnecting…</div>
@@ -642,6 +643,10 @@ requestAnimationFrame(frame);
     iconPath.setAttribute("fill", L > 0 ? (dark ? "rgba(0,0,0,.55)" : "rgba(255,255,255,.8)") : "none");
     const shown = dragLevel ?? modelLevel();
     val.textContent = shown > 0 ? Math.round(shown * 100) + "%" : "Off"; valDark.textContent = val.textContent;
+    // F26: held at the night cap: why, and how to go on
+    const hint = document.getElementById("capHint"), held = nightNow() && Math.abs(shown - CAP) < 0.005 && !(touching ? capUnlocked : wheelUnlocked);
+    hint.textContent = touching ? "Night · drag again for more" : "Night · turn again for more";
+    hint.style.top = (AH / 2 + 22) + "px"; hint.style.opacity = held ? valOp.x : 0;
     // split where the fill edge crosses the label: dark over the fill, white over the track
     const labelTop = AH / 2 - 26, fillTop = (AH - H) / 2 + H * (1 - L);
     for (const el of [val, valDark]) { el.style.top = labelTop + "px"; el.style.opacity = valOp.x * (1 - mode.x); el.style.lineHeight = "52px"; }

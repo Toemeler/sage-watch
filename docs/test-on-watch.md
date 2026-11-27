@@ -2,7 +2,7 @@
 
 Everything below passed the cloud build and unit tests but has **not** been seen on a real watch. Each line is one
 quick check; note ✓ / ✗ and anything odd. Long-press the face → **Lamp → Contact log** shows every lamp message.
-Up to date with build 105 (design log rounds 1–38).
+Up to date with build 111 (design log rounds 1–44).
 
 ## Face (3 min)
 - [ ] Time centred, no date, thin battery bar; bar yellow ≤ 20 %, red ≤ 10 %, green while charging.
@@ -35,13 +35,15 @@ Up to date with build 105 (design log rounds 1–38).
 - [ ] Leave it untouched 30 s → closes by itself; the "not reachable" screen too.
 - [ ] Lower the wrist with the panel open → raising it again shows the face.
 - [ ] iPhone in another room / Bluetooth off → change something → "Lamp didn't respond", slider snaps back.
+- [ ] Opening the panel while it asks the lamp: the slider as it last was, greyed, "Checking…" on it — no spinner
+      (except the very first time) — then it turns live in place.
 - [ ] Short drop → "Reconnecting…" (antenna, no spinner) and it reconnects by itself within ~10 s of the iPhone
       being back.
 - [ ] A notification arriving mid-drag never switches the lamp; the panel still closes after 30 s.
 
 ## Menu (1 min)
 - [ ] Long-press the face → Lamp shows Now, Last contact, "Automations: n of 6 on", Try sunrise, Contact log.
-- [ ] Automations page: six switches, each with a line saying what it does.
+- [ ] Automations page: seven switches (incl. Night cap), each with a line saying what it does.
 - [ ] Try sunrise (60 s): dims to candle, rises to daylight, full light, then back to exactly how it was. Touch the
       lamp midway → it stops and keeps yours.
 
@@ -49,7 +51,8 @@ Up to date with build 105 (design log rounds 1–38).
 - [ ] Crown **up** a few clicks → lamp panel.
 - [ ] Crown **down** a long turn (12 clicks) → "Nap · up to 100 min · Undo" (Record must be on). Pause, then turn:
       the length changes in 5-min steps with a click each (up longer, down shorter, 20–130). The menu shows
-      "This nap: up to N min". Undo cancels it.
+      "This nap: up to N min". Undo cancels it. A nap started by hand that never finds sleep does not change the
+      length of the next planned nap.
 - [ ] Double tap (pinch twice; watchOS 11 + a watch with double tap) → "Lamp on/off · Undo".
 - [ ] During a sleep block, crown and double tap do nothing.
 
@@ -69,6 +72,10 @@ Up to date with build 105 (design log rounds 1–38).
       than usual) it starts 90 min before bed ("early (short night)").
 - [ ] Fall asleep with the lamp on → it fades off in two steps. Touch the lamp between the steps → it stays on.
 - [ ] Reading in bed, lamp changed after you lay down → it is not switched off.
+- [ ] Night cap (between your usual bedtime and wake): a faint line marks 30 % on the slider; dragging stops there
+      with a click and "Night · drag again for more"; a second drag goes higher. Crown stops at 30 %; rest ½ s and
+      turn again to go on. Switching on at night comes on at most 30 %. Next evening the lamp still comes on in your
+      evening light (not 30 %). VoiceOver: increments stop at 30 %, the next one goes on.
 - [ ] On the charger after 21:00 → dim red bedside clock (if watchOS keeps Sage on screen there). Crown up → red
       night light; crown down → lamp off. Left alone, the night light goes off after 15 min.
 - [ ] Wind-down off, lamp bright at your usual bedtime → two quiet clicks and "Bedtime · lamp is bright".
