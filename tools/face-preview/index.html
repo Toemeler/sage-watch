@@ -141,6 +141,8 @@ function draw(ctx, st) {
   drawTime(ctx, st.date, st.dimmed);
   if (!st.dimmed && st.music) drawMusic(ctx, st.date);
   if (!st.dimmed && !st.sleeping) drawBattery(ctx, st.battery, st.charging);
+  // critical (≤ 10 %, not charging): the bar shows in always-on and on the sleep face too, dimmed
+  else if (st.battery != null && st.battery <= 10 && !st.charging) { ctx.globalAlpha = 0.6; drawBattery(ctx, st.battery, st.charging); ctx.globalAlpha = 1; }
   ctx.restore();
 }
 

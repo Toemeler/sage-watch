@@ -56,6 +56,13 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertFalse(FaceRules.keepMusicBars(lastPlaying: true, sinceAnswer: nil))   // never answered
     }
 
+    func testCriticalBatteryShowsEverywhere() {
+        XCTAssertTrue(FaceRenderer.criticalBattery(8, charging: false))
+        XCTAssertFalse(FaceRenderer.criticalBattery(8, charging: true))      // on the charger: no alarm
+        XCTAssertFalse(FaceRenderer.criticalBattery(15, charging: false))
+        XCTAssertFalse(FaceRenderer.criticalBattery(nil, charging: false))
+    }
+
     func testCrownDoesNothingWhileAsleep() {
         XCTAssertEqual(FaceRules.crownAction(delta: 20, sleeping: true), .none)
         XCTAssertEqual(FaceRules.crownAction(delta: -20, sleeping: true), .none)

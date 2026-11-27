@@ -879,3 +879,15 @@ multipath indoors).
 - **Changed:** all three decide on a state confirmed within 90 s (`freshState`, asked once if older). During a sunrise
   each step's reply keeps the state fresh, so it costs no extra messages there.
 - **Verified:** CI build (the rule is round 49's tested `freshEnough`). **Needs real nights:** the contact log.
+
+### 60 · 2026-11-27 — round 51: a dying battery must show in always-on (watch app change, install after recording)
+- **Process:** a visual pass of the prototype in the browser pane was refused by the session's permission check;
+  not worked around. The face was reviewed from the code instead, Swift against prototype: battery colours, music
+  bars, runner trail and note geometry still match.
+- **Review:** the battery bar is hidden in always-on and on the sleep face — reasonable at 70 %, wrong at 8 %: the
+  moment the watch is about to stop recording (and the smart wake with it) is exactly the moment the face shows
+  nothing, unless the wrist is raised.
+- **Changed:** at 10 % and below and not charging (`FaceRenderer.criticalBattery`, tested) the red bar shows in
+  always-on and on the sleep face too, at 60 % opacity. Prototype in step.
+- **Verified:** rule by unit tests (CI); prototype JS parses. **Needs the real watch:** that always-on keeps it
+  legible and it does not count as a bright element at night (it is small and only at ≤ 10 %).

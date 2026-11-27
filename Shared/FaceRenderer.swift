@@ -80,6 +80,10 @@ enum FaceRenderer {
             drawTime(&ctx, state.date, dimmed: state.dimmed)
             if !state.dimmed && state.mode != .sleeping {
                 drawPlaque(&ctx, battery: state.battery, charging: state.charging, date: state.date, dimmed: false)
+            } else if FaceRenderer.criticalBattery(state.battery, charging: state.charging) {
+                // always-on and the sleep face hide the bar — except when it is critical: a watch about to die must
+                // say so at a glance, dimmed, without waking the wrist
+                drawPlaque(&ctx, battery: state.battery, charging: state.charging, date: state.date, dimmed: true)
             }
         }
         if layers.contains(.music) && !state.dimmed && state.music { drawMusic(&ctx, state.date) }
@@ -249,8 +253,16 @@ enum FaceRenderer {
     }
 
     /// the watch battery as a thin bar at the bottom; the fill eases to the level so changes slide
+    /// the battery bar shows even in always-on and on the sleep face at 10 % and below, unless charging
+    static func criticalBattery(_ percent: Int?, charging: Bool) -> Bool {
+        guard let p = percent, !charging else { return false }
+        return p <= 10
+    }
+
     private static func drawPlaque(_ ctx: inout GraphicsContext, battery: Int?, charging: Bool, date: Date, dimmed: Bool) {
         guard let battery else { return }
+        if dimmed { ctx.opacity = 0.6 }
+        defer { if dimmed { ctx.opacity = 1 } }
         let target = Double(battery) / 100
         var level = shownLevel ?? target
         level += (target - level) * 0.08
