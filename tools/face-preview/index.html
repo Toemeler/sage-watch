@@ -30,7 +30,7 @@
   <div class="overlay">
     <!-- the face's note (SageWatchApp napNote): F17 shows the nap's length, the crown changes it -->
     <!-- in watch points x 2 (this screen is 368 px for 184 pt): 13 pt text, 12 / 8 pt padding, 44 x 32 pt button -->
-    <div id="napNote" style="position:absolute;left:50%;bottom:36px;transform:translateX(-50%);display:flex;gap:16px;align-items:center;
+    <div id="napNote" class="glass" style="position:absolute;left:50%;bottom:36px;transform:translateX(-50%);display:flex;gap:16px;align-items:center;
          background:rgba(31,31,31,.95);border-radius:99px;padding:16px 24px;white-space:nowrap;opacity:0;transition:opacity .2s;max-width:344px;box-sizing:border-box">
       <span id="napText" style="font:600 26px -apple-system,system-ui;color:#E2D9C9;overflow:hidden"></span>
       <span id="napAction" style="font:600 28px -apple-system,system-ui;color:#B9C4AA;min-width:88px;text-align:center;line-height:64px;flex:none">Undo</span>
@@ -354,8 +354,13 @@ requestAnimationFrame(frame);
   .val { position: absolute; left: 0; right: 0; text-align: center; font-size: 40px; font-weight: 600; font-variant-numeric: tabular-nums; z-index: 2; pointer-events: none; }
   .bub { position: absolute; width: 42px; height: 42px; margin: -21px 0 0 -21px; border-radius: 50%; box-sizing: border-box; }
   .bub.sel { box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 4px rgba(0,0,0,.25); }
+  /* Liquid Glass stand-in (watchOS 26+): blurred, translucent, a light rim; the watch uses .glassEffect(.regular) */
+  .glass { background: rgba(60,60,64,.42) !important; backdrop-filter: blur(12px) saturate(1.4); -webkit-backdrop-filter: blur(12px) saturate(1.4);
+           box-shadow: inset 0 0 0 0.5px rgba(255,255,255,.28), inset 0 1px 0 rgba(255,255,255,.18); }
   .lamp-fail { position: absolute; z-index: 4; top: 34px; left: 50%; transform: translateX(-50%); white-space: nowrap;
-               background: rgba(31,31,31,.94); border-radius: 99px; padding: 6px 10px; font-size: 12px; font-weight: 600;
+               background: rgba(60,60,64,.42); backdrop-filter: blur(12px) saturate(1.4); -webkit-backdrop-filter: blur(12px) saturate(1.4);
+               box-shadow: inset 0 0 0 0.5px rgba(255,255,255,.28), inset 0 1px 0 rgba(255,255,255,.18);
+               border-radius: 99px; padding: 6px 10px; font-size: 12px; font-weight: 600;
                opacity: 0; transition: opacity .25s; pointer-events: none; }
   .lamp-help { color: #8a877d; font-size: 12px; line-height: 1.5; max-width: 300px; }
 </style>

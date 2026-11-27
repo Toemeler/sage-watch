@@ -1018,3 +1018,14 @@ multipath indoors).
   chain): split into typed steps / a `bubbleFace` view. Tests and build green (build 134).
 - **Needs the real watch:** the system controls now look current (toolbar buttons, the menu's lists and toggles);
   everything drawn by Sage itself is unchanged. Next: glass for Sage's own pills and notes, gated to watchOS 26.
+
+### 72 · 2026-11-27 — round 63: Sage's own pills in the system's glass (watch app change)
+- **Review:** with the watchOS 26 SDK the system's controls now render in Liquid Glass, but Sage's own small pills
+  (the face's note, "Reconnecting…", "Lamp didn't respond", "Checking…") were still flat dark capsules — two
+  materials side by side on one screen.
+- **Changed:** one `PillBackground` modifier (`.pill()`) for all four: `glassEffect(.regular, in: .capsule)` on
+  watchOS 26+, the old solid capsule before. On the bedside clock always the near-black solid one: glass takes up
+  light from what is behind it, and at night nothing on the face may brighten. Reduce Transparency is handled by the
+  system's glass itself. Prototype: a glass stand-in (blur, translucency, light rim) on the note and lamp pills.
+- **Verified:** CI build. **Needs the real watch:** the note's legibility on glass over the busy dial (if weak, the
+  glass gets a dark tint next round).

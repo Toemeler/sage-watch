@@ -115,7 +115,7 @@ struct FaceScreen: View {
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     // follows the wearer's text size, up to the size where one line still fits the pill
                     .dynamicTypeSize(...DynamicTypeSize.xxLarge)
-                    .background(Capsule().fill(Color(white: Self.bedside(Date()) ? 0.05 : 0.12).opacity(0.95)))
+                    .pill(night: Self.bedside(Date()))
                     .padding(.bottom, 18)
                 }
                 .transition(.opacity)

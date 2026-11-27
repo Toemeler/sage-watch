@@ -374,7 +374,7 @@ struct LampPanel: View {
             Text("Reconnecting…").font(.caption.weight(.semibold)).foregroundStyle(.white)
         }
         .padding(.horizontal, 10).padding(.vertical, 5)
-        .background(Capsule().fill(Color(white: 0.12).opacity(0.94)))
+        .pill()
         .padding(.top, 34)
         .allowsHitTesting(false)
         .task {
@@ -424,7 +424,7 @@ struct LampPanel: View {
                 .clipShape(RoundedRectangle(cornerRadius: min(w, h) * 0.2, style: .continuous))
                 Text("Checking…").font(.caption.weight(.semibold)).foregroundStyle(.white)
                     .padding(.horizontal, 10).padding(.vertical, 5)
-                    .background(Capsule().fill(Color(white: 0.12).opacity(0.94)))
+                    .pill()
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
@@ -533,7 +533,7 @@ struct LampPanel: View {
                 .dynamicTypeSize(...DynamicTypeSize.xxLarge)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(Capsule().fill(Color(white: 0.12).opacity(0.94)))
+                .pill()
                 .padding(.top, 34)
             Spacer()
         }
