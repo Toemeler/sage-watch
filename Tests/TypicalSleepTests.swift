@@ -3,6 +3,16 @@ import XCTest
 
 /// The lamp's wind-down follows the average of recorded sleep, including nights that start either side of midnight.
 final class TypicalSleepTests: XCTestCase {
+    func testLastNightIsTheNewest() {
+        // two nights: the newer one 6 h, the older 8 h (unix seconds)
+        let t = TypicalSleep.from(naps: [], nights: [(1_000_000, 1_028_800), (1_100_000, 1_121_600)])
+        XCTAssertEqual(t.lastNightMinutes, 360)
+        XCTAssertEqual(t.lastNightEnd, 1_121_600)
+        let back = TypicalSleep(dictionary: t.dictionary)
+        XCTAssertEqual(back?.lastNightMinutes, 360)
+        XCTAssertEqual(back?.lastNightEnd, 1_121_600)
+    }
+
     private var cal: Calendar = {
         var c = Calendar(identifier: .gregorian)
         c.timeZone = TimeZone(identifier: "Europe/Zurich")!

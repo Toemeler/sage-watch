@@ -13,6 +13,15 @@ struct TypicalSleep: Codable, Equatable {
     var nightOnset: Double?        // night clock: times before 12:00 count as 24+ (00:40 = 1480)
     var nightWake: Double?
     var nightCount = 0
+    /// F20: the newest recorded night: how long it was (minutes) and when it ended (unix seconds)
+    var lastNightMinutes: Double?
+    var lastNightEnd: Double?
+
+    /// the usual night's length in minutes (from the averages), nil until two are recorded
+    var nightMinutes: Double? {
+        guard let on = nightOnset, let wk = nightWake, wk > on else { return nil }
+        return wk - on
+    }
 
     static let minimumSamples = 2
     static let window = 14
@@ -33,6 +42,10 @@ struct TypicalSleep: Codable, Equatable {
             t.napOnset = mean(n.map { clock($0.0, night: false) })
             t.napWake = mean(n.map { clock($0.1, night: false) })
         }
+        if let newest = g.first, newest.1 > newest.0 {
+            t.lastNightMinutes = (newest.1 - newest.0) / 60
+            t.lastNightEnd = newest.1
+        }
         if g.count >= minimumSamples {
             t.nightOnset = mean(g.map { clock($0.0, night: true) })
             // a wake is after midnight by definition; nightClock puts it at 24+ as well
@@ -47,6 +60,8 @@ struct TypicalSleep: Codable, Equatable {
         if let napWake { d["napWake"] = napWake }
         if let nightOnset { d["nightOnset"] = nightOnset }
         if let nightWake { d["nightWake"] = nightWake }
+        if let lastNightMinutes { d["lastNightMinutes"] = lastNightMinutes }
+        if let lastNightEnd { d["lastNightEnd"] = lastNightEnd }
         return d
     }
 
@@ -60,6 +75,8 @@ struct TypicalSleep: Codable, Equatable {
         nightOnset = d["nightOnset"] as? Double
         nightWake = d["nightWake"] as? Double
         nightCount = d["nightCount"] as? Int ?? 0
+        lastNightMinutes = d["lastNightMinutes"] as? Double
+        lastNightEnd = d["lastNightEnd"] as? Double
     }
 }
 

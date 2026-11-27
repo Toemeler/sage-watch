@@ -132,7 +132,9 @@ final class LampAutomation: ObservableObject {
         let at: Date
         let nap: Bool
         let learned: Bool
-        var lead: TimeInterval { nap ? 20 * 60 : LampAutomation.windDownMinutes * 60 }
+        /// F20: the night's wind-down starts this much earlier after a short night
+        var earlier: TimeInterval = 0
+        var lead: TimeInterval { (nap ? 20 * 60 : LampAutomation.windDownMinutes * 60) + earlier }
     }
 
     func nextBedtime(after now: Date = .now) -> Bedtime {
@@ -146,7 +148,14 @@ final class LampAutomation: ObservableObject {
             all.append(Bedtime(at: day.addingTimeInterval(night.0 * 60), nap: false, learned: night.1))
             all.append(Bedtime(at: day.addingTimeInterval(nap.0 * 60), nap: true, learned: nap.1))
         }
-        return all.filter { $0.at > now }.min { $0.at < $1.at }!
+        var next = all.filter { $0.at > now }.min { $0.at < $1.at }!
+        if !next.nap, let t = Plan.typical {
+            let base = LampAutomation.windDownMinutes * 60
+            next.earlier = LampRules.windDownLead(base: base, nap: false, lastNightMinutes: t.lastNightMinutes,
+                                                  usualMinutes: t.nightMinutes,
+                                                  sinceLastNight: t.lastNightEnd.map { now.timeIntervalSince1970 - $0 }) - base
+        }
+        return next
     }
 
     /// call when the app starts and whenever it becomes active; arms the next wind-down (night or nap)
@@ -162,7 +171,7 @@ final class LampAutomation: ObservableObject {
             windingDown = true
             defer { windingDown = false }
             let when = bed.at.formatted(date: .omitted, time: .shortened)
-            activity = "Winding down to your \(bed.learned ? "usual " : "")\(bed.nap ? "nap" : "bedtime") \(when)"
+            activity = "Winding down\(bed.earlier > 0 ? " early (short night)" : "") to your \(bed.learned ? "usual " : "")\(bed.nap ? "nap" : "bedtime") \(when)"
             let lamp = LampModel.shared
             let startState = lamp.state
             let step: TimeInterval = bed.nap ? 60 : 180
@@ -203,7 +212,7 @@ final class LampAutomation: ObservableObject {
                                              sleeping: FaceMode.auto(now) == .sleeping, lampOn: lamp.state.on,
                                              panelOpen: lamp.panelOpen,
                                              sinceUserOff: lamp.userOffAt.map { now.timeIntervalSince($0) },
-                                             minutesToBed: bed.at.timeIntervalSince(now) / 60) else { return }
+                                             inWindDown: bed.at.timeIntervalSince(now) <= bed.lead) else { return }
         lamp.set(p, byUser: false)
         arrivedAt = now
         activity = "Welcome home: lamp on"

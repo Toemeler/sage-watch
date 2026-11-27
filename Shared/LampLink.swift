@@ -120,17 +120,30 @@ enum LampRules {
     /// F16: a lamp you switched off this recently is not switched on again by an arrival
     static let arrivalOffGrace: TimeInterval = 10 * 60
 
-    /// F16, coming home after dark: the lamp comes on warm, dimmer when bedtime is under an hour away (the level
-    /// wind-down would be heading to). `awaySpan`: from the first to the last "away" answer; `sinceAway`: from the
+    /// F16, coming home after dark: the lamp comes on warm, dimmer inside the wind-down before bedtime (the level
+    /// wind-down would be heading to; an hour, or longer after a short night, F20). `awaySpan`: from the first to the last "away" answer; `sinceAway`: from the
     /// last "away" answer to now. Nil whenever it must not: away not proven, not fresh, not dark, a sleep block, the
     /// lamp already on, the lamp panel open (you are about to set it yourself; a tap there would toggle it straight
     /// back off), or you switched it off in the last 10 min. Automation never switches on over your own choice.
     static func arrivalLight(awaySpan: TimeInterval, sinceAway: TimeInterval, dark: Bool, sleeping: Bool, lampOn: Bool,
-                             panelOpen: Bool, sinceUserOff: TimeInterval?, minutesToBed: Double) -> [String: Any]? {
+                             panelOpen: Bool, sinceUserOff: TimeInterval?, inWindDown: Bool) -> [String: Any]? {
         guard awaySpan >= arrivalAway, sinceAway >= 0, sinceAway <= arrivalFresh else { return nil }
         guard dark, !sleeping, !lampOn, !panelOpen else { return nil }
         if let s = sinceUserOff, s >= 0, s < arrivalOffGrace { return nil }
-        return minutesToBed <= 60 ? ["state": true, "dimming": 25, "temp": 2200] : ["state": true, "dimming": 60, "temp": 2700]
+        return inWindDown ? ["state": true, "dimming": 25, "temp": 2200] : ["state": true, "dimming": 60, "temp": 2700]
+    }
+
+    /// F20: how much earlier the night's wind-down starts after a short night
+    static let shortNightExtraLead: TimeInterval = 30 * 60
+
+    /// F20: the wind-down's lead before bedtime. After a short night (the last recorded one over an hour shorter
+    /// than usual, and it was last night: ended under 20 h ago) the night's wind-down starts 30 min earlier. Naps
+    /// keep their lead. Only the lamp follows this; the plan and the alarm do not.
+    static func windDownLead(base: TimeInterval, nap: Bool, lastNightMinutes: Double?, usualMinutes: Double?,
+                             sinceLastNight: TimeInterval?) -> TimeInterval {
+        guard !nap, let l = lastNightMinutes, let u = usualMinutes, let s = sinceLastNight,
+              s >= 0, s < 20 * 3600, u - l > 60 else { return base }
+        return base + shortNightExtraLead
     }
 
     /// one sunrise step at progress `t` (0...1 through the wake window): eased like dawn, 10 → 80 % and

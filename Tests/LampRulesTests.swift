@@ -86,13 +86,13 @@ final class LampRulesTests: XCTestCase {
 
     func testArrivalLightOnlyWhenNothingSpeaksAgainstIt() {
         func a(away: TimeInterval = 3600, since: TimeInterval = 120, dark: Bool = true, sleeping: Bool = false, on: Bool = false, panel: Bool = false,
-               off: TimeInterval? = nil, bed: Double = 240) -> [String: Any]? {
+               off: TimeInterval? = nil, windDown: Bool = false) -> [String: Any]? {
             LampRules.arrivalLight(awaySpan: away, sinceAway: since, dark: dark, sleeping: sleeping, lampOn: on, panelOpen: panel,
-                                   sinceUserOff: off, minutesToBed: bed)
+                                   sinceUserOff: off, inWindDown: windDown)
         }
         XCTAssertEqual(a()?["dimming"] as? Int, 60)
         XCTAssertEqual(a()?["temp"] as? Int, 2700)
-        XCTAssertEqual(a(bed: 40)?["dimming"] as? Int, 25)            // close to bedtime: dim and warm
+        XCTAssertEqual(a(windDown: true)?["dimming"] as? Int, 25)     // inside the wind-down: dim and warm
         XCTAssertNil(a(away: 0))                                      // one flaky answer at home is not leaving
         XCTAssertNil(a(away: 600))                                    // a short drop is not coming home
         XCTAssertNil(a(since: 3 * 3600))                              // home for hours, the watch just had not asked
@@ -119,6 +119,18 @@ final class LampRulesTests: XCTestCase {
         XCTAssertFalse(Sun.dark(at: local(2026, 6, 21, 20, 30), lat: 47.37, lon: 8.54, calendar: cal))
         XCTAssertNil(Sun.times(on: local(2026, 6, 21, 12, 0), lat: 78, lon: 15, calendar: cal))   // midnight sun
         XCTAssertTrue(Sun.dark(at: local(2026, 6, 21, 22, 0), lat: nil, lon: nil, calendar: cal))  // no position: by the hour
+    }
+
+    func testWindDownStartsEarlierOnlyAfterAShortLastNight() {
+        func lead(nap: Bool = false, last: Double? = 330, usual: Double? = 450, since: TimeInterval? = 15 * 3600) -> TimeInterval {
+            LampRules.windDownLead(base: 3600, nap: nap, lastNightMinutes: last, usualMinutes: usual, sinceLastNight: since)
+        }
+        XCTAssertEqual(lead(), 5400)                          // 2 h short: 30 min earlier
+        XCTAssertEqual(lead(last: 420), 3600)                 // 30 min short: as usual
+        XCTAssertEqual(lead(nap: true), 3600)                 // naps keep their lead
+        XCTAssertEqual(lead(since: 30 * 3600), 3600)          // that was not last night
+        XCTAssertEqual(lead(usual: nil), 3600)                // no usual yet
+        XCTAssertEqual(lead(last: nil), 3600)
     }
 
     func testWindDownNeverSwitchesOnAndLeavesColour() {
