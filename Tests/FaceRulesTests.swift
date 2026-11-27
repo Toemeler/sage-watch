@@ -28,6 +28,15 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertEqual(FaceRules.doubleTap(ringing: true, sleeping: true, dimmed: true, bedside: false, home: true), .stopAlarm)
     }
 
+    func testBedsideCrownIsANightLightSwitch() {
+        XCTAssertEqual(FaceRules.bedsideCrown(delta: 4), .nightLight)
+        XCTAssertEqual(FaceRules.bedsideCrown(delta: -4), .lampOff)
+        XCTAssertEqual(FaceRules.bedsideCrown(delta: 2), .none)
+        // the night light is never bright
+        XCTAssertEqual(FaceRules.nightLight["dimming"] as? Int, 10)
+        XCTAssertNil(FaceRules.nightLight["temp"])
+    }
+
     func testBedsideOnlyOnTheChargerAtNight() {
         XCTAssertTrue(FaceRules.bedside(hour: 23, charging: true))
         XCTAssertTrue(FaceRules.bedside(hour: 3, charging: true))

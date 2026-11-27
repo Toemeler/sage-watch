@@ -146,6 +146,15 @@ struct FaceScreen: View {
             // a pause starts a new gesture; up opens the lamp, a long turn down starts a nap (FaceRules, tested)
             if Date().timeIntervalSince(crownMovedAt) > FaceRules.gesturePause { crownBase = v - (v - crownBase).clamped(to: -1...1) }
             crownMovedAt = Date()
+            if Self.bedside(Date()) {
+                // F12: on the bedside clock the crown is a night-light switch (never anything bright)
+                switch FaceRules.bedsideCrown(delta: v - crownBase) {
+                case .nightLight: crownBase = v; bedsideLamp(on: true)
+                case .lampOff: crownBase = v; bedsideLamp(on: false)
+                case .none: break
+                }
+                return
+            }
             switch FaceRules.crownAction(delta: v - crownBase, sleeping: FaceMode.auto(Date()) == .sleeping) {
             case .startNap:
                 crownBase = v
@@ -213,6 +222,24 @@ struct FaceScreen: View {
             showLamp = true
         case .none:
             break
+        }
+    }
+
+    /// F12: crown up on the bedside clock → red night light at the bulb's minimum; crown down → lamp off
+    private func bedsideLamp(on: Bool) {
+        guard lamp.showsControls else {
+            WKInterfaceDevice.current().play(.failure)
+            showNapNote("Lamp not reachable")
+            lamp.refresh(force: true)
+            return
+        }
+        WKInterfaceDevice.current().play(.click)
+        if on {
+            lamp.set(FaceRules.nightLight)
+            showNapNote("Night light", undo: { lamp.set(["state": false]) })
+        } else {
+            lamp.set(["state": false])
+            showNapNote("Lamp off")
         }
     }
 

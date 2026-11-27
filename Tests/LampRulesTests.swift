@@ -34,6 +34,13 @@ final class LampRulesTests: XCTestCase {
         XCTAssertNil(LampRules.windDown(t: 0.6, start: start, current: state(on: true, dim: 20, temp: 2700)))
     }
 
+    func testBedtimeTapOnlyWhenNothingElseHandlesIt() {
+        XCTAssertTrue(LampRules.bedtimeTap(lampOn: true, dimming: 80, windDownOn: false))
+        XCTAssertFalse(LampRules.bedtimeTap(lampOn: true, dimming: 80, windDownOn: true))   // wind-down handles it
+        XCTAssertFalse(LampRules.bedtimeTap(lampOn: true, dimming: 25, windDownOn: false))  // already dim
+        XCTAssertFalse(LampRules.bedtimeTap(lampOn: false, dimming: 80, windDownOn: false))
+    }
+
     func testPanelKeepsItsControlsThroughAShortDrop() {
         XCTAssertTrue(LampRules.showControls(home: true, sinceConfirmed: nil))
         XCTAssertTrue(LampRules.showControls(home: false, sinceConfirmed: 30))      // one failed check: keep them

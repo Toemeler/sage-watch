@@ -62,6 +62,12 @@ enum LampRules {
     /// how long after the lamp last answered the panel keeps its controls through a failed check
     static let reconnectGrace: TimeInterval = 120
 
+    /// F13: at your usual bedtime, tap the wrist only when the lamp is still bright and nothing else is taking care
+    /// of it (wind-down off). If wind-down is on (running or paused by your own change), you chose; no nagging.
+    static func bedtimeTap(lampOn: Bool, dimming: Int, windDownOn: Bool) -> Bool {
+        lampOn && dimming > 30 && !windDownOn
+    }
+
     /// keep the controls (with "Reconnecting…") when the lamp answered recently, so one failed background check
     /// does not swap the panel away under your finger; show the "not reachable" view only after that
     static func showControls(home: Bool, sinceConfirmed: TimeInterval?) -> Bool {

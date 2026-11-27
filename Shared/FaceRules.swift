@@ -32,6 +32,19 @@ enum FaceRules {
         return home ? .toggleLamp : .openLamp
     }
 
+    enum BedsideCrown: Equatable { case none, nightLight, lampOff }
+
+    /// F12: on the bedside clock the crown is a night-light switch: a turn up sets the lamp to a dim red night
+    /// light, a turn down switches the lamp off. Never anything bright (see nightLight).
+    static func bedsideCrown(delta: Double) -> BedsideCrown {
+        if delta >= lampDetents { return .nightLight }
+        if delta <= -lampDetents { return .lampOff }
+        return .none
+    }
+
+    /// the night light: deep red at the bulb's minimum (WiZ cannot go below 10 %), so getting up does not wake you
+    static let nightLight: [String: Any] = ["state": true, "r": 255, "g": 28, "b": 0, "dimming": 10]
+
     /// the bedside clock: on the charger between 21:00 and 07:00
     static func bedside(hour: Int, charging: Bool) -> Bool {
         charging && (hour >= 21 || hour < 7)
