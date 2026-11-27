@@ -87,7 +87,10 @@ final class LampAutomation: ObservableObject {
             while !Task.isCancelled {
                 let t = min(1, Date().timeIntervalSince(start) / span)
                 // eased like dawn; never dims a lamp that is already brighter (LampRules, tested)
-                if let p = LampRules.sunrise(t: t, current: LampModel.shared.state) { LampModel.shared.set(p, byUser: false) }
+                // "a sunrise never dims a lamp" holds only on a real state: a stale "off" would send a 10 % step
+                // to a lamp you already switched on bright this morning
+                if await freshState(), !Task.isCancelled,
+                   let p = LampRules.sunrise(t: t, current: LampModel.shared.state) { LampModel.shared.set(p, byUser: false) }
                 if t >= 1 { break }
                 try? await Task.sleep(for: .seconds(20))
             }
@@ -129,9 +132,11 @@ final class LampAutomation: ObservableObject {
         activity = "Off: you fell asleep"
         // two steps rather than a cut, so a half-asleep glance never sees the room snap dark. The second step is
         // cancelled by any change of yours in between (userChanged): you are awake, your light stays.
-        let from = lamp.state.dimming
         asleepTask?.cancel()
         asleepTask = Task { @MainActor in
+            // the first step says "on": decide it on a confirmed state, or a lamp already off would come back on
+            guard await freshState(), !Task.isCancelled, lamp.state.on else { asleepTask = nil; return }
+            let from = lamp.state.dimming
             lamp.set(["state": true, "dimming": max(10, from / 3)], byUser: false)
             try? await Task.sleep(for: .seconds(20))
             guard !Task.isCancelled else { return }
@@ -367,7 +372,9 @@ final class LampAutomation: ObservableObject {
             try? await Task.sleep(for: .seconds(LampRules.nightLightMinutes))
             guard !Task.isCancelled else { return }
             let lamp = LampModel.shared
-            if LampRules.nightLightExpired(current: lamp.state, setAt: setAt, now: Date()) {
+            // only if the lamp really still shows the night light (you may have changed it in the iPhone app)
+            if await freshState(), !Task.isCancelled,
+               LampRules.nightLightExpired(current: lamp.state, setAt: setAt, now: Date()) {
                 lamp.set(["state": false], byUser: false)
                 activity = "Night light off after 15 min"
             }

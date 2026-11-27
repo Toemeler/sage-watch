@@ -864,3 +864,18 @@ multipath indoors).
   last known state says a step could happen (on, and white for adaptive), so a lamp that is off costs no messages.
   The on-watch checklist gains the wall-switch case, adaptive white and the log filter.
 - **Verified:** rule by unit tests (CI). **Needs the real watch:** the wall-switch case in the checklist.
+
+### 59 · 2026-11-27 — round 50: the same stale-state check for every automation (watch app change, install after recording)
+- **Review:** round 49 covered the wind-down and adaptive white. Going through the others with the same question
+  ("what if the watch's idea of the lamp is old?"):
+  - **Sunrise:** "never dims a lamp" depends on the state — a stale "off" would send a 10 % candle step to a lamp you
+    switched on bright this morning.
+  - **Asleep fade:** its first step carries "on" — on a stale "on" it would switch a lamp that is already off back
+    on, dim, as you fall asleep.
+  - **Night-light timeout:** "only if it still shows the night light" — a stale state could switch off a light you
+    changed in the iPhone app.
+  - Fine as they are: arrival (decides on the answer that just came in), bedtime tap (asks first), alarm full light
+    (meant to switch on), Try sunrise (you asked for it).
+- **Changed:** all three decide on a state confirmed within 90 s (`freshState`, asked once if older). During a sunrise
+  each step's reply keeps the state fresh, so it costs no extra messages there.
+- **Verified:** CI build (the rule is round 49's tested `freshEnough`). **Needs real nights:** the contact log.
