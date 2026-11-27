@@ -48,8 +48,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F9 | **Nap from the face:** crown up opens the lamp; a long turn down (12 detents) starts a nap, with a note and Undo for 3 s | built (round 5, no answer) |
 | F10 | **Bedside mode:** while the watch charges at night, the face shows only the time in deep red at minimum brightness (no runner, no music), like a bedside clock that does not light the room | built (round 5, no answer) |
 | F11 | **Double tap toggles the lamp:** on watches with the double-tap gesture (pinch twice), double tap on the face switches the lamp on or off, with the click haptic; nothing during a sleep block | built (round 7, no answer) |
-| F12 | **Night light from the bedside clock:** on the charger at night, turning the crown sets the lamp to a dim red night light (5 %), for getting up without waking fully; turning back down switches it off. Never bright | proposed (round 9) |
-| F13 | **Bedtime tap:** at your usual bedtime, if the lamp is still bright and wind-down is off, one quiet tap on the wrist with "Bedtime" (no sound); nothing if the lamp is already dim or off | proposed (round 9) |
+| F12 | **Night light from the bedside clock:** on the charger at night, turning the crown sets the lamp to a dim red night light (5 %), for getting up without waking fully; turning back down switches it off. Never bright | built (round 10, no answer; 10 % is the WiZ minimum) |
+| F13 | **Bedtime tap:** at your usual bedtime, if the lamp is still bright and wind-down is off, one quiet tap on the wrist with "Bedtime" (no sound); nothing if the lamp is already dim or off | built (round 10, no answer) |
 
 ## Iterations
 
@@ -310,3 +310,16 @@ answer to the open background-delivery question.
 - Proposals F12 (night light from the bedside clock) and F13 (bedtime tap).
 
 **Verified:** CI build and tests. **Needs the watch:** the reconnect pill in a real drop.
+
+### 19 · 2026-11-27 — critical round 10: F12 night light, F13 bedtime tap
+**Design review before building:**
+- WiZ dimming cannot go below 10 %, so the night light is deep red (255, 28, 0) at 10 %, not the proposed 5 %.
+- `WKHapticType.notification` can play a tone; at bedtime that is unwelcome, so F13 uses two `.click`s.
+- No nagging: F13 taps only when wind-down is off; if wind-down is on (running, or paused by your own change)
+  you have already chosen. It asks the lamp fresh before deciding, so a cached state never taps.
+- A white note pill would be the brightest thing on the red bedside clock: notes are red there too.
+**Changed:** F12 (`FaceRules.bedsideCrown`, tested): crown up on the bedside clock → night light with Undo, crown
+down → lamp off; "Lamp not reachable" if it cannot be reached. F13 (`LampRules.bedtimeTap`, tested): at the usual
+night bedtime, two clicks and "Bedtime · lamp still bright"; switch in the long-press menu. Each on its own commit.
+**Verified:** CI build and tests. **Needs the watch:** whether watchOS lets the crown wake the bedside clock and
+whether background clicks are felt at bedtime.
