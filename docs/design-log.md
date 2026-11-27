@@ -728,3 +728,16 @@ multipath indoors).
   Prototype: the scroll wheel gains the same way.
 - **Verified:** rule by unit tests (CI); prototype JS parses. **Needs the real watch:** that the 120 / 30 ms
   thresholds feel natural with the crown's real detent rate.
+
+### 48 · 2026-11-27 — round 39: the device checklist catches up (docs only, no new build)
+- **Review (process):** seventeen rounds and ten features since the on-watch checklist was last written; it still
+  described the old crown (1 % only), the old note text, and had nothing for F16–F25 or the user-wins fixes. Every
+  round ends "needs the real watch" — the checklist is where that debt is paid, so it must be complete.
+- **Changed:** `docs/test-on-watch.md` rewritten for build 105: notes (one line, always-on, double tap, VoiceOver),
+  crown speed, colour wheel back / recents / zoom clicks, light by time of day, wrist-down close, reconnect, the
+  cancelled-touch case, the menu's Automations page, nap length on the crown, an evening for the arrival light
+  (including the must-never case: an hour at home with the iPhone in another room), a night for short-night
+  wind-down, the two asleep fixes, the battery guard and the morning "no dark after the alarm", and a way to
+  provoke "Recording stopped". Grouped so the sections fit the moments they need (2-min checks, one evening,
+  one night).
+- No app change: no IPA this round (build 105 is current).
