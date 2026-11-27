@@ -17,6 +17,22 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertEqual(FaceRules.napLength(125, steps: 4), 130)
     }
 
+    func testBatteryGuardOnlyWhenTheNightIsAtRisk() {
+        XCTAssertTrue(FaceRules.batteryGuard(percent: 22, charging: false, recording: true))
+        XCTAssertFalse(FaceRules.batteryGuard(percent: 22, charging: true, recording: true))    // on the charger
+        XCTAssertFalse(FaceRules.batteryGuard(percent: 22, charging: false, recording: false))  // no smart wake to protect
+        XCTAssertFalse(FaceRules.batteryGuard(percent: 30, charging: false, recording: true))
+        XCTAssertFalse(FaceRules.batteryGuard(percent: nil, charging: false, recording: true))  // unknown: quiet
+    }
+
+    func testRecordingStallNeedsTenQuietMinutes() {
+        XCTAssertTrue(FaceRules.recordingStalled(keepRunning: true, sinceStart: 3600, sinceLastSample: 601))
+        XCTAssertFalse(FaceRules.recordingStalled(keepRunning: true, sinceStart: 3600, sinceLastSample: 120))
+        XCTAssertFalse(FaceRules.recordingStalled(keepRunning: false, sinceStart: nil, sinceLastSample: 9999))  // Record off
+        XCTAssertFalse(FaceRules.recordingStalled(keepRunning: true, sinceStart: 60, sinceLastSample: 9999))    // just started
+        XCTAssertTrue(FaceRules.recordingStalled(keepRunning: true, sinceStart: nil, sinceLastSample: 700))     // stopped by itself
+    }
+
     func testCrownDoesNothingWhileAsleep() {
         XCTAssertEqual(FaceRules.crownAction(delta: 20, sleeping: true), .none)
         XCTAssertEqual(FaceRules.crownAction(delta: -20, sleeping: true), .none)

@@ -15,6 +15,28 @@ enum FaceRules {
         min(AlarmSettings.napLengthRange.upperBound, max(AlarmSettings.napLengthRange.lowerBound, minutes + Double(steps) * AlarmSettings.napLengthStep))
     }
 
+    /// F18: at bedtime, warn below this battery when not charging (the recorder and the smart wake need the night)
+    static let batteryGuardPercent = 30
+
+    /// F18: warn at bedtime? Only while Record is on (without it there is no smart wake to protect), not on the
+    /// charger, and below 30 %. An unknown level never warns.
+    static func batteryGuard(percent: Int?, charging: Bool, recording: Bool) -> Bool {
+        guard recording, !charging, let p = percent else { return false }
+        return p < batteryGuardPercent
+    }
+
+    /// F19: no motion written for this long while Record is on is a stall
+    static let stallSeconds: TimeInterval = 10 * 60
+
+    /// F19: is the recording stalled? Record is on, the run (if any) began more than 2 min ago (a normal start or
+    /// restart is not a stall), and nothing has been written for 10 min. `sinceStart` nil: not running although
+    /// Record is on, which counts once the 10 min have passed too.
+    static func recordingStalled(keepRunning: Bool, sinceStart: TimeInterval?, sinceLastSample: TimeInterval) -> Bool {
+        guard keepRunning else { return false }
+        if let s = sinceStart, s < 120 { return false }
+        return sinceLastSample >= stallSeconds
+    }
+
     /// a pause longer than this starts a new crown gesture
     static let gesturePause: TimeInterval = 1.5
 

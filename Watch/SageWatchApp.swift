@@ -49,6 +49,7 @@ struct FaceScreen: View {
     @State private var showLamp = false
     @ObservedObject private var audio = AudioModel.shared
     @ObservedObject private var automation = LampAutomation.shared
+    @ObservedObject private var guardian = WatchGuard.shared
     @State private var showMusic = false
     @State private var faceCrown: Double = 0
     @State private var crownBase: Double = 0
@@ -190,7 +191,11 @@ struct FaceScreen: View {
         .onChange(of: automation.arrivedAt) { _, t in
             if t != nil { showNapNote("Welcome home · lamp on", undo: { lamp.set(["state": false]) }) }
         }
-        .onAppear { lamp.refresh(force: true); audio.refresh(force: true) }
+        // F18: a watch that may not last the night says so at bedtime
+        .onChange(of: guardian.batteryWarnedAt) { _, t in
+            if t != nil { showNapNote("Charge for the alarm") }
+        }
+        .onAppear { lamp.refresh(force: true); audio.refresh(force: true); guardian.start() }
         .onChange(of: phase) { _, p in
             if p == .active { lamp.refresh(); audio.refresh(force: true); LampAutomation.shared.appBecameActive() }
         }
