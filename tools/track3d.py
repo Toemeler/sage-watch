@@ -267,6 +267,21 @@ def write(r, out: Path):
                                                        "geometry": {"type": "LineString", "coordinates": coords}}))
 
 
+def write_html(r, out: Path, name: str):
+    """track.html: tools/track_viewer.html with the day's points embedded (every 2 s), works offline"""
+    step = 2
+    pts = []
+    for i in range(0, len(r["t"]), step):
+        alt = None if np.isnan(r["alt"][i]) else round(float(r["alt"][i]), 2)
+        fl = None if np.isnan(r["floor"][i]) else int(r["floor"][i])
+        pts.append([int(r["t"][i]), round(float(r["x"][i]), 2), round(float(r["y"][i]), 2), alt, fl,
+                    round(float(r["hacc"][i]), 1), 0 if r["src"][i] == "gps" else 1])
+    data = {"name": name, "step": step, "tz": "Europe/Zurich", "points": pts}
+    tpl = (Path(__file__).parent / "track_viewer.html").read_text(encoding="utf-8")
+    html = tpl.replace("const TRACK = /*DATA*/null;", "const TRACK = " + json.dumps(data, separators=(",", ":")) + ";")
+    (out / "track.html").write_text(html, encoding="utf-8")
+
+
 def summary(r):
     dist = r["dist"].sum()
     fl = r["floor"]
@@ -283,9 +298,12 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("export")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--html", action="store_true", help="also write track.html, an interactive 3D viewer")
     a = ap.parse_args()
     d = Path(a.export)
     res = build(d)
     out = Path(a.out) if a.out else d / "track"
     write(res, out)
+    if a.html:
+        write_html(res, out, d.name)
     print(json.dumps(summary(res), indent=2))

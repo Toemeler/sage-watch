@@ -372,3 +372,12 @@ GPS noise, optimistic), indoors 3.9 m after 14 min.
    Barometer, steps and compass keep running. The menu / Data tab show when it is saving.
 3. *Process:* do not install new builds during a recording day (a reinstall restarts the app and leaves a gap).
 **Verified:** CI build and tests. **Needs a real day:** background GPS on the watch, battery, the real 3D path.
+
+### 23 · 2026-11-27 — round 14: the 3D viewer (no app change on a recording day)
+- **Decision:** no app changes this round; Tom may be recording today, and every app change means a build he should
+  not install mid-day. The round prepares tonight instead.
+- **Added:** `track3d.py --html` writes `track.html`, a self-contained interactive 3D viewer (template
+  `tools/track_viewer.html`, no libraries): drag to rotate, scroll/pinch to zoom, height exaggeration (floors are
+  small next to walking distances), colours per floor, a time slider moving a marker along the day with time, floor,
+  height and accuracy, summary tiles (walked distance, floor changes, minutes indoors and per floor). Tested on the
+  synthetic day and published as "Sage Day Path".
