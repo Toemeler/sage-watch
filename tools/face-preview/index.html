@@ -28,6 +28,12 @@
 <div class="watch"><div class="screen">
   <canvas id="face" width="736" height="896"></canvas>
   <div class="overlay">
+    <!-- the face's note (SageWatchApp napNote): F17 shows the nap's length, the crown changes it -->
+    <div id="napNote" style="position:absolute;left:50%;bottom:22px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;
+         background:rgba(31,31,31,.94);border-radius:99px;padding:6px 6px 6px 14px;white-space:nowrap;opacity:0;transition:opacity .2s">
+      <span id="napText" style="font:600 13px -apple-system,system-ui;color:#E2D9C9"></span>
+      <span style="font:600 14px -apple-system,system-ui;color:#B9C4AA;min-width:44px;text-align:center;line-height:32px">Undo</span>
+    </div>
   </div>
 </div></div>
 
@@ -41,6 +47,7 @@
   <label>Sleep face</label><input id="sleeping" type="checkbox">
   <label>Always-on (dimmed)</label><input id="dimmed" type="checkbox">
   <label>Bedside (charging at night)</label><input id="bedside" type="checkbox">
+  <label>Nap from the face (F17)</label><button type="button" id="napBtn">Start nap</button>
   <p class="hint">Coordinates are the renderer's reference space (screen x 131–827, y 63–893). Change the code here, reload, and port the settled values back to Shared/FaceRenderer.swift.</p>
 </div>
 
@@ -249,6 +256,28 @@ function drawBattery(ctx, pct, charging) {
   ctx.fillStyle = P.track; rrect(ctx, tr.x, tr.y, tr.w, tr.h, 6.5); ctx.fill();
   ctx.fillStyle = batteryColour(pct, charging); rrect(ctx, tr.x, tr.y, Math.max(13, tr.w * level), tr.h, 6.5); ctx.fill();
 }
+
+// ---------- F17: nap length on the crown (SageWatchApp.adjustNapLength, FaceRules.napLength) ----------
+const nap = { len: null, timer: 0, editFrom: 0, acc: 0 };
+function napShow() {
+  document.getElementById("napText").textContent = `Nap · up to ${nap.len} min`;
+  document.getElementById("napNote").style.opacity = 1;
+  clearTimeout(nap.timer);
+  nap.timer = setTimeout(() => { document.getElementById("napNote").style.opacity = 0; nap.len = null; }, 3000);
+}
+document.getElementById("napBtn").onclick = () => { nap.len = 100; nap.acc = 0; nap.editFrom = performance.now() + 600; napShow(); };
+// the scroll wheel is the crown: 4 detents (here 4 wheel notches) per 5-minute step, up longer, 20...130
+document.querySelector(".screen").addEventListener("wheel", e => {
+  if (nap.len == null) return;
+  e.preventDefault();
+  if (performance.now() < nap.editFrom) return;     // the turn that started the nap must not shorten it
+  nap.acc += -Math.sign(e.deltaY);
+  const steps = Math.trunc(nap.acc / 4); if (!steps) return;
+  nap.acc -= steps * 4;
+  const next = Math.min(130, Math.max(20, nap.len + steps * 5));
+  if (next === nap.len) return;
+  nap.len = next; navigator.vibrate && navigator.vibrate(8); napShow();
+}, { passive: false });
 
 // ---------- page ----------
 const $ = id => document.getElementById(id);

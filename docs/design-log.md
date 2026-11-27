@@ -52,8 +52,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F13 | **Bedtime tap:** at your usual bedtime, if the lamp is still bright and wind-down is off, one quiet tap on the wrist with "Bedtime" (no sound); nothing if the lamp is already dim or off | built (round 10, no answer) |
 | F14 | **Try the sunrise:** a "Try sunrise" button in the long-press menu plays the whole wake-up light in 60 s (10 % candle → 80 % daylight → full), so you can see and judge it without waiting for a morning; any touch of the lamp stops it | built (round 12, no answer) |
 | F15 | **Walk direction in recordings:** record the compass heading once a second (device motion, magnetic north) alongside the barometer, so walks get a direction and length; with floor changes from the barometer, a change of room shows up in the data (for counting work like beds). Small battery cost; compass is disturbed near metal (bed frames), so direction changes, not absolute bearings, are used | built (Tom asked for full position tracking) |
-| F16 | **Arrival light:** when you come home after dark (the lamp becomes reachable again after ≥ 30 min away, after sunset) and the lamp is off, it comes on warm at the level wind-down would have now; never during a sleep block, never if you switched it off in the last 10 min | proposed (round 22) |
-| F17 | **Nap length on the crown:** after the long turn down starts a nap (F9), the note shows its length and further turns change it in 5-min steps while the 3 s note is up | proposed (round 22) |
+| F16 | **Arrival light:** when you come home after dark and the lamp is off, it comes on warm (60 % 2700 K; 25 % 2200 K within an hour of bedtime). "Away" = the iPhone answered "no bulb" at least twice ≥ 20 min apart, and the lamp answers within 30 min of the last one. Never on a lamp that is on, in a sleep block, under the open lamp panel, or within 10 min of your own switch-off. Toggle "Arrival light" | built (round 23, no answer) |
+| F17 | **Nap length on the crown:** after the long turn down starts a nap (F9), the note shows its length ("Nap · up to 100 min") and further turns change it in 5-min steps (4 detents each, 20–130 min, up = longer) while the note is up; each step keeps the note 3 s more | built (round 23, no answer) |
 
 ## Iterations
 
@@ -476,3 +476,29 @@ multipath indoors).
 - **Verified:** rules by unit tests (CI), prototype JS parses. **Needs the real watch:** how often a real drop
   recovers within the 2 min grace with 8 s retries, and that the idle close is not felt as too early.
 - **Proposed:** F16 arrival light, F17 nap length on the crown (built next round if unanswered).
+
+### 32 · 2026-11-27 — round 23: F16 and F17 built (unanswered → approved; watch app change, install after recording)
+- **F17, nap length on the crown** (own commit): the nap note shows the length; 4 crown detents per 5 min, 20–130
+  min. The chosen length is this nap's only (the settings stay), persisted so a relaunch keeps it, cleared by
+  Undo, by a new nap and once sleep is found. The wake window keeps the usual width but never opens before half the
+  nap (`AlarmSettings.napWindow`, tested: 100 → 70–100, 60 → 30–60, 20 → 10–20).
+  - **Review findings fixed before commit:** the turn that started the nap carries on for a moment and would have
+    shortened it at once — editing starts 0.6 s after the start; any other note ends the editing, so a crown turn
+    after "Lamp on" can never change a nap.
+- **F16, arrival light** (own commit): sunrise/sunset from a rough position (`Sun`, NOAA approximation, tested for
+  Zürich in November and June, midnight sun, and the no-position fallback 17:00–07:00). The watch keeps its last GPS
+  fix rounded to 0.1° (~10 km), on the watch only.
+  - **Review findings fixed before commit (the user always wins):**
+    1. An iPhone out of Bluetooth range in another room must not look like leaving: only the iPhone's own answer
+       "no bulb replied" counts as away; an unreachable iPhone never does.
+    2. One flaky "no bulb" at home, then no check for an hour, would have looked like coming home and switched on a
+       lamp you had switched off. Away now needs two such answers ≥ 20 min apart, and the arrival must follow the
+       last one within 30 min.
+    3. Opening the panel at the door to switch on, while the arrival also switched on, would make your tap toggle
+       it straight back off: no arrival while the panel is open.
+  - Never touches a lamp that is on, never in a sleep block, never within 10 min of your own switch-off.
+- **Prototype:** the face preview has "Start nap" with the note; the scroll wheel sets the length as the crown does
+  (same steps, ends and 0.6 s guard). F16 has no visual part beyond the lamp coming on.
+- **Verified:** rules by unit tests (CI). **Needs the real watch:** whether the watch asks the lamp often enough
+  while you are out for "away" to be proven (it asks when the app comes to the front), and how the 4-detent step
+  feels on the crown.
