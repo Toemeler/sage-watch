@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 /// Watch ↔ iPhone messages for the WiZ lamps. watchOS cannot send UDP, so the watch asks the iPhone, which talks
 /// to the bulbs on the home network (local WiZ API, UDP 38899, see C:\Users\Tom\wiz-local).
@@ -144,6 +145,26 @@ enum LampRules {
         guard !nap, let l = lastNightMinutes, let u = usualMinutes, let s = sinceLastNight,
               s >= 0, s < 20 * 3600, u - l > 60 else { return base }
         return base + shortNightExtraLead
+    }
+
+    /// F21: how many recent colours the wheel marks
+    static let recentLimit = 3
+
+    /// F21: the recent colours (cell ids, newest first) after choosing `id`: it moves to the front, no doubles
+    static func recents(_ list: [Int], adding id: Int) -> [Int] {
+        Array(([id] + list.filter { $0 != id }).prefix(recentLimit))
+    }
+
+    /// F21: where the colour wheel opens. Centred on the colour that is set (as the app grid opens on the last app),
+    /// unless the set colour and the recent ones all fit around their middle without leaving the full-size centre
+    /// zone (`half`: its half extents) — then on that middle, so the recents are in reach too. Nothing set and
+    /// nothing recent: the middle of the wheel.
+    static func openCentre(current: CGPoint?, recents: [CGPoint], half: CGSize) -> CGPoint {
+        let all = (current.map { [$0] } ?? []) + recents
+        guard !all.isEmpty else { return .zero }
+        let mid = CGPoint(x: all.map(\.x).reduce(0, +) / CGFloat(all.count), y: all.map(\.y).reduce(0, +) / CGFloat(all.count))
+        let fits = all.allSatisfy { abs($0.x - mid.x) <= half.width && abs($0.y - mid.y) <= half.height }
+        return fits ? mid : (current ?? recents[0])
     }
 
     /// one sunrise step at progress `t` (0...1 through the wake window): eased like dawn, 10 → 80 % and

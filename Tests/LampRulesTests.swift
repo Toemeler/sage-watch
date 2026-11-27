@@ -133,6 +133,27 @@ final class LampRulesTests: XCTestCase {
         XCTAssertEqual(lead(last: nil), 3600)
     }
 
+    func testRecentColoursNewestFirstNoDoubles() {
+        XCTAssertEqual(LampRules.recents([], adding: 5), [5])
+        XCTAssertEqual(LampRules.recents([5, 9], adding: 12), [12, 5, 9])
+        XCTAssertEqual(LampRules.recents([12, 5, 9], adding: 9), [9, 12, 5])      // chosen again: to the front
+        XCTAssertEqual(LampRules.recents([12, 5, 9], adding: 30), [30, 12, 5])    // three at most
+    }
+
+    func testWheelOpensOnTheCurrentColourAndTheRecentsWhenTheyFit() {
+        let half = CGSize(width: 61, height: 81)
+        // current and recents close together: the middle of them
+        XCTAssertEqual(LampRules.openCentre(current: CGPoint(x: 0, y: 0), recents: [CGPoint(x: 47, y: 0)], half: half),
+                       CGPoint(x: 23.5, y: 0))
+        // a recent far away: the current colour wins
+        XCTAssertEqual(LampRules.openCentre(current: CGPoint(x: 0, y: 0), recents: [CGPoint(x: 188, y: 0)], half: half),
+                       CGPoint(x: 0, y: 0))
+        // nothing set, nothing recent: the middle of the wheel
+        XCTAssertEqual(LampRules.openCentre(current: nil, recents: [], half: half), .zero)
+        // nothing set (a colour from elsewhere): the recents
+        XCTAssertEqual(LampRules.openCentre(current: nil, recents: [CGPoint(x: 94, y: 40)], half: half), CGPoint(x: 94, y: 40))
+    }
+
     func testWindDownNeverSwitchesOnAndLeavesColour() {
         XCTAssertNil(LampRules.windDown(t: 0.5, start: state(on: true, dim: 80), current: state(on: false, dim: 80)))
         let colour = LampRules.windDown(t: 0.5, start: state(on: true, dim: 80, temp: nil), current: state(on: true, dim: 80, temp: nil))

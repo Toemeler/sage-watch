@@ -540,6 +540,7 @@ struct LampPanel: View {
 
     private func choose(_ s: Swatch) {
         lastUse = Date()
+        if let id = Honeycomb.cells.first(where: { $0.swatch == s })?.id { Honeycomb.recent = LampRules.recents(Honeycomb.recent, adding: id) }
         WKInterfaceDevice.current().play(.click)
         withAnimation(.easeInOut(duration: 0.35)) {
             switch s {
@@ -601,8 +602,16 @@ struct Honeycomb: View {
     @State private var panBase: CGSize = .zero
     @State private var bloomed = false
     @State private var panning = false
+    /// F21: read once per opening, not 61 times a frame while panning
+    @State private var recentIDs = Honeycomb.recent
 
     static let diameter: CGFloat = 42
+
+    /// F21: the colours chosen last (cell ids, newest first), kept across launches
+    static var recent: [Int] {
+        get { UserDefaults.standard.array(forKey: "lampRecentColours") as? [Int] ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: "lampRecentColours") }
+    }
     static let minHitRadius: CGFloat = 15
     static let pitch: CGFloat = 47
 
@@ -691,11 +700,13 @@ struct Honeycomb: View {
             if !panning { pan = panBase }
         }
         .onAppear {
-            // open centred on the colour that is set, as the app grid opens on the last app
-            if let cur = Self.cells.first(where: { $0.swatch.matches(state) }) {
-                panBase = CGSize(width: -cur.pos.x, height: -cur.pos.y)
-                pan = panBase
-            }
+            // open centred on the colour that is set, as the app grid opens on the last app; with the recent ones
+            // too when they fit around it (LampRules.openCentre, tested)
+            let cur = Self.cells.first(where: { $0.swatch.matches(state) })?.pos
+            let rec = recentIDs.compactMap { id in Self.cells.first(where: { $0.id == id })?.pos }
+            let c = LampRules.openCentre(current: cur, recents: rec, half: centreZone)
+            panBase = CGSize(width: -c.x, height: -c.y)
+            pan = panBase
             bloomed = true
         }
     }
@@ -724,12 +735,23 @@ struct Honeycomb: View {
             .min { $0.1 < $1.1 }?.0
     }
 
+    /// half extents of the zone where bubbles are drawn full size (the fisheye's centre)
+    private var centreZone: CGSize { CGSize(width: size.width / 2 - Self.diameter * 0.75, height: size.height / 2 - Self.diameter * 0.75) }
+
     private func bubble(_ cell: Cell) -> some View {
         let f = fisheye(CGPoint(x: cell.pos.x * zoom + pan.width, y: cell.pos.y * zoom + pan.height))
         let selected = cell.swatch.matches(state)
+        // F21: a recent colour (not the one set, which has its ring) carries a small dot, light on every colour
+        let recent = !selected && recentIDs.contains(cell.id)
         return Circle().fill(cell.swatch.color)
             .overlay(Circle().strokeBorder(Color.white, lineWidth: selected ? 3 : 0))
             .overlay(Circle().strokeBorder(Color.black.opacity(0.25), lineWidth: selected ? 1 : 0).padding(3))
+            .overlay(alignment: .bottom) {
+                if recent {
+                    Circle().fill(Color.white).overlay(Circle().strokeBorder(Color.black.opacity(0.35), lineWidth: 1))
+                        .frame(width: 7, height: 7).padding(.bottom, 6)
+                }
+            }
         .frame(width: Self.diameter, height: Self.diameter)
         .scaleEffect((bloomed || reduceMotion ? f.scale : 0.15) * zoom)
         .opacity(bloomed ? 1 : 0)
@@ -737,7 +759,7 @@ struct Honeycomb: View {
         .animation(reduceMotion ? .easeInOut(duration: 0.2)
                    : .spring(response: 0.5, dampingFraction: 0.74).delay(Double(cell.ring) * 0.04), value: bloomed)
         .accessibilityElement()
-        .accessibilityLabel(Text(cell.name))
+        .accessibilityLabel(Text(recent ? "\(cell.name), recent" : cell.name))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { pick(cell.swatch) }
     }
