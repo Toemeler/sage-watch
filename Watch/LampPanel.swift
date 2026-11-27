@@ -267,6 +267,7 @@ struct LampPanel: View {
     @State private var colours = false
     @State private var appeared = false
     @State private var crown: Double = 0             // the crown turns endlessly: only its movement is used
+    @State private var lastCrownAt = Date.distantPast
     @State private var showValue = false
     @State private var pressTask: Task<Void, Never>?
     @State private var hideTask: Task<Void, Never>?
@@ -588,7 +589,10 @@ struct LampPanel: View {
     /// starts at 10 %; reaching 100 % or off gives a click, like a control hitting its end.
     private func crownBrightness(by delta: Double) {
         let now = modelLevel
-        var next = now + delta / 100
+        // faster turns move further per detent (LampRules.crownStep, tested); slow turns stay at 1 %
+        let step = LampRules.crownStep(secondsSinceLast: Date().timeIntervalSince(lastCrownAt))
+        lastCrownAt = Date()
+        var next = now + delta * step / 100
         if delta < 0 && now <= 0.1 { next = 0 }
         if delta > 0 && now == 0 { next = 0.1 }
         next = min(1, max(0, next))
@@ -820,6 +824,8 @@ struct Honeycomb: View {
                    : .spring(response: 0.5, dampingFraction: 0.74).delay(Double(cell.ring) * 0.04), value: bloomed)
         .accessibilityElement()
         .accessibilityLabel(Text(recent ? "\(cell.name), recent" : cell.name))
+        // VoiceOver reaches the colour that is set first, then the recent ones, then the whites, then the 54 hues
+        .accessibilitySortPriority(selected ? 3 : recent ? 2 : cell.ring <= 1 ? 1 : 0)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { pick(cell.swatch) }
     }

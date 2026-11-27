@@ -127,6 +127,15 @@ enum LampRules {
         return u < onset
     }
 
+    /// brightness per crown detent, by how fast the crown turns: 1 % when turned slowly (precise), rising to 4 % when
+    /// spun (10 → 100 % in under a turn instead of three), as the system matches scrolling to the crown's speed.
+    /// `dt`: seconds since the previous detent.
+    static func crownStep(secondsSinceLast dt: TimeInterval) -> Double {
+        if dt >= 0.12 { return 1 }
+        if dt <= 0.03 { return 4 }
+        return 1 + 3 * (0.12 - dt) / 0.09
+    }
+
     /// F25: lowering the wrist (the app leaves the front) closes the panel, so the next raise shows the face, as
     /// Control Center does; never while a finger is still on the slider
     static func closeOnWristDown(active: Bool, touching: Bool) -> Bool {

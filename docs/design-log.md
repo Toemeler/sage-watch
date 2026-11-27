@@ -715,3 +715,16 @@ multipath indoors).
   settings lists do, and the closing note about the iPhone and the contact log.
 - **Prototype:** has no menu; not republished.
 - **Verified:** CI build. No new decision logic.
+
+### 47 · 2026-11-27 — round 38: the crown at the speed you turn it (watch app change, install after recording)
+- **Research:** Apple's Digital Crown guidance: update the interface to match the speed people turn the crown;
+  pickers change values as it turns. No numbers are published; Apple's own scrolling gains with angular velocity.
+- **Review:** the lamp's crown moved exactly 1 % per detent, so 10 → 100 % took ~90 detents (about three full
+  turns) — precise, but slow for the common "full light" turn. In the colour wheel VoiceOver walked the 61 bubbles
+  in ring order, so the colour that is set and the recent ones (F21) could be 50 swipes away.
+- **Changed:** `LampRules.crownStep` (tested): 1 % per detent when detents are ≥ 120 ms apart (slow, precise),
+  rising to 4 % at ≤ 30 ms (a spin covers the range in under a turn); the ends, the 10 % floor and the off detent
+  behave as before. VoiceOver order in the wheel: the set colour, then recents, then the whites, then the hues.
+  Prototype: the scroll wheel gains the same way.
+- **Verified:** rule by unit tests (CI); prototype JS parses. **Needs the real watch:** that the 120 / 30 ms
+  thresholds feel natural with the crown's real detent rate.

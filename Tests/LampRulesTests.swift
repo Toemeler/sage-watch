@@ -85,6 +85,13 @@ final class LampRulesTests: XCTestCase {
         XCTAssertFalse(LampRules.offWhenAsleep(onset: onset, lastUserChange: onset.addingTimeInterval(120)))   // awake then
     }
 
+    func testCrownIsPreciseSlowAndQuickWhenSpun() {
+        XCTAssertEqual(LampRules.crownStep(secondsSinceLast: 0.5), 1)
+        XCTAssertEqual(LampRules.crownStep(secondsSinceLast: 0.12), 1)
+        XCTAssertEqual(LampRules.crownStep(secondsSinceLast: 0.01), 4)
+        XCTAssertEqual(LampRules.crownStep(secondsSinceLast: 0.075), 2.5, accuracy: 1e-9)
+    }
+
     func testPanelClosesWithTheWristButNotUnderAFinger() {
         XCTAssertTrue(LampRules.closeOnWristDown(active: false, touching: false))
         XCTAssertFalse(LampRules.closeOnWristDown(active: false, touching: true))
