@@ -60,7 +60,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F21 | **Recent colours in the wheel:** the three colours you chose last carry a small white dot (VoiceOver: "recent"); the wheel opens on the middle of the current and recent colours when they all fit in the full-size centre, else on the current one | built (round 27, no answer) |
 | F22 | **Time-aware switch-on:** switching the lamp on from off (tap, double tap, VoiceOver) after dark brings back your own last evening light, in daylight your last daytime one; remembered only from your changes that reached the lamp, never the bedside night light or an automation; toggle "Light by time of day" | built (round 28, no answer) |
 | F23 | **Arrival in your evening light:** the arrival light (F16) comes on at your remembered evening light (F22) instead of a fixed 60 % (only with "Light by time of day" on), and still 25 % 2200 K inside the wind-down | built (round 29, no answer) |
-| F24 | **Double tap answers the note:** while a note with a button shows (Undo, Restart), double tap presses that button instead of toggling the lamp, as watchOS's double tap presses the primary button on screen | proposed (round 29) |
+| F24 | **Double tap answers the note:** while a note with a button shows (Undo, Restart), double tap presses that button instead of toggling the lamp, as watchOS's double tap presses the primary button on screen; a ringing alarm still comes first; not in always-on (the note is not seen there) | built (round 30, no answer) |
+| F25 | **Lamp panel closes with the wrist:** lowering the wrist (the app leaves the front) closes the lamp panel, so the next raise shows the face, as Control Center does; never while a finger is on it | proposed (round 30) |
 
 ## Iterations
 
@@ -602,3 +603,15 @@ multipath indoors).
 - **Prototype:** no visual change (the arrival has no screen of its own beyond the note); not republished.
 - **Verified:** rule by unit tests (CI). **Needs the real watch:** as F16.
 - **Proposed:** F24 double tap answers the note.
+
+### 39 · 2026-11-27 — round 30: F24 built (unanswered → approved; watch app change, install after recording)
+- **F24** (own commit): `FaceRules.doubleTap` gained `noteButton`, checked right after a ringing alarm (tested: the
+  note's button wins over the lamp, also on the bedside clock; the alarm wins over the note; nothing in always-on).
+  The face passes "a note with a button is up"; the action is the same closure as tapping the button, with the
+  click haptic.
+- **Review:** after a double tap switched the lamp on, the "Lamp on" note's Undo is the toggle back, so a second
+  double tap within 3 s still does what a double tap did before. On the bedside clock a double tap used to do
+  nothing; with a night-light note up it now undoes the night light, which is what the visible button says.
+- **Prototype:** has no double tap; not republished.
+- **Verified:** rule by unit tests (CI). **Needs the real watch:** double tap is watchOS 11+ on watches that have it.
+- **Proposed:** F25 lamp panel closes with the wrist.
