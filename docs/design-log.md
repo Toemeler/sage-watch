@@ -63,6 +63,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F24 | **Double tap answers the note:** while a note with a button shows (Undo, Restart), double tap presses that button instead of toggling the lamp, as watchOS's double tap presses the primary button on screen; a ringing alarm still comes first; not in always-on (the note is not seen there) | built (round 30, no answer) |
 | F25 | **Lamp panel closes with the wrist:** lowering the wrist (the app leaves the front) closes the lamp panel, so the next raise shows the face, as Control Center does; never while a finger is on it (then right after the touch ends) | built (round 31, no answer) |
 | F26 | **Night cap:** between your usual bedtime and wake (learned night), the slider and the crown stop at 30 % with a click and the stretch of the real top; a second push from the cap (a new drag starting there, or a crown turn after resting there ½ s) goes higher; switching on at night comes on at most 30 %; a light set brighter before is never pulled down; night changes are not remembered as the evening light (F22); toggle "Night cap" | built (round 42, no answer) |
+| F27 | **Adaptive white (like Apple Home's Adaptive Lighting):** while the lamp is on in white, its colour temperature follows the day by itself: warm in the morning, cooler around midday (~4000 K), warm again from sunset, candle-warm (2200 K) in the wind-down; small steps every few minutes, never touching brightness or a colour. Any white or colour you choose yourself stops it until the lamp is next switched off | proposed (round 46) |
 
 ## Iterations
 
@@ -815,3 +816,13 @@ multipath indoors).
   "Check again"; a slower poll would delay that).
 - **Prototype:** the music switch already shows the steady state; no change.
 - **Verified:** rule by unit tests (CI). **Needs the real watch:** that the bars no longer blink during a long song.
+
+### 55 · 2026-11-27 — round 46: the iPhone end, and the next idea (docs only, no new build)
+- **Review:** the iPhone side of a lamp change (`WizClient`): set and status already go to all three bulbs at once
+  (task group), each with 0.5 s timeouts and two retries, and a set that reaches no bulb falls back to a status — no
+  latency to win there.
+- **Research:** Apple Home's Adaptive Lighting shifts a bulb's colour temperature through the day — warmer in the
+  morning, cooler at midday, warmer again in the evening — and choosing a colour or temperature by hand stops it.
+  Sage already has the evening half (wind-down) and the morning half (sunrise); the day between is a fixed white.
+- **Proposed:** F27 adaptive white (built next round if unanswered).
+- No app change: build 112 is current.
