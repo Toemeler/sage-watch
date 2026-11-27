@@ -144,6 +144,9 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
             DispatchQueue.main.async {
                 guard let self else { return }
                 if let error { self.starting = false; self.setError("Health access: \(error.localizedDescription)"); return }
+                if self.store.authorizationStatus(for: HKObjectType.workoutType()) == .sharingDenied {
+                    self.setError("Health: workouts are off for Sage, so no heart rate. iPhone: Settings › Health › Data Access & Devices › Sage.")
+                }
                 self.beginSession()
             }
         }

@@ -14,6 +14,9 @@ final class WatchGuard: ObservableObject {
 
     @Published private(set) var batteryWarnedAt: Date?
     @Published private(set) var stalledAt: Date?
+    /// Record runs but no heart rate arrives: Health access is off (once per run)
+    @Published private(set) var heartMissingAt: Date?
+    private var heartWarnedRun: Date?
 
     private var loop: Task<Void, Never>?
     private var lastCount = -1
@@ -39,6 +42,13 @@ final class WatchGuard: ObservableObject {
     private func check(now: Date) {
         let rec = Recorder.shared
         // F19: motion samples are counted every 10 s while recording; no change for 10 min is a stall
+        if FaceRules.heartMissing(running: rec.isRunning, sinceStart: rec.startedAt.map { now.timeIntervalSince($0) },
+                                  heartSamples: rec.heartSamples), heartWarnedRun != rec.startedAt,
+           FaceMode.auto(now) != .sleeping {                 // never tap you awake for it: it waits for the morning
+            heartWarnedRun = rec.startedAt
+            WKInterfaceDevice.current().play(.click)
+            heartMissingAt = now
+        }
         if rec.motionSamples != lastCount { lastCount = rec.motionSamples; lastChange = now; stallWarned = false }
         if !stallWarned, FaceRules.recordingStalled(keepRunning: rec.keepRunning,
                                                     sinceStart: rec.startedAt.map { now.timeIntervalSince($0) },

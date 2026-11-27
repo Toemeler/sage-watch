@@ -50,6 +50,15 @@ enum FaceRules {
         return s >= 0 && s < musicGrace
     }
 
+    /// no heart rate at all this long into a run means Sage cannot read it (Health access off, e.g. after a reinstall;
+    /// watchOS does not tell an app that reading is denied, the samples just never come)
+    static let heartMissingAfter: TimeInterval = 180
+
+    static func heartMissing(running: Bool, sinceStart: TimeInterval?, heartSamples: Int) -> Bool {
+        guard running, let s = sinceStart else { return false }
+        return s >= heartMissingAfter && heartSamples == 0
+    }
+
     /// a pause longer than this starts a new crown gesture
     static let gesturePause: TimeInterval = 1.5
 

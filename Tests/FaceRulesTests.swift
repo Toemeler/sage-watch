@@ -63,6 +63,13 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertFalse(FaceRenderer.criticalBattery(nil, charging: false))
     }
 
+    func testHeartMissingOnlyAfterThreeQuietMinutes() {
+        XCTAssertTrue(FaceRules.heartMissing(running: true, sinceStart: 200, heartSamples: 0))
+        XCTAssertFalse(FaceRules.heartMissing(running: true, sinceStart: 60, heartSamples: 0))     // just started
+        XCTAssertFalse(FaceRules.heartMissing(running: true, sinceStart: 600, heartSamples: 40))   // beats coming
+        XCTAssertFalse(FaceRules.heartMissing(running: false, sinceStart: nil, heartSamples: 0))
+    }
+
     func testCrownDoesNothingWhileAsleep() {
         XCTAssertEqual(FaceRules.crownAction(delta: 20, sleeping: true), .none)
         XCTAssertEqual(FaceRules.crownAction(delta: -20, sleeping: true), .none)

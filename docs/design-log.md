@@ -1029,3 +1029,16 @@ multipath indoors).
   system's glass itself. Prototype: a glass stand-in (blur, translucency, light rim) on the note and lamp pills.
 - **Verified:** CI build. **Needs the real watch:** the note's legibility on glass over the busy dial (if weak, the
   glass gets a dark tint next round).
+
+### 73 · 2026-11-27 — no heart rate since the reinstall (Tom's evening export, 18:00–23:33)
+- **Found:** from 17:21 no heart sample at all (no hr.csv, heart_samples 0 in every status line), while motion was
+  recorded normally. The heart-rate code did not change (only the barometer clock fix touched the recorder). The
+  same export shows the watch's Motion permission at "not determined" at 17:21, then "denied", then "authorized":
+  a fresh install reset Sage's permissions, and Health access with them. watchOS does not tell an app that reading
+  heart rate is denied — the samples simply never come, silently.
+- **Changed:** `FaceRules.heartMissing` (tested): a run 3 min old with no heart sample → one click and "No heart
+  rate · allow Health" (8 s), once per run, never during a sleep block (it waits for the morning); the menu says
+  where to switch it on (iPhone: Settings › Health › Data Access & Devices › Sage). At start the recorder checks the
+  one permission it can read (sharing workouts) and says so when it is off.
+- **Tom to do now:** turn on Heart Rate and Workouts for Sage in the iPhone's Health settings, then stop and start
+  Record. **Needs the real watch:** that heart rate comes back after that.

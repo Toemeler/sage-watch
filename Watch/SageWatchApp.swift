@@ -208,6 +208,10 @@ struct FaceScreen: View {
         .onChange(of: guardian.batteryWarnedAt) { _, t in
             if t != nil { showNapNote("Charge for the alarm") }
         }
+        // no heart rate is arriving: almost always Health access (reset by a reinstall)
+        .onChange(of: guardian.heartMissingAt) { _, t in
+            if t != nil { showNapNote("No heart rate · allow Health", seconds: 8) }
+        }
         // F19: Record is on but nothing is being written: say so, with a one-tap restart
         .onChange(of: guardian.stalledAt) { _, t in
             if t != nil {

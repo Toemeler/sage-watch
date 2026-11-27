@@ -24,6 +24,12 @@ struct RecorderControls: View {
                 if recorder.isRunning {
                     row("Since", recorder.startedAt.map { $0.formatted(date: .omitted, time: .shortened) } ?? "–")
                     row("Heart", recorder.bpm.map { "\($0) bpm" } ?? "waiting…")
+                    if FaceRules.heartMissing(running: recorder.isRunning,
+                                              sinceStart: recorder.startedAt.map { Date().timeIntervalSince($0) },
+                                              heartSamples: recorder.heartSamples) {
+                        Text("No heart rate arrives. On the iPhone: Settings › Health › Data Access & Devices › Sage — turn on Heart Rate and Workouts, then stop and start Record.")
+                            .font(.footnote).foregroundStyle(.orange)
+                    }
                     row("Heart samples", "\(recorder.heartSamples)")
                     row("Motion samples", "\(recorder.motionSamples)")
                 }
