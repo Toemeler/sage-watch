@@ -58,7 +58,8 @@ struct FaceScreen: View {
     @State private var napNoteTask: Task<Void, Never>?
     @State private var napLength: Double?            // F17: while the nap note shows, the crown sets the nap's length
     @State private var napEditFrom = Date.distantFuture
-    @State private var noteUndo: (() -> Void)?        // what Undo on the current note does (nil: no Undo)
+    @State private var noteUndo: (() -> Void)?
+    @State private var noteActionLabel = "Undo"      // the note's button: Undo, or Restart (F19)        // what Undo on the current note does (nil: no Undo)
     @Environment(\.scenePhase) private var phase
 
     var body: some View {
@@ -93,7 +94,7 @@ struct FaceScreen: View {
                         if let undo = noteUndo {
                             // a target a sleepy finger can hit: ~44 x 32 pt, not just the word
                             Button { undo(); hideNapNote() } label: {
-                                Text("Undo").font(.system(size: 14, weight: .semibold))
+                                Text(noteActionLabel).font(.system(size: 14, weight: .semibold))
                                     .frame(minWidth: 44, minHeight: 32)
                                     .contentShape(Rectangle())
                             }
@@ -194,6 +195,13 @@ struct FaceScreen: View {
         // F18: a watch that may not last the night says so at bedtime
         .onChange(of: guardian.batteryWarnedAt) { _, t in
             if t != nil { showNapNote("Charge for the alarm") }
+        }
+        // F19: Record is on but nothing is being written: say so, with a one-tap restart
+        .onChange(of: guardian.stalledAt) { _, t in
+            if t != nil {
+                // a warning with an action gets 8 s, not the 3 s of a confirmation; the menu's Record switch remains
+                showNapNote("Recording stopped", undo: { recorder.restart(); guardian.restarted() }, action: "Restart", seconds: 8)
+            }
         }
         .onAppear { lamp.refresh(force: true); audio.refresh(force: true); guardian.start() }
         .onChange(of: phase) { _, p in
@@ -305,20 +313,21 @@ struct FaceScreen: View {
         keepNote(Self.napText(next))
     }
 
-    private func showNapNote(_ text: String, undo: (() -> Void)? = nil) {
+    private func showNapNote(_ text: String, undo: (() -> Void)? = nil, action: String = "Undo", seconds: Double = 3) {
         napLength = nil                          // any other note ends the nap-length editing
         noteUndo = undo
-        keepNote(text)
+        noteActionLabel = action
+        keepNote(text, seconds: seconds)
     }
 
     /// show `text` and (re)start the note's 3 s
-    private func keepNote(_ text: String) {
+    private func keepNote(_ text: String, seconds: Double = 3) {
         napNoteTask?.cancel()
         withAnimation(.easeOut(duration: 0.2)) { napNote = text }
         // the note is gone in 3 s, before VoiceOver would reach it by swiping: read it out as it appears
         AccessibilityNotification.Announcement(text).post()
         napNoteTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
             hideNapNote()
         }

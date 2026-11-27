@@ -30,9 +30,11 @@ enum FaceRules {
 
     /// F19: is the recording stalled? Record is on, the run (if any) began more than 2 min ago (a normal start or
     /// restart is not a stall), and nothing has been written for 10 min. `sinceStart` nil: not running although
-    /// Record is on, which counts once the 10 min have passed too.
-    static func recordingStalled(keepRunning: Bool, sinceStart: TimeInterval?, sinceLastSample: TimeInterval) -> Bool {
-        guard keepRunning else { return false }
+    /// Record is on, which counts once the 10 min have passed too. Never during a sleep block: a tap at 3 am would
+    /// wake you, and only the smart wake may do that; it is reported when the block ends.
+    static func recordingStalled(keepRunning: Bool, sinceStart: TimeInterval?, sinceLastSample: TimeInterval,
+                                 sleeping: Bool = false) -> Bool {
+        guard keepRunning, !sleeping else { return false }
         if let s = sinceStart, s < 120 { return false }
         return sinceLastSample >= stallSeconds
     }

@@ -65,6 +65,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
     private var builder: HKLiveWorkoutBuilder?
     private var starting = false
     private var recovering = false
+    private var restartWhenStopped = false
     private var segment: String?
 
     private let motion = CMMotionManager()
@@ -183,6 +184,13 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         startPressureAndStatus()
         startHeartQuery(since: now)
         markRunning(since: now)
+    }
+
+    /// F19: stop and start again (a stalled run). The new run opens new files; nothing recorded is lost.
+    func restart() {
+        guard session != nil || isRunning else { start(); return }
+        restartWhenStopped = true
+        stop()
     }
 
     /// Ends the run; the workout is saved to (or discarded from) Health and the last chunks are sent.
@@ -584,6 +592,10 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         startedAt = nil
         bpm = nil
         if wasRunning { NotificationCenter.default.post(name: .recorderStateChanged, object: self) }
+        if restartWhenStopped {
+            restartWhenStopped = false
+            DispatchQueue.main.async { self.start() }
+        }
     }
 
     private func markRunning(since: Date) {

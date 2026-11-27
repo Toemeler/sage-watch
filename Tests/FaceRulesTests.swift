@@ -31,6 +31,7 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertFalse(FaceRules.recordingStalled(keepRunning: false, sinceStart: nil, sinceLastSample: 9999))  // Record off
         XCTAssertFalse(FaceRules.recordingStalled(keepRunning: true, sinceStart: 60, sinceLastSample: 9999))    // just started
         XCTAssertTrue(FaceRules.recordingStalled(keepRunning: true, sinceStart: nil, sinceLastSample: 700))     // stopped by itself
+        XCTAssertFalse(FaceRules.recordingStalled(keepRunning: true, sinceStart: 3600, sinceLastSample: 9999, sleeping: true))  // not at night
     }
 
     func testCrownDoesNothingWhileAsleep() {
