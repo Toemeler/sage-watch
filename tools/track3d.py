@@ -106,7 +106,7 @@ def build(d: Path):
     p_pres, _ = pick(d, "phonepressure", "pressure")
     p_abs, _ = pick(d, "phonealtitude", "altitude")
     steps = load(p_steps, [0, 1, 2, 3, 4]) if p_steps else None
-    head = load(p_head, [0, 1]) if p_head else None
+    head = load(p_head, [0, 1, 2, 3, 4, 5]) if p_head else None
     pres = load(p_pres, [0, 2]) if p_pres else None
     absalt = load(p_abs, [0, 1, 2]) if p_abs else None
     starts = [a[0, 0] for a in (allfix, steps, head, pres) if a is not None]
@@ -198,13 +198,50 @@ def build(d: Path):
                     gacc[i] = row[4]
                     gcourse[i] = row[7] if row[7] >= 0 and row[6] > 0.6 else np.nan
 
-    # ---------- heading offset (device -> walking direction), learned outdoors
-    offset_deg = 0.0
+    # ---------- heading offset (device -> walking direction), learned outdoors, per pocket period
+    # A phone in a pocket keeps a fixed offset between where it points and where you walk, until it is taken out and
+    # put back. Re-pocketings show as a jump of the phone's orientation (its z axis turning > 45 deg within 10 s);
+    # each period between them gets its own offset from its own GPS walks. (Not for the watch: a wrist turns all the
+    # time, so it keeps one offset for the day.)
     both = ~np.isnan(hdg) & ~np.isnan(gcourse) & (dist > 0.4) & (gacc < 15)
-    if both.sum() >= 30:
-        delta = (gcourse[both] - hdg[both]) % 360
-        offset_deg = circ_mean(delta)
-    walk_dir = (hdg + offset_deg) % 360
+    bounds = [0]
+    if head is not None and head_name == "phoneheading" and head.shape[1] >= 6:
+        q = head[:, 2:6]
+        zx = 2 * (q[:, 1] * q[:, 3] + q[:, 0] * q[:, 2]); zy = 2 * (q[:, 2] * q[:, 3] - q[:, 0] * q[:, 1])
+        zz = 1 - 2 * (q[:, 1] ** 2 + q[:, 2] ** 2)
+        sec = np.floor(head[:, 0] - t[0]).astype(int)
+        ok = (sec >= 0) & (sec < n)
+        Z = np.zeros((n, 3)); C = np.zeros(n)
+        np.add.at(Z, sec[ok], np.column_stack([zx, zy, zz])[ok]); np.add.at(C, sec[ok], 1)
+        have = C > 0
+        Z[have] /= np.linalg.norm(Z[have], axis=1, keepdims=True)
+        last = -999
+        for i in range(10, n):
+            if have[i] and have[i - 10]:
+                ang = math.degrees(math.acos(max(-1.0, min(1.0, float(Z[i] @ Z[i - 10])))))
+                if ang > 45 and i - last > 30:
+                    bounds.append(i); last = i
+    bounds.append(n)
+    periods = []
+    for a_, b_ in zip(bounds[:-1], bounds[1:]):
+        m = both[a_:b_]
+        if m.sum() >= 30:
+            delta = (gcourse[a_:b_][m] - hdg[a_:b_][m]) % 360
+            periods.append([a_, b_, circ_mean(delta), True])
+        else:
+            periods.append([a_, b_, None, False])
+    learned = [p for p in periods if p[3]]
+    borrowed = []
+    for p in periods:
+        if not p[3] and learned:
+            near = min(learned, key=lambda L: min(abs(L[0] - p[1]), abs(L[1] - p[0])))
+            p[2] = near[2]
+            borrowed.append(p)
+    offset_s = np.zeros(n)
+    for a_, b_, off, _ in periods:
+        offset_s[a_:b_] = off if off is not None else 0.0
+    offset_deg = circ_mean(np.array([p[2] for p in learned])) if learned else 0.0
+    walk_dir = (hdg + offset_s) % 360
 
     # ---------- Kalman filter (state x, y) + RTS smoother
     x = np.zeros((n, 2)); P = np.zeros((n, 2, 2))
@@ -254,6 +291,9 @@ def build(d: Path):
         have |= near <= 30
     src = np.where(~have, "gap", np.where(~np.isnan(gx) & (gacc < 15), "gps", np.where(dist > 0, "steps", "still")))
     warnings = []
+    for p in borrowed:
+        warnings.append(f"pocket period {p[0]//60:.0f}–{p[1]//60:.0f} min after start had no GPS walk: its direction "
+                        f"is borrowed from the nearest period and may be off")
     if both.sum() < 30 and head is not None:
         warnings.append("no GPS walk to learn the pocket/wrist heading offset: the path's shape is right but it may be "
                         "rotated; the map orientation is not known")
@@ -262,7 +302,8 @@ def build(d: Path):
     if pres is None:
         warnings.append("no barometer: height and floors come from GPS only and are coarse")
     return dict(t=t, x=xs[:, 0], y=xs[:, 1], lat=lat, lon=lon, alt=alt_s, floor=floor, hacc=hacc,
-                src=src, dist=dist, offset=offset_deg, steps_src=steps_name, head_src=head_name, warnings=warnings)
+                src=src, dist=dist, offset=offset_deg, steps_src=steps_name, head_src=head_name, warnings=warnings,
+                pocket_periods=[(int(p[0]), int(p[1]), None if p[2] is None else round(p[2], 1), p[3]) for p in periods])
 
 
 def write(r, out: Path):
@@ -307,7 +348,9 @@ def summary(r):
            "gps_share": float(np.mean(r["src"] == "gps")), "heading_offset_deg": r["offset"],
            "median_h_acc_m": float(np.median(r["hacc"][r["src"] != "gap"])) if (r["src"] != "gap").any() else None,
            "steps_from": r["steps_src"], "heading_from": r["head_src"],
-           "gap_minutes": float((r["src"] == "gap").sum() / 60), "warnings": r["warnings"]}
+           "gap_minutes": float((r["src"] == "gap").sum() / 60), "warnings": r["warnings"],
+           "pocket_periods": [{"from_min": a // 60, "to_min": b // 60, "offset_deg": o, "learned": l}
+                              for a, b, o, l in r["pocket_periods"]]}
     if not np.isnan(fl).all():
         out["minutes_per_floor"] = {int(k): float((fl == k).sum() / 60) for k in np.unique(fl[~np.isnan(fl)])}
     return out

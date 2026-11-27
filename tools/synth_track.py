@@ -38,12 +38,20 @@ with open(out / "phonelocation.csv", "w") as f:
         nx, ny = rng.normal(0, 4, 2)
         f.write(f"{t[i]:.3f},{lat[i] + math.degrees(ny / R):.7f},{lon[i] + math.degrees(nx / (R * math.cos(math.radians(lat0)))):.7f},"
                 f"{z[i] + rng.normal(0, 5):.2f},5.0,6.0,{spd[i]:.2f},{course[i] if spd[i] > 0 else -1:.1f},\n")
-# phone heading: device points 35 deg off the walking direction (pocket), compass noise 8 deg
+# phone heading: device points OFF1 deg off the walking direction (pocket), compass noise 8 deg.
+# With --repocket the phone is taken out during the 60 s stand on floor 2 and put back turned: from then on it
+# points OFF2 deg off, and its orientation (quaternion) jumps, as a real re-pocketing does.
+REPOCKET = "--repocket" in sys.argv
+OFF1, OFF2 = 35.0, (110.0 if REPOCKET else 35.0)
+t_re = T0 + 120 + 200 + 60 + 40 + 300 + 30          # middle of the stand on floor 2
 with open(out / "phoneheading.csv", "w") as f:
     f.write("unix_time,heading_deg,qw,qx,qy,qz,ax,ay,az,rx,ry,rz\n")
     for i in range(len(t) - 1):
+        after = t[i] >= t_re
+        off = OFF2 if after else OFF1
+        q = "0.7071,0.7071,0,0" if after else "1,0,0,0"     # tilted 90 deg after re-pocketing
         for k in range(10):
-            f.write(f"{t[i] + k / 10:.3f},{(course[i] - 35 + rng.normal(0, 8)) % 360:.1f},1,0,0,0,0,0,0,0,0,0\n")
+            f.write(f"{t[i] + k / 10:.3f},{(course[i] - off + rng.normal(0, 8)) % 360:.1f},{q},0,0,0,0,0,0\n")
 # steps: cumulative distance with 5 % length error
 with open(out / "phonesteps.csv", "w") as f:
     f.write("unix_time,steps,distance_m,floors_up,floors_down,cadence,pace\n")

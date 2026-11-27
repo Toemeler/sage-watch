@@ -401,3 +401,14 @@ multipath indoors).
   compass, steps/floors, barometer and absolute altitude are present, at the right rate (compass ~10/s), with gaps
   over 2 min, GPS accuracy, compass validity (heading -1 = uncalibrated) and the height range. Tested on a good, a
   deliberately broken (gaps, dead compass) and an old export without position data; it flags each problem.
+
+### 26 · 2026-11-27 — round 17: the phone gets taken out of the pocket (no app change)
+- **Review:** track3d learned one pocket-heading offset for the whole day. Every time the phone is taken out and put
+  back, that offset changes, and every indoor stretch after it would be drawn rotated.
+- **Measured:** a synthetic day with one re-pocketing (35° → 110°): one offset for the day blends to 72° and puts the
+  path **126–212 m** off.
+- **Changed:** re-pocketings are found from the phone's orientation (its z axis turning > 45° within 10 s); each
+  period between them learns its own offset from its own GPS walks; a period without a GPS walk borrows the nearest
+  one and the summary warns about it. Not applied to the watch (a wrist turns constantly).
+- **Result:** the re-pocketing is found at minute 12, offsets 35.0° / 109.9° (true 35 / 110), errors back to 0.6 m
+  outdoors / 3.9 m indoors; the normal day is unchanged.
