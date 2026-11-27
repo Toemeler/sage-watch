@@ -121,7 +121,7 @@ struct DayView: View {
         case .movement:
             ZoomChartScreen(title: kind.title, fullX: range, fullY: 0...300, minSpanY: 10) { x, y in movementChart(d, x: x, y: y) }
         case .battery:
-            ZoomChartScreen(title: kind.title, fullX: range, fullY: 0...100, minSpanY: 5) { x, y in batteryChart(d, x: x, y: y) }
+            ZoomChartScreen(title: kind.title, fullX: range, fullY: 0...100, minSpanY: 5) { x, y in batteryChart(d, x: x, y: y ?? 0...100) }
         }
     }
 
