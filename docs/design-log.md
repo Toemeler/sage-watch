@@ -61,7 +61,7 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F22 | **Time-aware switch-on:** switching the lamp on from off (tap, double tap, VoiceOver) after dark brings back your own last evening light, in daylight your last daytime one; remembered only from your changes that reached the lamp, never the bedside night light or an automation; toggle "Light by time of day" | built (round 28, no answer) |
 | F23 | **Arrival in your evening light:** the arrival light (F16) comes on at your remembered evening light (F22) instead of a fixed 60 % (only with "Light by time of day" on), and still 25 % 2200 K inside the wind-down | built (round 29, no answer) |
 | F24 | **Double tap answers the note:** while a note with a button shows (Undo, Restart), double tap presses that button instead of toggling the lamp, as watchOS's double tap presses the primary button on screen; a ringing alarm still comes first; not in always-on (the note is not seen there) | built (round 30, no answer) |
-| F25 | **Lamp panel closes with the wrist:** lowering the wrist (the app leaves the front) closes the lamp panel, so the next raise shows the face, as Control Center does; never while a finger is on it | proposed (round 30) |
+| F25 | **Lamp panel closes with the wrist:** lowering the wrist (the app leaves the front) closes the lamp panel, so the next raise shows the face, as Control Center does; never while a finger is on it (then right after the touch ends) | built (round 31, no answer) |
 
 ## Iterations
 
@@ -615,3 +615,18 @@ multipath indoors).
 - **Prototype:** has no double tap; not republished.
 - **Verified:** rule by unit tests (CI). **Needs the real watch:** double tap is watchOS 11+ on watches that have it.
 - **Proposed:** F25 lamp panel closes with the wrist.
+
+### 40 · 2026-11-27 — round 31: F25 built, and a stuck touch found (watch app change, install after recording)
+- **F25** (own commit): the panel watches the scene phase; leaving the front closes it (`LampRules.closeOnWristDown`,
+  tested). If a finger was still down, the close happens as soon as that touch has ended.
+- **Found while building it (pre-existing):** a touch the system cancels (a notification, the wrist going down
+  mid-drag) never reaches the gesture's onEnded, so `touching` stayed true for good: the 30 s idle close never
+  fired again and the crown ignored brightness changes until the panel was reopened. Now a `@GestureState` that
+  resets by itself detects the cancel; if onEnded has not run 150 ms after it, the touch is ended without counting
+  as a tap (a cancel must never switch the lamp), the press look springs back, the level a drag had set stays.
+  `release()` runs once per touch.
+- **Prototype:** has no scene phase or system cancels; not republished.
+- **No new proposal this round:** the list has 25 entries, all built or rejected; the next rounds go back to
+  reviewing what is there, and a proposal comes when there is a real gap.
+- **Verified:** rule by unit tests (CI). **Needs the real watch:** the order of onEnded and the gesture-state reset
+  (the 150 ms wait makes either order safe), and that a lowered wrist closes the panel without a flash.

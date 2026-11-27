@@ -539,6 +539,8 @@ struct LampPanel: View {
         withAnimation(.spring(response: 0.5, dampingFraction: 0.55)) { overshoot = 0 }
         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { lifted = false; dragLevel = nil }
         if moved { reveal(holding: false) }
+        // the wrist went down mid-touch: the close that waited for the finger happens now
+        if LampRules.closeOnWristDown(active: phase == .active, touching: false) { dismiss() }
     }
 
     private func release() {
