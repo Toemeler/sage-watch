@@ -839,3 +839,16 @@ multipath indoors).
   wind-down, the 10 min after the alarm).
 - **Prototype:** shows the adaptive white for the current time (07:00/17:00 day).
 - **Verified:** rules by unit tests (CI). **Needs the real watch:** that 300 K steps every 4 min are not noticed.
+
+### 57 · 2026-11-27 — round 48: adaptive white must not drown the night's evidence (watch app change, install after recording)
+- **Review of F27 against everything else:** the contact log kept the last 40 messages, and its most important use
+  is the morning check of last night's background steps (the open question of the whole lamp design). Adaptive
+  white sends a step every 4 min while the white is moving — ~30 a day — all labelled "change (auto)": by evening
+  the night entries would be gone, and the rest indistinguishable. Also, the white now changes by itself with
+  nothing saying why.
+- **Changed:** messages carry their source ("change (adaptive)"); the log keeps 120 and hides adaptive steps by
+  default ("Hide adaptive white" switch at the top); the menu's "Now" says "Adaptive white · 3300 K" after a step
+  (only when no other automation is speaking).
+- **Checked, fine:** F27 with the switch-on memory (only your own changes are remembered), the night cap (no
+  brightness change), arrival (sets a white the next step continues from), deferred retries (superseded by newer).
+- **Verified:** CI build. **Needs the real watch:** nothing new beyond F27 itself.

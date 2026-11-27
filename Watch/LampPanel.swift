@@ -45,6 +45,7 @@ final class LampModel: ObservableObject {
     private var lastCheck = Date.distantPast
     private var pending: [String: Any]?
     private var pendingByUser = true
+    private var pendingSource: String?          // which automation sent it, for the contact log ("adaptive")
     /// an automatic change (sunrise, wind-down, asleep) that could not get through; sent again when the app comes
     /// to the front (the iPhone is reachable for sure then)
     private var deferred: (params: [String: Any], at: Date)?
@@ -98,7 +99,7 @@ final class LampModel: ObservableObject {
     }
 
     /// change the lamps; rapid changes (crown, slider) are coalesced so only the latest goes out
-    func set(_ params: [String: Any], byUser: Bool = true) {
+    func set(_ params: [String: Any], byUser: Bool = true, source: String? = nil) {
         if byUser {
             LampAutomation.shared.userChanged()      // you took over: sunrise / wind-down step aside
             userChangedAt = Date()
@@ -113,6 +114,7 @@ final class LampModel: ObservableObject {
         apply(params)
         pending = params
         pendingByUser = byUser
+        pendingSource = source
         flush()
     }
 
@@ -168,11 +170,11 @@ final class LampModel: ObservableObject {
 
     private func flush() {
         guard !sending, let p = pending else { return }
-        let byUser = pendingByUser
+        let byUser = pendingByUser, source = pendingSource
         pending = nil
         sending = true
         Task {
-            let ok = await send([LampLink.commandKey: LampLink.set, LampLink.paramsKey: p], byUser: byUser)
+            let ok = await send([LampLink.commandKey: LampLink.set, LampLink.paramsKey: p], byUser: byUser, source: source)
             // a failed automatic step is kept for a retry only if nothing newer is waiting behind it
             if !ok && !byUser && pending == nil { deferred = (p, Date()) }
             // F22: a light you set and the lamp took becomes this time of day's memory (never an automatic one,
@@ -188,11 +190,12 @@ final class LampModel: ObservableObject {
 
     /// one message to the iPhone: waits for reachability, retries, then takes the reply in
     @discardableResult
-    private func send(_ message: [String: Any], byUser: Bool = true) async -> Bool {
+    private func send(_ message: [String: Any], byUser: Bool = true, source: String? = nil) async -> Bool {
         inFlight += 1
         defer { inFlight -= 1 }
         let background = WKApplication.shared().applicationState != .active
-        let what = (message[LampLink.commandKey] as? String == LampLink.status ? "check" : "change") + (byUser ? "" : " (auto)")
+        let what = (message[LampLink.commandKey] as? String == LampLink.status ? "check" : "change")
+            + (byUser ? "" : " (\(source ?? "auto"))")
         var lastError = "The iPhone did not answer. Open Sage on the iPhone and retry."
         for attempt in 0..<3 {
             if attempt > 0 { try? await Task.sleep(for: .milliseconds(attempt == 1 ? 300 : 900)) }
@@ -222,7 +225,8 @@ final class LampModel: ObservableObject {
 
     private func note(_ c: Contact) {
         contacts.insert(c, at: 0)
-        if contacts.count > 40 { contacts.removeLast(contacts.count - 40) }
+        // 120: a day of adaptive-white steps (~30) must not push last night's entries out of the log
+        if contacts.count > 120 { contacts.removeLast(contacts.count - 120) }
         if let d = try? JSONEncoder().encode(contacts) { UserDefaults.standard.set(d, forKey: "lampContacts") }
     }
 

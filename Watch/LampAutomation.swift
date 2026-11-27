@@ -288,7 +288,10 @@ final class LampAutomation: ObservableObject {
         let target = LampRules.adaptiveKelvin(minutes: minutes, sunrise: rise, sunset: set)
         let evening = minutes >= set || minutes < rise
         if let p = LampRules.adaptiveStep(current: lamp.state, target: target, paused: adaptivePaused, onlyWarmer: evening) {
-            lamp.set(p, byUser: false)
+            lamp.set(p, byUser: false, source: "adaptive")
+            if activity.isEmpty || activity.hasPrefix("Adaptive white") {
+                activity = "Adaptive white · \(p["temp"] as? Int ?? target) K"      // why the white just changed
+            }
         }
     }
 

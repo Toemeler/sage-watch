@@ -180,9 +180,13 @@ struct LampAutomations: View {
 
 struct LampContactLog: View {
     @ObservedObject private var lamp = LampModel.shared
+    @State private var hideAdaptive = true
 
     var body: some View {
-        List(lamp.contacts) { c in
+        // the adaptive white's daytime steps are many and dull; hidden by default so the night's entries stand out
+        List {
+            Toggle("Hide adaptive white", isOn: $hideAdaptive).font(.footnote)
+            ForEach(lamp.contacts.filter { !hideAdaptive || !$0.what.contains("adaptive") }) { c in
             HStack {
                 Image(systemName: c.ok ? "checkmark.circle.fill" : "xmark.circle.fill")
                     .foregroundStyle(c.ok ? FaceGeometry.Palette.sage : Color(hex: 0xD9503F))
@@ -191,6 +195,7 @@ struct LampContactLog: View {
                     Text("\(c.at.formatted(date: .omitted, time: .standard))\(c.background ? " · background" : "")")
                         .font(.system(size: 11)).foregroundStyle(.secondary)
                 }
+            }
             }
         }
         .navigationTitle("Contact log")
