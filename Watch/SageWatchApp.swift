@@ -80,15 +80,18 @@ struct FaceScreen: View {
                 VStack {
                     Spacer()
                     HStack(spacing: 8) {
-                        Text(note).font(.system(size: 13, weight: .semibold)).foregroundStyle(FaceGeometry.Palette.ivory)
+                        // on the bedside clock the note is red too, so it never lights the room
+                        let night = Self.bedside(Date())
+                        Text(note).font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(night ? FaceRenderer.bedsideRed : FaceGeometry.Palette.ivory)
                         if let undo = noteUndo {
                             Button("Undo") { undo(); hideNapNote() }
                                 .font(.system(size: 13, weight: .semibold)).buttonStyle(.plain)
-                                .foregroundStyle(FaceGeometry.Palette.sageLight)
+                                .foregroundStyle(night ? FaceRenderer.bedsideRed : FaceGeometry.Palette.sageLight)
                         }
                     }
                     .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(Capsule().fill(Color(white: 0.12).opacity(0.95)))
+                    .background(Capsule().fill(Color(white: Self.bedside(Date()) ? 0.05 : 0.12).opacity(0.95)))
                     .padding(.bottom, 18)
                 }
                 .transition(.opacity)
