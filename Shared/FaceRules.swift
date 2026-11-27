@@ -51,15 +51,19 @@ enum FaceRules {
         return .none
     }
 
-    enum DoubleTapAction: Equatable { case none, stopAlarm, toggleLamp, openLamp }
+    enum DoubleTapAction: Equatable { case none, stopAlarm, noteButton, toggleLamp, openLamp }
 
     /// double tap (pinch twice) on the face: toggles the lamp when the watch knows it is at home, otherwise opens
     /// the lamp panel (which says why) rather than switching on from a stale state; nothing during a sleep block,
     /// in always-on or on the bedside clock
     /// While the alarm rings (or a test alarm taps), double tap stops it, as on Apple's own alarms; that takes
     /// precedence over everything else.
-    static func doubleTap(ringing: Bool = false, sleeping: Bool, dimmed: Bool, bedside: Bool, home: Bool) -> DoubleTapAction {
+    /// F24: while a note with a button shows (Undo, Restart), double tap presses that button, as watchOS's double
+    /// tap presses the primary button on screen; only the alarm comes first.
+    static func doubleTap(ringing: Bool = false, noteButton: Bool = false, sleeping: Bool, dimmed: Bool, bedside: Bool,
+                          home: Bool) -> DoubleTapAction {
         if ringing { return .stopAlarm }
+        if noteButton && !dimmed { return .noteButton }
         if sleeping || dimmed || bedside { return .none }
         return home ? .toggleLamp : .openLamp
     }

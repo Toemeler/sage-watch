@@ -244,10 +244,16 @@ struct FaceScreen: View {
     private var alarmActive: Bool { alarm.ringing || alarm.testing }
 
     private func lampDoubleTap() {
-        switch FaceRules.doubleTap(ringing: alarmActive, sleeping: FaceMode.auto(Date()) == .sleeping, dimmed: dimmed,
+        switch FaceRules.doubleTap(ringing: alarmActive, noteButton: napNote != nil && noteUndo != nil,
+                                   sleeping: FaceMode.auto(Date()) == .sleeping, dimmed: dimmed,
                                    bedside: Self.bedside(Date()), home: lamp.home) {
         case .stopAlarm:
             if alarm.ringing { alarm.stop() } else { alarm.stopTest() }
+        case .noteButton:
+            // F24: the same as tapping the note's button (Undo, Restart)
+            WKInterfaceDevice.current().play(.click)
+            noteUndo?()
+            hideNapNote()
         case .toggleLamp:
             WKInterfaceDevice.current().play(.click)
             let on = !lamp.state.on

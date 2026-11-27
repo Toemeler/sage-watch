@@ -47,6 +47,14 @@ final class FaceRulesTests: XCTestCase {
         XCTAssertEqual(FaceRules.doubleTap(sleeping: false, dimmed: false, bedside: true, home: true), .none)
     }
 
+    func testDoubleTapPressesTheNotesButton() {
+        XCTAssertEqual(FaceRules.doubleTap(noteButton: true, sleeping: false, dimmed: false, bedside: false, home: true), .noteButton)
+        XCTAssertEqual(FaceRules.doubleTap(noteButton: true, sleeping: false, dimmed: false, bedside: true, home: true), .noteButton)
+        XCTAssertEqual(FaceRules.doubleTap(ringing: true, noteButton: true, sleeping: false, dimmed: false, bedside: false, home: true), .stopAlarm)
+        XCTAssertEqual(FaceRules.doubleTap(noteButton: true, sleeping: false, dimmed: true, bedside: false, home: true), .none)  // not seen
+        XCTAssertEqual(FaceRules.doubleTap(noteButton: false, sleeping: false, dimmed: false, bedside: false, home: true), .toggleLamp)
+    }
+
     func testDoubleTapStopsARingingAlarmFirst() {
         // ringing in the morning window: still a "sleep block" for the face, but double tap must stop the alarm
         XCTAssertEqual(FaceRules.doubleTap(ringing: true, sleeping: true, dimmed: true, bedside: false, home: true), .stopAlarm)
