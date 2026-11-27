@@ -3,6 +3,14 @@ import XCTest
 
 /// The recorder's file format: per-second motion summary, time filtering, stream names and export ranges.
 final class RecordingFormatTests: XCTestCase {
+    func testCoreMotionTimestampsEitherSinceBootOrSince2001() {
+        let now = 1_795_642_846.0, uptime = 200.0
+        // since boot (device motion): plus the boot time
+        XCTAssertEqual(RecordingFormat.unixTime(logTimestamp: uptime, bootOffset: now - uptime), now, accuracy: 1e-6)
+        // since 2001 (the altimeter on watchOS 27): the reference date, not the boot time
+        XCTAssertEqual(RecordingFormat.unixTime(logTimestamp: now - 978_307_200, bootOffset: now - uptime), now, accuracy: 1e-6)
+    }
+
     func testSummaryEmitsOneLinePerSecond() {
         var s = MotionSummarizer()
         var lines: [String] = []

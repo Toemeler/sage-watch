@@ -399,7 +399,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
                     return
                 }
                 guard let self, let d = data else { return }
-                let t = d.timestamp + self.bootOffset
+                let t = RecordingFormat.unixTime(logTimestamp: d.timestamp, bootOffset: self.bootOffset)
                 self.pressureFile?.append("\(RecordingFormat.unix(t)),\(String(format: "%.4f", d.pressure.doubleValue)),\(String(format: "%.2f", d.relativeAltitude.doubleValue))", at: t)
             }
         }
@@ -428,7 +428,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
         headingCount += 1
         guard headingCount >= headingStride, let file = headingFile else { return }
         headingCount = 0
-        let t = d.timestamp + bootOffset
+        let t = RecordingFormat.unixTime(logTimestamp: d.timestamp, bootOffset: bootOffset)
         let q = d.attitude.quaternion, a = d.userAcceleration, r = d.rotationRate
         file.append(PositionFormat.heading(t: t, heading: d.heading, q: (q.w, q.x, q.y, q.z), a: (a.x, a.y, a.z),
                                            r: (r.x, r.y, r.z)), at: t)
@@ -463,7 +463,7 @@ final class Recorder: NSObject, ObservableObject, HKWorkoutSessionDelegate, HKLi
             // sensor time does not tick while the watch sleeps deeply; re-anchor it to the wall clock once a minute
             bootOffset = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime
         }
-        let t = time + bootOffset
+        let t = RecordingFormat.unixTime(logTimestamp: time, bootOffset: bootOffset)
         let f = RecordingFormat.f4
         if let raw = rawFile {
             if let r = rotation {

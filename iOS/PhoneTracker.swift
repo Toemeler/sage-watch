@@ -86,7 +86,7 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
             motion.deviceMotionUpdateInterval = 0.1
             motion.startDeviceMotionUpdates(using: frame, to: queue) { [weak self] d, _ in
                 guard let self, let d else { return }
-                let t = d.timestamp + bootOffset
+                let t = RecordingFormat.unixTime(logTimestamp: d.timestamp, bootOffset: bootOffset)
                 let q = d.attitude.quaternion, a = d.userAcceleration, r = d.rotationRate
                 self.files[PositionFormat.phoneHeading]?.append(
                     PositionFormat.heading(t: t, heading: d.heading, q: (q.w, q.x, q.y, q.z), a: (a.x, a.y, a.z), r: (r.x, r.y, r.z)), t)
@@ -110,7 +110,7 @@ final class PhoneTracker: NSObject, ObservableObject, CLLocationManagerDelegate 
         if CMAltimeter.isRelativeAltitudeAvailable() {
             altimeter.startRelativeAltitudeUpdates(to: queue) { [weak self] d, _ in
                 guard let self, let d else { return }
-                let t = d.timestamp + bootOffset
+                let t = RecordingFormat.unixTime(logTimestamp: d.timestamp, bootOffset: bootOffset)
                 self.files[PositionFormat.phonePressure]?.append(
                     "\(RecordingFormat.unix(t)),\(String(format: "%.4f", d.pressure.doubleValue)),\(String(format: "%.2f", d.relativeAltitude.doubleValue))", t)
             }

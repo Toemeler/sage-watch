@@ -44,6 +44,14 @@ enum RecordingFormat {
     }
 
     static func unix(_ t: Double) -> String { String(format: "%.3f", t) }
+
+    /// a Core Motion log timestamp (CMLogItem.timestamp) in unix seconds. Documented as seconds since boot, and so
+    /// it is for device motion; but the altimeter on watchOS 27 delivers seconds since 2001 (the reference date):
+    /// the watch's barometer was written ~26 years in the future (exports "ending" in 2052). A value past ~9.5
+    /// years of uptime can only be that.
+    static func unixTime(logTimestamp ts: Double, bootOffset: Double) -> Double {
+        ts > 3e8 ? ts + 978_307_200 : ts + bootOffset
+    }
     static func unix(_ d: Date) -> String { unix(d.timeIntervalSince1970) }
     static func f4(_ v: Double) -> String { String(format: "%.4f", v) }
 
