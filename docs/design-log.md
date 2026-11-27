@@ -54,6 +54,8 @@ Direction from Tom: focus on the watch app itself; only the watch's smart wake w
 | F15 | **Walk direction in recordings:** record the compass heading once a second (device motion, magnetic north) alongside the barometer, so walks get a direction and length; with floor changes from the barometer, a change of room shows up in the data (for counting work like beds). Small battery cost; compass is disturbed near metal (bed frames), so direction changes, not absolute bearings, are used | built (Tom asked for full position tracking) |
 | F16 | **Arrival light:** when you come home after dark and the lamp is off, it comes on warm (60 % 2700 K; 25 % 2200 K within an hour of bedtime). "Away" = the iPhone answered "no bulb" at least twice ≥ 20 min apart, and the lamp answers within 30 min of the last one. Never on a lamp that is on, in a sleep block, under the open lamp panel, or within 10 min of your own switch-off. Toggle "Arrival light" | built (round 23, no answer) |
 | F17 | **Nap length on the crown:** after the long turn down starts a nap (F9), the note shows its length ("Nap · up to 100 min") and further turns change it in 5-min steps (4 detents each, 20–130 min, up = longer) while the note is up; each step keeps the note 3 s more | built (round 23, no answer) |
+| F18 | **Battery guard for the alarm:** at your usual bedtime, if the watch is below 30 % and not charging (the recorder and smart wake may not last the night), one quiet tap and the note "Charge for the alarm"; nothing once it is on the charger | proposed (round 24) |
+| F19 | **Recording stopped:** if Record is on but nothing was written for 10 min (a crash, a revoked permission), one tap and the note "Recording stopped · tap to restart"; never during a sleep block's first minutes of a normal restart | proposed (round 24) |
 
 ## Iterations
 
@@ -502,3 +504,22 @@ multipath indoors).
 - **Verified:** rules by unit tests (CI). **Needs the real watch:** whether the watch asks the lamp often enough
   while you are out for "away" to be proven (it asks when the app comes to the front), and how the 4-detent step
   feels on the crown.
+
+### 33 · 2026-11-27 — round 24: what F16/F17 left out (watch app change; install after recording)
+- **Review of last round's features:**
+  - F16 switched the lamp on with nothing on the face and no way back: an automation that switches a light on
+    must say so and be undoable on the spot. The menu's "Now" row also kept "Welcome home" for the rest of the
+    evening.
+  - F17's chosen length was visible for 3 s only; after the note there was nowhere to check it.
+  - The face's notes vanish in 3 s, before VoiceOver reaches them by swiping: VoiceOver users never heard "Nap ·
+    up to 90 min", "Lamp on" or "Welcome home".
+- **Research:** Apple's Feedback guidance for watchOS asks apps to avoid indeterminate progress indicators (people
+  glance; show content). The "Reconnecting…" pill had a spinner over controls that work.
+- **Changed:** "Welcome home · lamp on" note with Undo (Undo counts as your own switch-off, so nothing switches it on
+  again for 10 min); "Now" clears after 10 min (cancellable, so a second arrival is not cleared early); the menu
+  shows "This nap: up to N min" while a nap waits for sleep; every face note is announced to VoiceOver as it
+  appears; the pill shows a static antenna symbol instead of a spinner (Swift and prototype). The "Checking…"
+  spinner stays: with no state known yet there is no content to show instead.
+- **Verified:** CI build. No new decision logic (the arrival rule is unchanged and tested). **Needs the real
+  watch:** that the announcement does not cut into VoiceOver reading something else.
+- **Proposed:** F18 battery guard for the alarm, F19 recording-stopped warning.

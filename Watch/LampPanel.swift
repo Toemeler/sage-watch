@@ -301,8 +301,11 @@ struct LampPanel: View {
     /// not at home, or the iPhone could not reach the lamps: say why, offer a retry
     /// a short drop while the panel is open: controls stay, this says the watch is reaching the lamp again
     private var reconnecting: some View {
+        // a static symbol, not a spinner: the HIG asks watch apps to avoid indeterminate progress indicators, and
+        // the controls under it work (they are what you should look at)
         HStack(spacing: 6) {
-            ProgressView().controlSize(.mini)
+            Image(systemName: "antenna.radiowaves.left.and.right").font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(FaceGeometry.Palette.sageLight)
             Text("Reconnecting…").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white)
         }
         .padding(.horizontal, 10).padding(.vertical, 5)

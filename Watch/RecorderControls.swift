@@ -37,6 +37,9 @@ struct RecorderControls: View {
                 if !alarm.status.isEmpty {
                     Text(alarm.status).font(.footnote)
                 }
+                if alarm.napArmed && alarm.nap == nil {
+                    row("This nap", "up to \(Int(alarm.napLength)) min")     // F17: set on the face with the crown
+                }
                 if alarm.nap != nil || alarm.status.hasPrefix("Nap: waiting") {
                     Button("Cancel nap alarm", role: .destructive) { alarm.cancelNap() }
                 } else {

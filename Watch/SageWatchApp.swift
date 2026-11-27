@@ -185,6 +185,11 @@ struct FaceScreen: View {
         .onChange(of: automation.bedtimeTappedAt) { _, t in
             if t != nil { showNapNote("Bedtime · lamp still bright", undo: nil) }
         }
+        // F16: an automation that switches the lamp on says so, and Undo switches it off again (as your own change:
+        // nothing automatic switches it back on for the next 10 min)
+        .onChange(of: automation.arrivedAt) { _, t in
+            if t != nil { showNapNote("Welcome home · lamp on", undo: { lamp.set(["state": false]) }) }
+        }
         .onAppear { lamp.refresh(force: true); audio.refresh(force: true) }
         .onChange(of: phase) { _, p in
             if p == .active { lamp.refresh(); audio.refresh(force: true); LampAutomation.shared.appBecameActive() }
@@ -305,6 +310,8 @@ struct FaceScreen: View {
     private func keepNote(_ text: String) {
         napNoteTask?.cancel()
         withAnimation(.easeOut(duration: 0.2)) { napNote = text }
+        // the note is gone in 3 s, before VoiceOver would reach it by swiping: read it out as it appears
+        AccessibilityNotification.Announcement(text).post()
         napNoteTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }

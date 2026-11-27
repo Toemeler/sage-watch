@@ -34,6 +34,9 @@ final class LampAutomation: ObservableObject {
     }
     /// when the bedtime tap last fired (the face shows a note for it)
     @Published private(set) var bedtimeTappedAt: Date?
+    /// when the arrival light (F16) last switched the lamp on (the face shows a note with Undo)
+    @Published private(set) var arrivedAt: Date?
+    private var arrivalClear: Task<Void, Never>?
     private var bedtimeTask: Task<Void, Never>?
     /// when the alarm last rang with the sunrise on: full light is sent again when you raise your wrist
     private var rangAt: Date?
@@ -202,7 +205,14 @@ final class LampAutomation: ObservableObject {
                                              sinceUserOff: lamp.userOffAt.map { now.timeIntervalSince($0) },
                                              minutesToBed: bed.at.timeIntervalSince(now) / 60) else { return }
         lamp.set(p, byUser: false)
+        arrivedAt = now
         activity = "Welcome home: lamp on"
+        // the menu's "Now" says what is happening, not what happened an evening ago
+        arrivalClear?.cancel()
+        arrivalClear = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(10 * 60))
+            if !Task.isCancelled, activity == "Welcome home: lamp on" { activity = "" }
+        }
     }
 
     // MARK: try the sunrise (F14)
