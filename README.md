@@ -7,7 +7,7 @@ A test build with only data, no watch face or other design: it gets as much data
   - the batched 800 Hz accelerometer and 200 Hz device motion, on watches that have them
   - barometer, absolute altitude, pedometer (steps, distance, floors, cadence, pace, pause/resume) and motion activity
   - GPS and the compass
-  - every Health sample the watch holds, from 24 h back and then live: about 50 quantity types, 11 category types, heartbeat series with beat-to-beat times, and workouts
+  - every Health sample the watch holds, from 24 h back and then live, limited to what an Apple Watch SE 3 records: 29 quantity types, 10 category types, heartbeat series with beat-to-beat times, and workouts
   - live workout heart rate and energy
   - the watch's own status every 5 s: battery, temperature state, Low Power, Water Lock, wrist, app state, free space
 - **Transfer:** CSV files in 2-minute chunks, compressed, through WatchConnectivity file transfers. They are resent until the iPhone has them. Live values go to the iPhone once a second while it is near.

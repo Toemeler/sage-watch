@@ -558,23 +558,22 @@ final class DataProbe: NSObject, ObservableObject, CLLocationManagerDelegate, HK
 
     // MARK: Health
 
+    /// what an Apple Watch SE 3 records itself (no blood oxygen, ECG/AFib, depth or water temperature; walking
+    /// steadiness, gait and stair speed come from the iPhone; cycling power/cadence need external sensors)
     static let quantityIDs: [HKQuantityTypeIdentifier] = [
         .heartRate, .restingHeartRate, .walkingHeartRateAverage, .heartRateVariabilitySDNN, .heartRateRecoveryOneMinute,
-        .oxygenSaturation, .respiratoryRate, .appleSleepingWristTemperature, .bodyTemperature, .vo2Max,
+        .respiratoryRate, .appleSleepingWristTemperature, .vo2Max,
         .stepCount, .distanceWalkingRunning, .distanceCycling, .distanceSwimming, .swimmingStrokeCount, .flightsClimbed,
         .activeEnergyBurned, .basalEnergyBurned, .appleExerciseTime, .appleStandTime, .appleMoveTime,
-        .environmentalAudioExposure, .headphoneAudioExposure, .environmentalSoundReduction, .timeInDaylight, .physicalEffort,
-        .walkingSpeed, .walkingStepLength, .walkingAsymmetryPercentage, .walkingDoubleSupportPercentage,
-        .stairAscentSpeed, .stairDescentSpeed, .sixMinuteWalkTestDistance, .appleWalkingSteadiness,
+        .environmentalAudioExposure, .headphoneAudioExposure, .timeInDaylight, .physicalEffort,
         .runningSpeed, .runningPower, .runningStrideLength, .runningVerticalOscillation, .runningGroundContactTime,
-        .cyclingSpeed, .cyclingCadence, .cyclingPower, .underwaterDepth, .waterTemperature,
-        .bodyMass, .height, .peripheralPerfusionIndex, .electrodermalActivity, .numberOfTimesFallen, .atrialFibrillationBurden
+        .numberOfTimesFallen
     ]
 
     static let categoryIDs: [HKCategoryTypeIdentifier] = [
         .sleepAnalysis, .appleStandHour, .highHeartRateEvent, .lowHeartRateEvent, .irregularHeartRhythmEvent,
         .mindfulSession, .environmentalAudioExposureEvent, .headphoneAudioExposureEvent, .handwashingEvent,
-        .lowCardioFitnessEvent, .appleWalkingSteadinessEvent
+        .lowCardioFitnessEvent
     ]
 
     private static var quantityTypes: [HKQuantityType] {
