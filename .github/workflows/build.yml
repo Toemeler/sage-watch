@@ -6,7 +6,7 @@ on:
   push:
     branches: [main, data-lab]
     tags: ["v*"]
-    paths-ignore: ["**.md", "LICENSE"]
+    paths-ignore: ["**.md", "LICENSE", "scripts/fetch-ipa.sh"]
   pull_request:
   workflow_dispatch:
 
