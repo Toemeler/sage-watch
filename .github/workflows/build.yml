@@ -1,9 +1,12 @@
 name: Build IPA
 
+# Fast loop: the IPA job does nothing but build and publish (about 2-3 min); the unit tests run in their own job
+# next to it, so a test run (simulator boot + a second build) never delays the IPA.
 on:
   push:
     branches: [main, data-lab]
     tags: ["v*"]
+    paths-ignore: ["**.md", "LICENSE"]
   pull_request:
   workflow_dispatch:
 
@@ -14,64 +17,46 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # quicker builds: no code index, no dSYM bundles (the IPA is for testing, crashes are read on the device)
+  FAST_FLAGS: COMPILER_INDEX_STORE_ENABLE=NO DEBUG_INFORMATION_FORMAT=dwarf CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+
 jobs:
-  build:
+  ipa:
     runs-on: macos-26
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
         run: |
-          # the newest Xcode 26 if the runner has one (watchOS 26 SDK: the system's Liquid Glass look for buttons,
-          # toggles and sheets), else the newest Xcode 16
-          ls -d /Applications/Xcode*.app
+          # the newest Xcode 26 if the runner has one (watchOS 26 SDK), else the newest Xcode 16
           XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
           [ -z "$XC" ] && XC=$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)
-          echo "Using $XC"; sudo xcode-select -s "$XC"; xcodebuild -version
-
-      - name: Install tools
-        run: brew install xcodegen
+          echo "Using $XC"; sudo xcode-select -s "$XC"
 
       - name: Generate project
-        run: xcodegen generate
-
-      - name: Unit tests (iPhone simulator)
-        run: |
-          set -o pipefail
-          SIM=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')))")
-          xcodebuild test -project Sage.xcodeproj -scheme Sage -destination "id=$SIM" \
-            -derivedDataPath build-test CODE_SIGNING_ALLOWED=NO | xcbeautify
+        run: brew install -q xcodegen && xcodegen generate --quiet
 
       - name: Build iPhone app with embedded watch app (unsigned)
         run: |
           set -o pipefail
           xcodebuild -project Sage.xcodeproj -scheme Sage -configuration Release \
             -destination 'generic/platform=iOS' -derivedDataPath build \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | xcbeautify
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} $FAST_FLAGS build | xcbeautify --quiet
 
-      - name: Package IPA (entitlements via ldid, re-signed by SideStore on install)
+      - name: Package IPA (ad-hoc signed with entitlements, re-signed by SideStore on install)
         run: |
           set -e
           APP=build/Build/Products/Release-iphoneos/Sage.app
-          test -d "$APP"
           WATCH="$APP/Watch/SageWatch.app"
-          if [ -d "$WATCH" ]; then echo "watch app embedded"; else echo "::error::watch app not embedded"; exit 1; fi
+          test -d "$WATCH" || { echo "::error::watch app not embedded"; exit 1; }
           python3 scripts/check_platform.py "$WATCH/SageWatch"
-          lipo -info "$WATCH/SageWatch"
-          # ad-hoc sign inside-out with entitlements (ldid crashes on arm64_32); SideStore re-signs on install
           codesign -f -s - --entitlements Watch/SageWatch.entitlements "$WATCH"
           codesign -f -s - --entitlements iOS/Sage.entitlements "$APP"
-          codesign -d --entitlements - "$WATCH" | tail -5
           mkdir -p out/Payload && cp -R "$APP" out/Payload/
           (cd out && zip -qry Sage.ipa Payload)
-          ls -la out
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Sage-ipa
-          path: out/Sage.ipa
+          ls -la out/Sage.ipa
 
       - name: Publish release
         if: github.event_name != 'pull_request'
@@ -82,4 +67,32 @@ jobs:
           TAG="v${VER}-build.${{ github.run_number }}"
           PRE="--prerelease"
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then TAG="${GITHUB_REF#refs/tags/}"; PRE=""; fi
-          gh release create "$TAG" out/Sage.ipa --title "Sage $TAG" $PRE --notes-file RELEASE_NOTES.md
+          gh release create "$TAG" out/Sage.ipa --title "Sage $TAG" $PRE --target "${GITHUB_SHA}" --notes-file RELEASE_NOTES.md
+
+      - if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sage-ipa
+          path: out/Sage.ipa
+
+  tests:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -z "$XC" ] && XC=$(ls -d /Applications/Xcode_16*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC"
+
+      - name: Generate project
+        run: brew install -q xcodegen && xcodegen generate --quiet
+
+      - name: Unit tests (iPhone simulator)
+        run: |
+          set -o pipefail
+          SIM=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')))")
+          xcodebuild test -project Sage.xcodeproj -scheme Sage -destination "id=$SIM" \
+            -derivedDataPath build-test $FAST_FLAGS | xcbeautify
