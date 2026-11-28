@@ -2,7 +2,7 @@ name: Build IPA
 
 on:
   push:
-    branches: [main]
+    branches: [main, data-lab]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -58,11 +58,9 @@ jobs:
           test -d "$APP"
           WATCH="$APP/Watch/SageWatch.app"
           if [ -d "$WATCH" ]; then echo "watch app embedded"; else echo "::error::watch app not embedded"; exit 1; fi
-          test -d "$WATCH/PlugIns/SageComplications.appex" && echo "complications embedded" || { echo "::error::complications not embedded"; ls -R "$WATCH" | head -40; exit 1; }
           python3 scripts/check_platform.py "$WATCH/SageWatch"
           lipo -info "$WATCH/SageWatch"
           # ad-hoc sign inside-out with entitlements (ldid crashes on arm64_32); SideStore re-signs on install
-          codesign -f -s - "$WATCH/PlugIns/SageComplications.appex"
           codesign -f -s - --entitlements Watch/SageWatch.entitlements "$WATCH"
           codesign -f -s - --entitlements iOS/Sage.entitlements "$APP"
           codesign -d --entitlements - "$WATCH" | tail -5

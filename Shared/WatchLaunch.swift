@@ -1,14 +1,12 @@
 import HealthKit
 
-/// The iPhone opens Sage on the watch through HealthKit's "start watch app", which hands the watch a workout
-/// configuration. Its location type says why: indoor = start recording, unknown = keep Sage awake for live breathing.
+/// The iPhone opens the app on the watch through HealthKit's "start watch app", which hands the watch a workout
+/// configuration; the watch then starts the probe (its workout session keeps it running in the background).
 enum WatchLaunch {
-    static func configuration(live: Bool) -> HKWorkoutConfiguration {
+    static func configuration() -> HKWorkoutConfiguration {
         let c = HKWorkoutConfiguration()
         c.activityType = .mindAndBody
-        c.locationType = live ? .unknown : .indoor
+        c.locationType = .indoor
         return c
     }
-
-    static func isLive(_ c: HKWorkoutConfiguration) -> Bool { c.locationType == .unknown }
 }

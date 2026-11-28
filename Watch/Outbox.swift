@@ -1,7 +1,7 @@
 import Foundation
 import WatchConnectivity
 
-/// Sends finished recording files to the iPhone through WatchConnectivity.
+/// Sends finished probe files to the iPhone through WatchConnectivity, and takes the iPhone's probe commands.
 ///
 /// A file stays in `Documents/Outbox/<segment>/` until the iPhone confirms it, so nothing is lost when the phone is
 /// out of reach; anything left over is sent again when the session activates or when you tap "Send now".
@@ -60,7 +60,7 @@ final class Outbox: NSObject, ObservableObject, WCSessionDelegate {
         }
     }
 
-    /// Ships every file left in `live` (a recording that ended without closing its files), except the running segment.
+    /// Ships every file left in `live` (a run that ended without closing its files), except the running segment.
     func shipLeftovers(in live: URL, except running: String?) {
         queue.async {
             let fm = FileManager.default
@@ -113,84 +113,18 @@ final class Outbox: NSObject, ObservableObject, WCSessionDelegate {
     // MARK: WCSessionDelegate
 
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        if activationState == .activated {
-            resendAll()
-            Self.apply(session.receivedApplicationContext)
-        }
+        if activationState == .activated { resendAll() }
     }
 
-    // the iPhone's live breathing screen asks for the motion stream (and repeats the request while it is open)
-    // ...and the alarm screen sends tests, previews and stops (handled on the main queue, where the alarm lives)
+    /// the iPhone's probe buttons (start, stop, send files, status)
     func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
-        if message[AlarmLink.commandKey] != nil {
-            DispatchQueue.main.async { replyHandler(SmartAlarm.shared.handle(message)) }
-            return
-        }
-        replyHandler(handleLive(message))
+        guard let command = message[ProbeLink.commandKey] as? String else { replyHandler([:]); return }
+        DispatchQueue.main.async { replyHandler(DataProbe.shared.handle(command)) }
     }
 
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        if message[AlarmLink.commandKey] != nil {
-            DispatchQueue.main.async { _ = SmartAlarm.shared.handle(message) }
-            return
-        }
-        _ = handleLive(message)
-    }
-
-    /// the alarm settings and the last night's summary, sent whenever they change on the iPhone (they arrive even
-    /// while Sage was not running)
-    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
-        Self.apply(applicationContext)
-    }
-
-    static let lastSleepKey = "lastSleep"
-
-    /// F28: a Track position change made on the iPhone (newer than this watch's own last change)
-    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
-        Self.followPosition(userInfo)
-    }
-
-    static func followPosition(_ message: [String: Any]) {
-        guard let c = PositionSync.change(in: message),
-              PositionSync.shouldFollow(remoteAt: c.at, localAt: PositionSync.localChangedAt) else { return }
-        DispatchQueue.main.async {
-            PositionSync.localChangedAt = c.at
-            if Recorder.shared.trackPosition != c.on { Recorder.shared.trackPosition = c.on }
-        }
-    }
-
-    static func apply(_ context: [String: Any]) {
-        followPosition(context)
-        if let d = context[AlarmLink.settingsKey] as? [String: Any] {
-            AlarmSettings(dictionary: d).save()
-            DispatchQueue.main.async { SmartAlarm.shared.scheduleNext() }
-        }
-        if let t = TypicalSleep(dictionary: context["typicalSleep"] as? [String: Any]) {
-            DispatchQueue.main.async {
-                Plan.typical = t
-                LampAutomation.shared.rescheduleWindDown()     // the lamp dims before your usual bedtime and nap
-            }
-        }
-        if let s = LastSleepSummary(dictionary: context[lastSleepKey] as? [String: Any]),
-           let data = try? JSONEncoder().encode(s) {
-            UserDefaults.standard.set(data, forKey: lastSleepKey)
-            DispatchQueue.main.async { FaceMode.lastSleep = s }
-        }
-    }
-
-    /// the last night's summary saved from the iPhone's last message
-    static func loadLastSleep() {
-        guard let data = UserDefaults.standard.data(forKey: lastSleepKey),
-              let s = try? JSONDecoder().decode(LastSleepSummary.self, from: data) else { return }
-        FaceMode.lastSleep = s
-    }
-
-    private func handleLive(_ message: [String: Any]) -> [String: Any] {
-        guard message[LiveLink.commandKey] as? String == LiveLink.breathing else { return [:] }
-        let on = message[LiveLink.onKey] as? Bool ?? false
-        LiveStreamer.shared.request(on: on)
-        DispatchQueue.main.async { LiveStreamer.shared.keepAwake(on) }
-        return [LiveLink.recordingKey: Recorder.shared.isRunning]
+        guard let command = message[ProbeLink.commandKey] as? String else { return }
+        DispatchQueue.main.async { _ = DataProbe.shared.handle(command) }
     }
 
     func session(_ session: WCSession, didFinish fileTransfer: WCSessionFileTransfer, error: Error?) {

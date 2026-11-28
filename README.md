@@ -1,18 +1,27 @@
-# Sage
+# Sage Data (data-lab branch)
 
-A biphasic-sleep watch face for Apple Watch SE 3 (44 mm) and its iPhone companion.
+A test build with only data, no watch face or other design: it gets as much data as it can off the Apple Watch, sends it to the iPhone, records it there and shows it.
 
-- **Watch:** the Sage face full-screen, drawn 1:1 from the design prototype. Ten modes follow the day and the sleep plan (nap 17:00–18:30, night 00:30–06:30 with smart wake).
-- **iPhone:** Today (24-hour ring), Sleep (night and nap stages), Plan, Faces, Data.
-- **Recorder:** long-press the face → *Record*. A Mind & Body session keeps Sage in front day and night and records heart rate (~5 s), per-second motion, raw motion (up to 100 Hz, optional gyroscope), air pressure and battery. The iPhone's Data tab exports any range as CSV.
+- **Watch:** one screen, the data probe. Switch *Probe* on, or start it from the iPhone. A Mind & Body workout session keeps it recording in the background. The workout is discarded and never saved to Health. It records:
+  - device motion at 50 Hz: acceleration, gravity, rotation, attitude, heading, magnetic field
+  - the batched 800 Hz accelerometer and 200 Hz device motion, on watches that have them
+  - barometer, absolute altitude, pedometer (steps, distance, floors, cadence, pace, pause/resume) and motion activity
+  - GPS and the compass
+  - every Health sample the watch holds, from 24 h back and then live: about 50 quantity types, 11 category types, heartbeat series with beat-to-beat times, and workouts
+  - live workout heart rate and energy
+  - the watch's own status every 5 s: battery, temperature state, Low Power, Water Lock, wrist, app state, free space
+- **Transfer:** CSV files in 2-minute chunks, compressed, through WatchConnectivity file transfers. They are resent until the iPhone has them. Live values go to the iPhone once a second while it is near.
+- **iPhone:** one screen, the data lab:
+  - every live value, with a chart of its history
+  - the wrist's acceleration waveform
+  - a log of every live snapshot, as a JSONL file you can share
+  - every received run, with charts and the newest rows for each stream, and a zip to share
+  - everything is also in Files › On My iPhone › Sage
 
 ## Build
 
-No Mac needed: every push to `main` runs GitHub Actions on macOS. It runs the unit tests, builds an unsigned `Sage.ipa` with the watch app embedded, and attaches it to a release. The Xcode project is generated from `project.yml` by XcodeGen.
+Every push to `data-lab` (and `main`) runs GitHub Actions on macOS. It runs the unit tests, builds an unsigned `Sage.ipa` with the watch app embedded, and attaches it to a release. The Xcode project is generated from `project.yml` by XcodeGen.
 
 ## Install
 
-- **SideStore:** install `Sage.ipa`. The watch app then appears under Watch app → Available Apps. Required for the watch face and for Health data.
-- **LiveContainer:** the iPhone app runs, but iOS cannot deliver the watch app from inside LiveContainer.
-
-Apple does not allow third-party watch faces, so the face is a watch app. Set *Settings → General → Return to App* on the watch so it comes back on wrist raise.
+The app uses the same bundle ID as Sage on `main`, so installing this IPA with SideStore replaces Sage. Install a `main` build to get the face back.

@@ -8,9 +8,9 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    MARKETING_VERSION: "0.4.0"
+    MARKETING_VERSION: "0.5.0"
     CURRENT_PROJECT_VERSION: "1"
-    # unsigned build: the IPA is re-signed on install (Sideloadly / AltStore with a free Apple ID)
+    # unsigned build: the IPA is re-signed on install (SideStore with a free Apple ID)
     CODE_SIGNING_ALLOWED: NO
     CODE_SIGNING_REQUIRED: NO
     CODE_SIGN_IDENTITY: ""
@@ -22,25 +22,18 @@ targets:
     sources:
       - path: iOS
       - path: Shared
-      - path: Resources
     info:
       path: iOS/Info.plist
       properties:
-        CFBundleDisplayName: Sage
+        CFBundleDisplayName: Sage Data
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
-        UIAppFonts: [PlayfairDisplay-Regular.ttf, PlayfairDisplay-Italic.ttf]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIUserInterfaceStyle: Dark
-        NSHealthShareUsageDescription: Sage shows your steps, heart rate and sleep on the watch face and in the app. Nothing leaves your devices.
-        NSHealthUpdateUsageDescription: The watch recorder runs as a Mind & Body session. It is only saved to Health if you turn that on.
+        NSHealthShareUsageDescription: The watch's data probe reads every Health type the watch records, for testing. Nothing leaves your devices.
+        NSHealthUpdateUsageDescription: The watch probe runs as a Mind & Body workout session to keep recording; it is discarded and never saved to Health.
         UIFileSharingEnabled: true
-        NSLocationWhenInUseUsageDescription: With Track position on, Sage records where you go (GPS outdoors, compass and steps indoors) together with the watch. Nothing leaves your devices.
-        NSLocationAlwaysAndWhenInUseUsageDescription: With Always, Track position can be started from the watch and keeps recording if iOS closes Sage in the background. Nothing leaves your devices.
-        NSMotionUsageDescription: With Track position on, Sage records steps, floors, compass heading and the barometer to follow your path indoors.
-        UIBackgroundModes: [location]
-        NSLocalNetworkUsageDescription: Sage controls your WiZ lamps on your home network from the watch.
         LSSupportsOpeningDocumentsInPlace: true
     settings:
       base:
@@ -55,57 +48,30 @@ targets:
     sources:
       - path: Watch
       - path: Shared
-      - path: Resources
     info:
       path: Watch/Info.plist
       properties:
-        CFBundleDisplayName: Sage
+        CFBundleDisplayName: Sage Data
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         WKApplication: true
         WKCompanionAppBundleIdentifier: dev.sage.companion
-        UIAppFonts: [PlayfairDisplay-Regular.ttf, PlayfairDisplay-Italic.ttf]
-        NSHealthShareUsageDescription: Sage shows your steps and heart rate on the face and records your heart rate while the recorder runs. Nothing leaves your devices.
-        NSHealthUpdateUsageDescription: The recorder runs as a Mind & Body session to keep Sage on screen and read heart rate every few seconds. It is only saved to Health if you turn that on.
-        NSLocationWhenInUseUsageDescription: With Track position on, Sage records where you go (GPS outdoors, compass and steps indoors) into your recordings. Nothing leaves your devices.
+        NSHealthShareUsageDescription: The data probe reads every Health type the watch records and sends it to your iPhone, for testing. Nothing leaves your devices.
+        NSHealthUpdateUsageDescription: The probe runs as a Mind & Body workout session to keep recording and to read heart rate every few seconds. It is discarded, never saved to Health.
+        NSLocationWhenInUseUsageDescription: The data probe records GPS fixes and the compass and sends them to your iPhone. Nothing leaves your devices.
         UIBackgroundModes: [location]
-        NSMotionUsageDescription: Sage records wrist motion, air pressure and what you are doing (still, walking, running, cycling, driving) for your sleep and day data, and feels for the moment you fall asleep and wake. The files go only to your iPhone.
-        WKBackgroundModes: [smart-alarm, workout-processing]
+        NSMotionUsageDescription: The data probe records motion, the barometer, steps and activity and sends them to your iPhone. Nothing leaves your devices.
+        WKBackgroundModes: [workout-processing]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.sage.companion.watchkitapp
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "4"
-    dependencies:
-      - target: SageComplications
-  SageComplications:
-    type: app-extension
-    platform: watchOS
-    sources:
-      - path: Complications
-      - path: Shared/SleepPlan.swift
-    info:
-      path: Complications/Info.plist
-      properties:
-        CFBundleDisplayName: Sage
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.widgetkit-extension
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.sage.companion.watchkitapp.complications
-        TARGETED_DEVICE_FAMILY: "4"
-        SKIP_INSTALL: YES
   SageTests:
     type: bundle.unit-test
     platform: iOS
     sources:
       - path: Tests
-        excludes: ["Fixtures/**"]
-      - path: Tests/Fixtures
-        type: folder
-        buildPhase: resources
     dependencies:
       - target: Sage
     settings:

@@ -1,13 +1,11 @@
 import Foundation
 import WatchConnectivity
 
-/// One recording run as it arrived from the watch.
+/// One probe run as it arrived from the watch.
 struct Segment: Identifiable, Hashable {
     let id: String
     let start: Date?
     let end: Date?
-    let rawMotionHz: Int?
-    let gyroscope: Bool
     let files: Int
     let bytes: Int64
 
@@ -19,20 +17,20 @@ struct Segment: Identifiable, Hashable {
     }
 
     var detail: String {
-        var parts = ["\(files) files", ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)]
-        if let hz = rawMotionHz { parts.append(hz > 0 ? "raw \(hz) Hz\(gyroscope ? " + gyro" : "")" : "summary only") }
-        return parts.joined(separator: " · ")
+        "\(files) files · \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))"
     }
 }
 
-/// Receives the recorder's files from the watch and keeps them in `Documents/Recordings/<segment>/`
-/// (also visible in the Files app under "On My iPhone › Sage").
+/// Receives the probe's files from the watch and keeps them in `Documents/Recordings/<segment>/`
+/// (also visible in the Files app under "On My iPhone › Sage"), and hands its live snapshots to `ProbeStore`.
 final class Receiver: NSObject, ObservableObject, WCSessionDelegate {
     static let shared = Receiver()
 
     @Published private(set) var segments: [Segment] = []
     @Published private(set) var lastReceived: Date?
-    @Published private(set) var watchReachable = false
+    @Published private(set) var filesReceived = 0
+    @Published private(set) var watchPaired = false
+    @Published private(set) var watchAppInstalled = false
 
     static var root: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Recordings", isDirectory: true)
@@ -54,7 +52,6 @@ final class Receiver: NSObject, ObservableObject, WCSessionDelegate {
         for dir in dirs {
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: dir.path, isDirectory: &isDir), isDir.boolValue else { continue }
-            if dir.lastPathComponent == "events" { continue }          // alarm events while nothing recorded
             let names = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
             var bytes: Int64 = 0
             for n in names {
@@ -66,8 +63,6 @@ final class Receiver: NSObject, ObservableObject, WCSessionDelegate {
                 id: dir.lastPathComponent,
                 start: (meta["start"] as? Double).map { Date(timeIntervalSince1970: $0) },
                 end: (meta["end"] as? Double).map { Date(timeIntervalSince1970: $0) },
-                rawMotionHz: meta["raw_motion_hz"] as? Int,
-                gyroscope: meta["gyroscope"] as? Bool ?? false,
                 files: names.filter { $0.hasSuffix(".csv") }.count,
                 bytes: bytes))
         }
@@ -83,6 +78,24 @@ final class Receiver: NSObject, ObservableObject, WCSessionDelegate {
         guard let data = try? Data(contentsOf: dir.appendingPathComponent(RecordingFormat.metaName)),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
         return obj
+    }
+
+    /// a zip of one segment (CSV files and segment.json) to share
+    static func zip(_ segment: Segment) throws -> URL {
+        let dir = root.appendingPathComponent(segment.id, isDirectory: true)
+        let dest = FileManager.default.temporaryDirectory.appendingPathComponent("\(segment.id).zip")
+        var coordinatorError: NSError?
+        var copyError: Error?
+        NSFileCoordinator().coordinate(readingItemAt: dir, options: [.forUploading], error: &coordinatorError) { zipped in
+            do {
+                try? FileManager.default.removeItem(at: dest)
+                try FileManager.default.copyItem(at: zipped, to: dest)
+            } catch {
+                copyError = error
+            }
+        }
+        if let e = coordinatorError ?? copyError { throw e }
+        return dest
     }
 
     private static func safe(_ s: String) -> String {
@@ -112,35 +125,24 @@ final class Receiver: NSObject, ObservableObject, WCSessionDelegate {
         }
         DispatchQueue.main.async {
             self.lastReceived = Date()
+            self.filesReceived += 1
             self.reload()
         }
     }
 
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
-        DispatchQueue.main.async { self.watchReachable = session.isPaired && session.isWatchAppInstalled }
-    }
-
-    // live breathing: motion samples streamed from the watch while that screen is open
+    /// the probe's live snapshot, once a second
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
-        guard let data = message[LiveLink.samplesKey] as? Data else { return }
-        DispatchQueue.main.async { LiveBreathing.shared.receive(data) }
+        guard let snap = message[ProbeLink.snapshotKey] as? [String: Any] else { return }
+        let wave = message[ProbeLink.waveKey] as? Data
+        DispatchQueue.main.async { ProbeStore.shared.receive(snap, wave: wave) }
     }
 
-    // lamp control from the watch: the iPhone (woken in the background if needed) talks UDP to the WiZ bulbs
     func session(_ session: WCSession, didReceiveMessage message: [String: Any], replyHandler: @escaping ([String: Any]) -> Void) {
-        guard message[LampLink.commandKey] != nil else { replyHandler([:]); return }
-        Task { replyHandler(await WizClient.handle(message)) }
+        replyHandler([:])
     }
 
-    /// F28: a Track position change made on the watch (newer than this iPhone's own last change)
-    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
-        guard let c = PositionSync.change(in: userInfo),
-              PositionSync.shouldFollow(remoteAt: c.at, localAt: PositionSync.localChangedAt) else { return }
-        DispatchQueue.main.async {
-            PositionSync.localChangedAt = c.at
-            let tracker = PhoneTracker.shared
-            if c.on && !tracker.running { tracker.start() } else if !c.on && tracker.running { tracker.stop() }
-        }
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        updateWatchState(session)
     }
 
     func sessionDidBecomeInactive(_ session: WCSession) {}
@@ -150,6 +152,14 @@ final class Receiver: NSObject, ObservableObject, WCSessionDelegate {
     }
 
     func sessionWatchStateDidChange(_ session: WCSession) {
-        DispatchQueue.main.async { self.watchReachable = session.isPaired && session.isWatchAppInstalled }
+        updateWatchState(session)
+    }
+
+    private func updateWatchState(_ session: WCSession) {
+        let paired = session.isPaired, installed = session.isWatchAppInstalled
+        DispatchQueue.main.async {
+            self.watchPaired = paired
+            self.watchAppInstalled = installed
+        }
     }
 }

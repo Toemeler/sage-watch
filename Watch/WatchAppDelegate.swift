@@ -4,23 +4,16 @@ import HealthKit
 /// Launch-time wiring: the iPhone link, workout recovery after a relaunch, and starts requested from the iPhone.
 final class WatchAppDelegate: NSObject, WKApplicationDelegate {
     func applicationDidFinishLaunching() {
-        Outbox.loadLastSleep()
         Outbox.shared.activate()
-        ActivityMonitor.shared.start()
     }
 
-    /// watchOS relaunched Sage while its workout session was still running
+    /// watchOS relaunched the app while its workout session was still running
     func handleActiveWorkoutRecovery() {
-        Recorder.shared.recover()
+        DataProbe.shared.recover()
     }
 
-    /// the iPhone app opened Sage: to start recording (Data tab, "Start on watch") or to keep it awake for live breathing
+    /// the iPhone opened the app ("Open on the watch and start")
     func handle(_ workoutConfiguration: HKWorkoutConfiguration) {
-        if WatchLaunch.isLive(workoutConfiguration) {
-            LiveStreamer.shared.keepAwake(true)
-            return
-        }
-        Recorder.shared.keepRunning = true
-        Recorder.shared.start()
+        DataProbe.shared.start()
     }
 }

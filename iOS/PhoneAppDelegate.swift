@@ -4,8 +4,6 @@ import HealthKit
 final class PhoneAppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Receiver.shared.activate()
-        // position tracking resumes here even when iOS relaunches Sage in the background for a location change
-        _ = PhoneTracker.shared
         return true
     }
 
